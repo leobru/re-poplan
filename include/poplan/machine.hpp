@@ -85,6 +85,11 @@ public:
     std::uint16_t p21274_decode_character();
     std::uint16_t p21275_encode_character();
     std::uint16_t p21431_buffer_char();
+    std::uint16_t p21443_advance_descriptor();
+    std::uint16_t p25346_begin_character_output();
+    std::uint16_t p25350_continue_character_output();
+    std::uint16_t p25361_resume_character_output();
+    std::uint16_t p25364_return_character_output();
 
 private:
     static std::uint16_t address_add(std::uint16_t value, int delta)
@@ -94,6 +99,7 @@ private:
 
     static Word48 cyclic_add(Word48 left, Word48 right);
     static Word48 logical_shift(Word48 value, int count);
+    void shift_accumulator(int count);
     void select_alu_group(std::uint8_t group);
     void normalize_and_round(std::int64_t mantissa, int exponent,
                              std::uint64_t low, bool round);

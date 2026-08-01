@@ -145,6 +145,34 @@ Word48 Machine::logical_shift(Word48 value, int count)
     return value;
 }
 
+void Machine::shift_accumulator(int count)
+{
+    remainder_ = Word48();
+    if (count > 0) {
+        if (count < 48) {
+            remainder_ = Word48(
+                accumulator_.raw() << (48 - count));
+            accumulator_ = Word48(accumulator_.raw() >> count);
+        } else {
+            remainder_ = Word48(
+                accumulator_.raw() >> (count - 48));
+            accumulator_ = Word48();
+        }
+    } else if (count < 0) {
+        count = -count;
+        if (count < 48) {
+            remainder_ = Word48(
+                accumulator_.raw() >> (48 - count));
+            accumulator_ = Word48(accumulator_.raw() << count);
+        } else {
+            remainder_ = Word48(
+                accumulator_.raw() << (count - 48));
+            accumulator_ = Word48();
+        }
+    }
+    select_alu_group(rau_logical);
+}
+
 void Machine::select_alu_group(std::uint8_t group)
 {
     alu_mode_ = static_cast<std::uint8_t>(
@@ -688,8 +716,7 @@ std::uint16_t Machine::p21255_begin_character_input()
 
 std::uint16_t Machine::p21260_forward_converted_character()
 {
-    // 21260: pass the converted low byte to the next output/buffering
-    // boundary. Its body at 25346 and dependency at 21443 are not translated.
+    // 21260: pass the converted low byte to the output/buffering entry.
     registers_[015] = 021261;
     return 025346;
 }
@@ -782,6 +809,144 @@ std::uint16_t Machine::p21431_buffer_char()
     }
 
     hardware_pop_acc();
+    return registers_[015];
+}
+
+std::uint16_t Machine::p21443_advance_descriptor()
+{
+    // 21443..21447: use the exponent in the descriptor at r16 to replace one
+    // eight-bit field in the packed word addressed by that descriptor. The
+    // temporary XTS/AAX pair uses r17 but leaves it balanced.
+    const std::uint16_t descriptor_address = registers_[016];
+    const Word48 descriptor = memory_[descriptor_address];
+    registers_[014] = descriptor.address();
+    registers_[010] = 021431;
+
+    const int shift =
+        static_cast<int>((descriptor.raw() >> 41) & 0177) - 64;
+    shift_accumulator(shift);
+    remainder_ = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[registers_[014]].raw());
+    select_alu_group(rau_logical);
+
+    xts(021457);
+    select_alu_group(rau_logical);
+    shift_accumulator(shift);
+    registers_[017] = address_add(registers_[017], -1);
+    accumulator_ = accumulator_ & memory_[registers_[017]];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[registers_[014]].raw());
+    select_alu_group(rau_logical);
+    memory_[registers_[014]] = accumulator_;
+
+    // 21450..21454 advances by one eight-bit field. In multiplicative mode,
+    // U1A at 21452 falls through when the old descriptor has bit 48 set; that
+    // is the six-byte wrap case, which restores exponent -40 and increments
+    // the packed-word address.
+    accumulator_ = memory_[descriptor_address];
+    select_alu_group(rau_logical);
+    accumulator_ = cyclic_add(accumulator_, memory_[021462]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    memory_[descriptor_address] = accumulator_;
+    accumulator_ = cyclic_add(accumulator_, memory_[021460]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    remainder_ = accumulator_;
+    if ((accumulator_.raw() & 04000000000000000ULL) != 0) {
+        accumulator_ = cyclic_add(accumulator_, memory_[021463]);
+        remainder_ = Word48();
+        select_alu_group(rau_multiplicative);
+        memory_[descriptor_address] = accumulator_;
+        registers_[014] = 0;
+    }
+    return registers_[015];
+}
+
+std::uint16_t Machine::p25346_begin_character_output()
+{
+    // 25346..25347: save the converted byte and the 21261 return link, then
+    // enter the packed-descriptor helper with descriptor 25417.
+    its(015);
+    const std::uint16_t character_address =
+        address_add(registers_[017], -1);
+    xts(character_address);
+    select_alu_group(rau_logical);
+    registers_[016] = 025417;
+    registers_[015] = 025350;
+    return 021443;
+}
+
+std::uint16_t Machine::p25350_continue_character_output()
+{
+    // 25350..25354: count the packed byte, request the external continuation
+    // at 20245 for character 0377, and otherwise return until the configured
+    // field count at 25416 is reached.
+    registers_[010] = 025346;
+    accumulator_ = memory_[025412];
+    select_alu_group(rau_logical);
+    accumulator_ = cyclic_add(accumulator_, memory_[025406]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    memory_[025412] = accumulator_;
+
+    accumulator_ = memory_[address_add(registers_[017], -2)];
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[025407].raw());
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (accumulator_.raw() == 0) {
+        registers_[015] = 025361;
+        return 020245;
+    }
+
+    accumulator_ = memory_[025412];
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[025416].raw());
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (accumulator_.raw() != 0) {
+        return p25364_return_character_output();
+    }
+
+    // 25355..25357 unwinds this invocation and immediately starts another
+    // 25346 pass for the 0377 terminator.
+    p25364_return_character_output();
+    registers_[010] = 025346;
+    accumulator_ = memory_[025407];
+    select_alu_group(rau_logical);
+    return 025346;
+}
+
+std::uint16_t Machine::p25361_resume_character_output()
+{
+    // 25361..25363: after 20245, restore the initial output descriptor and
+    // clear the byte count before taking the common return bracket.
+    registers_[010] = 025346;
+    accumulator_ = memory_[025410];
+    select_alu_group(rau_logical);
+    memory_[025417] = accumulator_;
+    accumulator_ = memory_[0];
+    select_alu_group(rau_logical);
+    memory_[025412] = accumulator_;
+    return p25364_return_character_output();
+}
+
+std::uint16_t Machine::p25364_return_character_output()
+{
+    // 25364..25365: pop the saved 21261 link into r15 and the converted byte
+    // back into the accumulator, balancing the two words pushed at 25346.
+    hardware_pop_acc();
+    sti(015);
+    select_alu_group(rau_logical);
     return registers_[015];
 }
 

@@ -77,6 +77,8 @@ The current labels are maintained in `poplan.sym`.
 | `21274` | `CHAR_DECODE` | Selects the input-side conversion table at `21301` |
 | `21275` | `CHAR_ENCODE` | Selects the output-side conversion table at `21354` |
 | `21431` | `BUFFER_CHAR` | Advances a packed-text descriptor and returns a character |
+| `21443` | `DESCRIPTOR_ADVANCE` | Inserts a byte and advances a packed-word descriptor |
+| `25346` | `CHARACTER_OUTPUT` | Packs converted bytes and handles the `0377` continuation boundary |
 | `25370` | `TOKEN_SOURCE` | Refills and initializes the current input descriptor |
 | `25641` | `FORMAT_NUMBER` | Startup number/time formatting driver |
 
@@ -92,7 +94,7 @@ The quine trace contains:
 - 10.1% word-address coverage of the 15,360-word static image;
 - 98 direct `vjm` targets.
 
-Only 20 direct targets currently have useful semantic descriptions. Leaf
+Only 21 direct targets currently have useful semantic descriptions. Leaf
 status in generated call inventories means that no nested `vjm` was observed
 while an invocation was active. It is dynamic evidence, not a static proof.
 
@@ -103,7 +105,6 @@ The most frequently called unnamed targets are:
 | `11541` | 279 | leaf |
 | `11673` | 279 | nonleaf, linked through `r14` |
 | `16457` | 195 | nonleaf |
-| `25346` | 191 | nonleaf |
 | `11717` | 186 | nonleaf |
 | `16421` | 121 | leaf |
 | `16505` | 96 | nonleaf |
@@ -114,8 +115,8 @@ The most frequently called unnamed targets are:
 
 1. Identify `11541`, `11673`, and `11717`, which dominate execution of the
    generated quine loop.
-2. Continue the converted-character path through `25346` and its `21443`
-   buffering dependency.
+2. Continue the converted-character `0377` path through the console/input
+   continuation at `20245`.
 3. Separate executable code, tagged POP objects, jump tables, strings, and
    numeric constants in the static listing.
 4. Extend the focused POP-2 probes beyond the current arithmetic, list,

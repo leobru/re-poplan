@@ -37,7 +37,10 @@ The address-preserving machine layer now translates:
 - `21255..21257` character-input wrapper entry;
 - `21260..21275` table-driven character forwarding, return, decode, and
   encode entries;
-- `21431..21440` packed-text character extraction and cursor advance.
+- `21431..21440` packed-text character extraction and cursor advance;
+- `21443..21454` packed-byte insertion and descriptor advance;
+- `25346..25365` converted-character output, counting, continuation resume,
+  and return entries.
 
 The C++ tests compare the one-argument `20124` transition at generated entry
 `65576` with the BESM trace, exercise a three-argument activation round trip,
@@ -49,10 +52,10 @@ continues with shared slot `65763` at `K=0` instead of restoring outer `K=1`.
 This is an evaluator/activation milestone, not yet a source-level C++ POPLAN.
 The primitive runtime is now entered through the syntax-diagnostic output
 path, including the table-driven character converter. Entry `21260` now stops
-at the `25346` boundary; the `25346` body, its `21443` buffering dependency,
-and the console calls remain untranslated. The original compiler, remaining
-runtime, I/O, and whole-system driver must still be translated before the
-closure fix can be validated end to end.
+only when `25350` requests the console/input continuation at `20245`; the
+`20245` body and console calls remain untranslated. The original compiler,
+remaining runtime, I/O, and whole-system driver must still be translated
+before the closure fix can be validated end to end.
 
 ## Port Order
 

@@ -81,6 +81,19 @@ int main()
         target.memory(021364) = Word48(00000040200602005ULL);
     };
 
+    const auto install_character_output = [](Machine &target) {
+        target.memory(021457) = Word48(0377);
+        target.memory(021460) = Word48(07377777777777777ULL);
+        target.memory(021462) = Word48(00400000000000000ULL);
+        target.memory(021463) = Word48(05400000000000000ULL);
+        target.memory(025406) = Word48(1);
+        target.memory(025407) = Word48(0377);
+        target.memory(025410) =
+            Word48(01400000000020440ULL);
+        target.memory(025416) = Word48(0117);
+        target.memory(025417) = target.memory(025410);
+    };
+
     Machine dispatch;
     install_dispatch_constants(dispatch);
     dispatch.accumulator() = Word48(06606562700065576ULL);
@@ -295,13 +308,139 @@ int main()
     require(character_return.p21260_forward_converted_character()
                 == 025346
                 && character_return.reg(015) == 021261,
-            "21260 transfers to boundary 25346 with link 21261");
+            "21260 transfers to output entry 25346 with link 21261");
     require(character_return.p21261_return_character() == 03235,
             "21261 restores the saved environment-binding link");
     require(character_return.accumulator() == Word48(03235)
                 && character_return.reg(015) == 03235
                 && character_return.reg(017) == 066024,
             "21261 balances r17 while returning through 03235");
+
+    // Complete trace-backed output of 052 -> 031 through 25346 and 21443.
+    Machine buffered_character;
+    install_character_converter(buffered_character);
+    install_character_output(buffered_character);
+    buffered_character.accumulator() =
+        Word48(06400000000000052ULL);
+    buffered_character.reg(015) = 03235;
+    buffered_character.reg(017) = 066023;
+    require(buffered_character.p21255_begin_character_input() == 021275
+                && buffered_character.p21275_encode_character() == 021260
+                && buffered_character.p21260_forward_converted_character()
+                    == 025346,
+            "21255..21260 reaches the translated output entry");
+    require(buffered_character.p25346_begin_character_output() == 021443,
+            "25346 enters the packed-descriptor helper");
+    require(buffered_character.accumulator() == Word48(031)
+                && buffered_character.memory(066024) == Word48(031)
+                && buffered_character.memory(066025) == Word48(021261)
+                && buffered_character.reg(015) == 025350
+                && buffered_character.reg(016) == 025417
+                && buffered_character.reg(017) == 066026,
+            "25346 preserves the converted byte and both return links");
+    require(buffered_character.p21443_advance_descriptor() == 025350,
+            "21443 returns to the output continuation");
+    require(buffered_character.memory(020440)
+                == Word48(00620000000000000ULL)
+                && buffered_character.memory(025417)
+                    == Word48(02000000000020440ULL),
+            "21443 packs 031 and advances descriptor 140 to 200");
+    require(buffered_character.reg(014) == 020440
+                && buffered_character.reg(017) == 066026,
+            "21443 preserves its packed-word address and balances r17");
+    require(buffered_character.p25350_continue_character_output()
+                == 021261,
+            "25350 returns an ordinary converted character to 21261");
+    require(buffered_character.memory(025412) == Word48(1)
+                && buffered_character.accumulator() == Word48(031)
+                && buffered_character.reg(015) == 021261
+                && buffered_character.reg(017) == 066024,
+            "25350 counts the byte and releases its two-word frame");
+    require(buffered_character.p21261_return_character() == 03235
+                && buffered_character.reg(017) == 066023,
+            "the complete output bracket restores 03235 and r17");
+
+    // The first diagnostic conversion, 012 -> 377, takes the traced 20245
+    // continuation branch and resumes at 25361.
+    Machine terminated_output;
+    install_character_converter(terminated_output);
+    install_character_output(terminated_output);
+    terminated_output.accumulator() =
+        Word48(06400000000000012ULL);
+    terminated_output.reg(015) = 03235;
+    terminated_output.reg(017) = 066023;
+    terminated_output.p21255_begin_character_input();
+    terminated_output.p21275_encode_character();
+    terminated_output.p21260_forward_converted_character();
+    terminated_output.p25346_begin_character_output();
+    terminated_output.p21443_advance_descriptor();
+    require(terminated_output.p25350_continue_character_output()
+                == 020245
+                && terminated_output.reg(015) == 025361,
+            "25350 calls boundary 20245 for converted character 0377");
+    require(terminated_output.accumulator() == Word48()
+                && terminated_output.remainder() == Word48()
+                && terminated_output.memory(020440)
+                    == Word48(07760000000000000ULL)
+                && terminated_output.memory(025412) == Word48(1)
+                && terminated_output.reg(017) == 066026,
+            "the 0377 branch retains its frame across 20245");
+    require(terminated_output.p25361_resume_character_output() == 021261,
+            "25361 resumes the 0377 output call after 20245");
+    require(terminated_output.memory(025417)
+                == Word48(01400000000020440ULL)
+                && terminated_output.memory(025412) == Word48()
+                && terminated_output.accumulator() == Word48(0377)
+                && terminated_output.reg(017) == 066024,
+            "25361 resets descriptor and count before releasing the frame");
+    require(terminated_output.p21261_return_character() == 03235
+                && terminated_output.reg(017) == 066023,
+            "the resumed 0377 path restores the original caller");
+
+    Machine descriptor_wrap;
+    install_character_output(descriptor_wrap);
+    descriptor_wrap.reg(015) = 07654;
+    descriptor_wrap.reg(016) = 025417;
+    descriptor_wrap.reg(017) = 060000;
+    descriptor_wrap.memory(025417) =
+        Word48(04000000000020440ULL);
+    descriptor_wrap.memory(020440) =
+        Word48(0123456701234500ULL);
+    descriptor_wrap.accumulator() = Word48(017);
+    require(descriptor_wrap.p21443_advance_descriptor() == 07654,
+            "21443 returns through r15 after its sixth byte");
+    require(descriptor_wrap.memory(020440)
+                == Word48(0123456701234417ULL)
+                && descriptor_wrap.memory(025417)
+                    == Word48(01400000000020441ULL)
+                && descriptor_wrap.reg(014) == 0
+                && descriptor_wrap.reg(017) == 060000,
+            "21443 replaces the low byte and wraps to the next packed word");
+
+    Machine output_limit;
+    install_character_converter(output_limit);
+    install_character_output(output_limit);
+    output_limit.memory(025412) = Word48(0116);
+    output_limit.accumulator() =
+        Word48(06400000000000052ULL);
+    output_limit.reg(015) = 03235;
+    output_limit.reg(017) = 066023;
+    output_limit.p21255_begin_character_input();
+    output_limit.p21275_encode_character();
+    output_limit.p21260_forward_converted_character();
+    output_limit.p25346_begin_character_output();
+    output_limit.p21443_advance_descriptor();
+    require(output_limit.p25350_continue_character_output() == 025346
+                && output_limit.accumulator() == Word48(0377)
+                && output_limit.reg(015) == 021261
+                && output_limit.reg(017) == 066024,
+            "25355 injects 0377 after configured count 0117");
+    output_limit.p25346_begin_character_output();
+    output_limit.p21443_advance_descriptor();
+    require(output_limit.p25350_continue_character_output() == 020245
+                && output_limit.reg(015) == 025361
+                && output_limit.memory(025412) == Word48(0120),
+            "the injected 0377 reaches the same 20245 boundary");
 
     // Snapshot at 03072 after CUCHIN and BIND_ENVIRONMENT return. This closes
     // the first formatter call and enters the packed-character sequence.

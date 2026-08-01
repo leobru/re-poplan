@@ -52,13 +52,16 @@ the quine trace is `11673`.
 | `20674` | `MESSAGE_OUTPUT` | Common interactive message-output routine. | Uses `*71 14(10)`, `*71 20(10)`, and `*71 14(10)` around a descriptor selected through `r16`. |
 | `21251` | `CHAR_EXTRACT` | Character/byte extraction wrapper. | Calls `25370`, postprocesses through a table at `21301`, and returns a low byte. |
 | `21255` | `CHAR_INPUT` | Character conversion/input subentry. | Saves its parameter and the environment-binding return, then enters conversion at `21275`. |
-| `21260` | `CHAR_FORWARD` | Converted-character forwarding entry. | Calls the still-untranslated target `25346` with link `21261`. |
+| `21260` | `CHAR_FORWARD` | Converted-character forwarding entry. | Calls `25346` with link `21261`. |
 | `21261` | `CHAR_RETURN` | Character-conversion return entry. | Pops the saved caller link from `r17` and returns through `r15`. |
 | `21264` | `CHAR_CONVERT` | Shared table-driven character converter. | Uses BESM multiplication and RMR state to select a word and byte from the table based at `r16`. |
 | `21274` | `CHAR_DECODE` | Input-side table selector. | Selects table base `21301` and enters `21264`. |
 | `21275` | `CHAR_ENCODE` | Output-side table selector. | Selects table base `21354` and enters `21264`. |
 | `21431` | `BUFFER_CHAR` | Packed text-buffer cursor advance and character fetch. | Updates the descriptor passed in `r16`; with `25413`, reads packed text from `20400`. |
-| `21443` | `DESCRIPTOR_ADVANCE` | Packed descriptor advance helper. | Updates descriptor/count state for callers at `16470` and `25347`. |
+| `21443` | `DESCRIPTOR_ADVANCE` | Packed descriptor advance helper. | Inserts one byte and advances or wraps the descriptor for callers at `16470` and `25347`. |
+| `25346` | `CHARACTER_OUTPUT` | Converted-character packing entry. | Preserves the byte and return link, inserts it through `21443`, and continues at `25350`. |
+| `25350` | `CHARACTER_OUTPUT_CONTINUE` | Packed-output count and boundary logic. | Returns ordinary bytes, injects `0377` at count `0117`, and calls `20245` for `0377`. |
+| `25361` | `CHARACTER_OUTPUT_RESUME` | Output continuation resume entry. | Restores descriptor `1400000000020440`, clears the count, and releases the `25346` frame. |
 | `25370` | `TOKEN_SOURCE` | Input-token source wrapper. | Refills through `20170`, stores descriptor `6400000000020400` at `25413`, then calls `21431`. |
 | `25641` | `FORMAT_NUMBER` | Octal/decimal number-formatting driver. | Performs arithmetic conversion and calls `25660` three times. |
 | `25660` | `PACK_DIGIT` | Digit/field packing helper for `25641`. | Combines the arithmetic result with the `r17` frame and returns through `r15`. |

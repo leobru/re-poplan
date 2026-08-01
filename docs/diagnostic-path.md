@@ -68,7 +68,11 @@ The translated path now continues through the first formatting bracket:
 | `p21275_encode_character()` | Selects table base `21354` and enters the common arithmetic converter |
 | `p21274_decode_character()` | Selects table base `21301` for the corresponding input-side conversion |
 | `p21264_convert_character()` | Uses `NTR 3`, multiply/RMR arithmetic, and a shifted table word to convert one low byte |
-| `p21260_forward_converted_character()` | Transfers the result to the untranslated boundary `25346` with link `21261` |
+| `p21260_forward_converted_character()` | Transfers the result to converted-character output at `25346` with link `21261` |
+| `p25346_begin_character_output()` | Saves the byte and link, then calls descriptor helper `21443` |
+| `p21443_advance_descriptor()` | Inserts one byte into packed output and advances or wraps descriptor `25417` |
+| `p25350_continue_character_output()` | Counts bytes, returns ordinary bytes, and calls boundary `20245` for `0377` |
+| `p25361_resume_character_output()` | Resets descriptor and count after the `20245` continuation |
 | `p21261_return_character()` | Restores the saved `03235` link from the hardware stack |
 | `p03072_resume_error_format()` | Restores the diagnostic state and selects the packed sequence at `03162` |
 | `p16313_begin_character_sequence()` | Constructs packed-character cursor `6400000000003162` |
@@ -81,6 +85,7 @@ registers, and static constants, then checks the scratch words, POP arguments,
 hardware-stack save areas, descriptor dispatches, and packed-text cursor.
 
 The nested-diagnostic branch beginning in the right half of `03024` is not yet
-translated. Character forwarding stops at `25346`, whose body and `21443`
-buffering dependency remain pending; the later formatting blocks after `03101`
-are also pending. The syntax-error probe takes the normal path documented here.
+translated. Character forwarding now continues through `25346` and its
+`21443` buffering dependency, stopping at continuation boundary `20245`; the
+later formatting blocks after `03101` are also pending. The syntax-error probe
+takes the normal path documented here.
