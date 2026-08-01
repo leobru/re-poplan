@@ -2,6 +2,109 @@
 
 namespace poplan {
 
+namespace {
+
+constexpr std::uint64_t bit40 = 00010000000000000ULL;
+constexpr std::uint64_t bit41 = 00020000000000000ULL;
+constexpr std::uint64_t bit42 = 00040000000000000ULL;
+constexpr std::uint64_t bits40 = 00017777777777777ULL;
+constexpr std::uint64_t bits41 = 00037777777777777ULL;
+constexpr std::uint64_t bits42 = 00077777777777777ULL;
+
+constexpr std::uint8_t rau_norm_disable = 001;
+constexpr std::uint8_t rau_round_disable = 002;
+constexpr std::uint8_t rau_logical = 004;
+constexpr std::uint8_t rau_multiplicative = 010;
+constexpr std::uint8_t rau_additive = 020;
+constexpr std::uint8_t rau_overflow_disable = 040;
+constexpr std::uint8_t rau_group_mask =
+    rau_logical | rau_multiplicative | rau_additive;
+
+struct MantissaExponent {
+    explicit MantissaExponent(Word48 value)
+        : exponent(static_cast<int>((value.raw() >> 41) & 0177))
+    {
+        const std::uint64_t raw_mantissa = value.raw() & bits41;
+        mantissa = static_cast<std::int64_t>(raw_mantissa);
+        if ((raw_mantissa & bit41) != 0) {
+            mantissa |= static_cast<std::int64_t>(~bits41);
+        }
+    }
+
+    MantissaExponent() = default;
+
+    bool negative() const { return mantissa < 0; }
+
+    bool denormal() const
+    {
+        const std::uint64_t value =
+            static_cast<std::uint64_t>(mantissa);
+        return (((value >> 40) ^ (value >> 41)) & 1) != 0;
+    }
+
+    void normalize_right()
+    {
+        mantissa >>= 1;
+        ++exponent;
+    }
+
+    std::int64_t mantissa = 0;
+    int exponent = 0;
+};
+
+unsigned highest_bit(std::uint64_t value)
+{
+    unsigned width = 32;
+    unsigned index = 0;
+    do {
+        const std::uint64_t high = value >> width;
+        if (high != 0) {
+            index += width;
+            value = high;
+        }
+    } while ((width >>= 1) != 0);
+    return 48 - index;
+}
+
+std::uint64_t multiply_mantissas(std::int64_t &left,
+                                 std::int64_t right)
+{
+    unsigned negative = 0;
+    if (left < 0) {
+        left = -left;
+        negative ^= 1;
+    }
+    if (right < 0) {
+        right = -right;
+        negative ^= 1;
+    }
+
+    const std::uint64_t high =
+        static_cast<std::uint64_t>(right) >> 20;
+    const std::uint64_t low =
+        static_cast<std::uint64_t>(right) & 0xfffff;
+    std::uint64_t remainder =
+        static_cast<std::uint64_t>(left) * low;
+    left = static_cast<std::int64_t>(
+        static_cast<std::uint64_t>(left) * high);
+    remainder +=
+        (static_cast<std::uint64_t>(left) & 0xfffff) << 20;
+    left >>= 20;
+    left += static_cast<std::int64_t>(remainder >> 40);
+    remainder &= bits40;
+
+    if (negative != 0) {
+        left = ~left;
+        remainder ^= bits40;
+        ++remainder;
+        left += static_cast<std::int64_t>(remainder >> 40);
+        remainder &= bits40;
+    }
+    return remainder;
+}
+
+} // namespace
+
 bool FunctionDescriptor::is_function(Word48 value)
 {
     return (value & tag_mask) == function_tag;
@@ -40,6 +143,219 @@ Word48 Machine::logical_shift(Word48 value, int count)
         return Word48(value.raw() << -count);
     }
     return value;
+}
+
+void Machine::select_alu_group(std::uint8_t group)
+{
+    alu_mode_ = static_cast<std::uint8_t>(
+        (alu_mode_ & ~rau_group_mask) | group);
+}
+
+void Machine::normalize_and_round(std::int64_t mantissa, int exponent,
+                                  std::uint64_t low, bool round)
+{
+    std::uint64_t shifted_out = 0;
+
+    if ((alu_mode_ & rau_norm_disable) == 0) {
+        const unsigned leading = static_cast<unsigned>(
+            (static_cast<std::uint64_t>(mantissa) >> 39) & 3);
+        if (leading == 0) {
+            std::uint64_t value =
+                static_cast<std::uint64_t>(mantissa) & bits40;
+            if (value != 0) {
+                const int count =
+                    static_cast<int>(highest_bit(value)) - 9;
+                value <<= count;
+                shifted_out = low >> (40 - count);
+                mantissa = static_cast<std::int64_t>(
+                    value | shifted_out);
+                low <<= count;
+                exponent -= count;
+            } else if ((low & bits40) != 0) {
+                const int count =
+                    static_cast<int>(highest_bit(low & bits40)) - 9;
+                shifted_out = low;
+                mantissa = static_cast<std::int64_t>(low << count);
+                low = 0;
+                exponent -= 40 + count;
+            } else {
+                accumulator_ = Word48();
+                remainder_ = Word48(
+                    remainder_.raw() & ~bits40);
+                return;
+            }
+        } else if (leading == 3) {
+            std::uint64_t value =
+                ~static_cast<std::uint64_t>(mantissa) & bits40;
+            if (value != 0) {
+                const int count =
+                    static_cast<int>(highest_bit(value)) - 9;
+                value = (value << count)
+                    | ((std::uint64_t{1} << count) - 1);
+                shifted_out = low >> (40 - count);
+                mantissa = static_cast<std::int64_t>(
+                    bit41 | (~value & bits40) | shifted_out);
+                low <<= count;
+                exponent -= count;
+            } else {
+                value = ~low & bits40;
+                if (value != 0) {
+                    const int count =
+                        static_cast<int>(highest_bit(value)) - 9;
+                    shifted_out = low;
+                    value = (value << count)
+                        | ((std::uint64_t{1} << count) - 1);
+                    mantissa = static_cast<std::int64_t>(
+                        bit41 | (~value & bits40));
+                    low = 0;
+                    exponent -= 40 + count;
+                } else {
+                    shifted_out = 1;
+                    mantissa = static_cast<std::int64_t>(bit41);
+                    low = 0;
+                    exponent -= 80;
+                }
+            }
+        }
+    }
+
+    if (shifted_out != 0) {
+        round = false;
+    }
+    if (exponent < 0) {
+        accumulator_ = Word48();
+        remainder_ = Word48(remainder_.raw() & ~bits40);
+        return;
+    }
+    if ((alu_mode_ & rau_round_disable) == 0 && round) {
+        mantissa |= 1;
+    }
+    if (mantissa == 0 && (alu_mode_ & rau_norm_disable) == 0) {
+        accumulator_ = Word48();
+        remainder_ = Word48(remainder_.raw() & ~bits40);
+        return;
+    }
+
+    accumulator_ = Word48(
+        (static_cast<std::uint64_t>(exponent) & 0177) << 41
+        | (static_cast<std::uint64_t>(mantissa) & bits41));
+    remainder_ = Word48(low & bits40);
+    if (exponent > 0177
+        && (alu_mode_ & rau_overflow_disable) == 0) {
+        throw MachineError("BESM-6 arithmetic overflow");
+    }
+}
+
+void Machine::multiply(Word48 value)
+{
+    if (accumulator_.raw() == 0 || value.raw() == 0) {
+        accumulator_ = Word48();
+        remainder_ = Word48(remainder_.raw() & ~bits40);
+        select_alu_group(rau_multiplicative);
+        return;
+    }
+
+    MantissaExponent acc(accumulator_);
+    const MantissaExponent operand(value);
+    std::uint64_t low =
+        multiply_mantissas(acc.mantissa, operand.mantissa);
+    acc.exponent += operand.exponent - 64;
+    if (acc.denormal()) {
+        acc.normalize_right();
+    }
+    normalize_and_round(acc.mantissa, acc.exponent, low, low != 0);
+    select_alu_group(rau_multiplicative);
+}
+
+void Machine::yta(int exponent_delta)
+{
+    if ((alu_mode_ & rau_group_mask) == rau_logical) {
+        accumulator_ = remainder_;
+        return;
+    }
+
+    const Word48 saved_remainder = remainder_;
+    MantissaExponent acc(Word48(
+        (accumulator_.raw() & ~bits41)
+        | (remainder_.raw() & bits40)));
+    acc.exponent += exponent_delta;
+    remainder_ = Word48();
+    normalize_and_round(acc.mantissa, acc.exponent, 0, false);
+    remainder_ = saved_remainder;
+}
+
+void Machine::reverse_subtract(Word48 value)
+{
+    MantissaExponent acc(accumulator_);
+    MantissaExponent operand(value);
+    acc.mantissa = -acc.mantissa;
+
+    int difference = acc.exponent - operand.exponent;
+    MantissaExponent smaller;
+    MantissaExponent larger;
+    if (difference < 0) {
+        difference = -difference;
+        smaller = acc;
+        larger = operand;
+    } else {
+        smaller = operand;
+        larger = acc;
+    }
+
+    std::uint64_t low = 0;
+    const bool negative = smaller.negative();
+    bool round = false;
+    if (difference == 0) {
+        // No alignment is required.
+    } else if (difference <= 40) {
+        const std::uint64_t small =
+            static_cast<std::uint64_t>(smaller.mantissa);
+        low = (small << (40 - difference)) & bits40;
+        round = low != 0;
+        smaller.mantissa = static_cast<std::int64_t>(
+            (small >> difference)
+            | (negative ? (~std::uint64_t{0} << (40 - difference)) : 0));
+        smaller.mantissa &= static_cast<std::int64_t>(bits42);
+        if ((static_cast<std::uint64_t>(smaller.mantissa) & bit42) != 0) {
+            smaller.mantissa |= static_cast<std::int64_t>(~bits42);
+        }
+    } else if (difference <= 80) {
+        difference -= 40;
+        round = smaller.mantissa != 0;
+        const std::uint64_t small =
+            static_cast<std::uint64_t>(smaller.mantissa);
+        low = ((small >> difference)
+               | (negative
+                      ? (~std::uint64_t{0} << (40 - difference))
+                      : 0))
+            & bits40;
+        smaller.mantissa = negative
+            ? static_cast<std::int64_t>(~std::uint64_t{0}) : 0;
+    } else {
+        round = smaller.mantissa != 0;
+        low = negative ? bits40 : 0;
+        smaller.mantissa = negative
+            ? static_cast<std::int64_t>(~std::uint64_t{0}) : 0;
+    }
+
+    acc.exponent = larger.exponent;
+    acc.mantissa = smaller.mantissa + larger.mantissa;
+    if (acc.denormal()) {
+        round = round
+            || (static_cast<std::uint64_t>(acc.mantissa) & 1) != 0;
+        low = (low >> 1)
+            | ((static_cast<std::uint64_t>(acc.mantissa) & 1) << 39);
+        acc.normalize_right();
+    }
+    normalize_and_round(acc.mantissa, acc.exponent, low, round);
+    select_alu_group(rau_additive);
+}
+
+void Machine::modifier_add(std::size_t destination, std::size_t source)
+{
+    registers_[destination] = address_add(
+        registers_[source], registers_[destination]);
+    registers_[0] = 0;
 }
 
 void Machine::hardware_push_acc()
@@ -368,6 +684,74 @@ std::uint16_t Machine::p21255_begin_character_input()
     accumulator_ = memory_[021263];
     registers_[015] = 021260;
     return 021275;
+}
+
+std::uint16_t Machine::p21260_forward_converted_character()
+{
+    // 21260: pass the converted low byte to the next output/buffering
+    // boundary. Its body at 25346 and dependency at 21443 are not translated.
+    registers_[015] = 021261;
+    return 025346;
+}
+
+std::uint16_t Machine::p21261_return_character()
+{
+    // 21261..21262: recover the environment-binding link saved by 21256 and
+    // return through it. XTA (r17) performs a hardware-stack pop.
+    hardware_pop_acc();
+    registers_[015] = accumulator_.address();
+    return registers_[015];
+}
+
+std::uint16_t Machine::p21264_convert_character()
+{
+    // 21264..21273: retain the low byte, then use the original BESM floating
+    // multiply/remainder path to select one six-byte table word and one byte
+    // within it. NTR 3 disables normalization and rounding for this sequence.
+    registers_[010] = 021264;
+    accumulator_ = accumulator_ & memory_[021276];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    memory_[021430] = accumulator_;
+
+    alu_mode_ = 003;
+    accumulator_ = memory_[021430];
+    select_alu_group(rau_logical);
+    multiply(memory_[021427]);
+    registers_[014] = accumulator_.address();
+    modifier_add(014, 016);
+
+    yta(0);
+    multiply(memory_[021277]);
+    reverse_subtract(memory_[021300]);
+    registers_[013] = accumulator_.address();
+
+    accumulator_ = memory_[registers_[014]];
+    select_alu_group(rau_logical);
+    const int shift =
+        static_cast<int>((0100 + registers_[013]) & 0177) - 64;
+    accumulator_ = logical_shift(accumulator_, shift);
+    select_alu_group(rau_logical);
+    accumulator_ = accumulator_ & memory_[021276];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    return registers_[015];
+}
+
+std::uint16_t Machine::p21274_decode_character()
+{
+    // 21274 selects the table beginning at 21301 and tail-enters the common
+    // arithmetic converter at 21264.
+    registers_[016] = 021301;
+    return p21264_convert_character();
+}
+
+std::uint16_t Machine::p21275_encode_character()
+{
+    // 21275 selects the table beginning at 21354 and tail-enters the common
+    // arithmetic converter at 21264.
+    registers_[016] = 021354;
+    return p21264_convert_character();
 }
 
 std::uint16_t Machine::p21431_buffer_char()

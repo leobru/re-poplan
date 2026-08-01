@@ -73,6 +73,9 @@ The current labels are maintained in `poplan.sym`.
 | `20263` | `IO_INIT` | Initializes console and message state |
 | `20674` | `MESSAGE_OUTPUT` | Common interactive message output |
 | `21255` | `CHAR_INPUT` | Saves a character parameter and enters conversion |
+| `21264` | `CHAR_CONVERT` | Converts through one of the tables selected at `21274` or `21275` |
+| `21274` | `CHAR_DECODE` | Selects the input-side conversion table at `21301` |
+| `21275` | `CHAR_ENCODE` | Selects the output-side conversion table at `21354` |
 | `21431` | `BUFFER_CHAR` | Advances a packed-text descriptor and returns a character |
 | `25370` | `TOKEN_SOURCE` | Refills and initializes the current input descriptor |
 | `25641` | `FORMAT_NUMBER` | Startup number/time formatting driver |
@@ -89,7 +92,7 @@ The quine trace contains:
 - 10.1% word-address coverage of the 15,360-word static image;
 - 98 direct `vjm` targets.
 
-Only 19 direct targets currently have useful semantic descriptions. Leaf
+Only 20 direct targets currently have useful semantic descriptions. Leaf
 status in generated call inventories means that no nested `vjm` was observed
 while an invocation was active. It is dynamic evidence, not a static proof.
 
@@ -100,7 +103,6 @@ The most frequently called unnamed targets are:
 | `11541` | 279 | leaf |
 | `11673` | 279 | nonleaf, linked through `r14` |
 | `16457` | 195 | nonleaf |
-| `21275` | 191 | leaf |
 | `25346` | 191 | nonleaf |
 | `11717` | 186 | nonleaf |
 | `16421` | 121 | leaf |
@@ -112,8 +114,8 @@ The most frequently called unnamed targets are:
 
 1. Identify `11541`, `11673`, and `11717`, which dominate execution of the
    generated quine loop.
-2. Resolve the parser/token pipeline around `21251`, `21275`, `25346`, and
-   `25370`.
+2. Continue the converted-character path through `25346` and its `21443`
+   buffering dependency.
 3. Separate executable code, tagged POP objects, jump tables, strings, and
    numeric constants in the static listing.
 4. Extend the focused POP-2 probes beyond the current arithmetic, list,

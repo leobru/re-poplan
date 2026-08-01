@@ -35,6 +35,8 @@ The address-preserving machine layer now translates:
 - `20110..20123` activation argument transfer;
 - `20124..20140` activation construction;
 - `21255..21257` character-input wrapper entry;
+- `21260..21275` table-driven character forwarding, return, decode, and
+  encode entries;
 - `21431..21440` packed-text character extraction and cursor advance.
 
 The C++ tests compare the one-argument `20124` transition at generated entry
@@ -46,10 +48,11 @@ continues with shared slot `65763` at `K=0` instead of restoring outer `K=1`.
 
 This is an evaluator/activation milestone, not yet a source-level C++ POPLAN.
 The primitive runtime is now entered through the syntax-diagnostic output
-path, but its character conversion, buffering, and console calls remain
-incomplete. The original compiler, remaining runtime, I/O, and whole-system
-driver must still be translated before the closure fix can be validated end
-to end.
+path, including the table-driven character converter. Entry `21260` now stops
+at the `25346` boundary; the `25346` body, its `21443` buffering dependency,
+and the console calls remain untranslated. The original compiler, remaining
+runtime, I/O, and whole-system driver must still be translated before the
+closure fix can be validated end to end.
 
 ## Port Order
 

@@ -66,6 +66,21 @@ int main()
         target.memory(03012) = Word48(06600000000000000ULL);
     };
 
+    const auto install_character_converter = [](Machine &target) {
+        target.memory(021276) = Word48(0377);
+        target.memory(021277) = Word48(04000000000000060ULL);
+        target.memory(021300) = Word48(050);
+        target.memory(021427) = Word48(04002525252525253ULL);
+
+        // Only the trace-backed words needed by the focused mappings below.
+        target.memory(021301) = Word48(01403046214632065ULL);
+        target.memory(021305) = Word48(02722504211614074ULL);
+        target.memory(021355) = Word48(02745713627577536ULL);
+        target.memory(021361) = Word48(02745701726656136ULL);
+        target.memory(021363) = Word48(00620501502607014ULL);
+        target.memory(021364) = Word48(00000040200602005ULL);
+    };
+
     Machine dispatch;
     install_dispatch_constants(dispatch);
     dispatch.accumulator() = Word48(06606562700065576ULL);
@@ -203,6 +218,90 @@ int main()
     require(syntax_error.accumulator() == Word48(012)
                 && syntax_error.reg(015) == 021260,
             "21255 enters 21275 with the traced accumulator and link");
+
+    // Traced output conversion for the first diagnostic heading character.
+    Machine character_output;
+    install_character_converter(character_output);
+    character_output.accumulator() =
+        Word48(06400000000000052ULL);
+    character_output.remainder() = Word48(0777);
+    character_output.alu_mode() = 077;
+    character_output.reg(015) = 021260;
+    character_output.reg(017) = 066025;
+    require(character_output.p21275_encode_character() == 021260,
+            "21275 returns the converted heading character through r15");
+    require(character_output.accumulator() == Word48(031),
+            "21275 maps traced output character 052 to 031");
+    require(character_output.memory(021430) == Word48(052),
+            "21264 stores the masked source character at 21430");
+    require(character_output.reg(014) == 021363
+                && character_output.reg(013) == 050,
+            "21264 selects word 21363 and its leading byte");
+    require(character_output.reg(010) == 021264
+                && character_output.reg(016) == 021354
+                && character_output.reg(015) == 021260,
+            "21264 preserves the traced converter register state");
+    require(character_output.remainder() == Word48()
+                && character_output.alu_mode() == 007
+                && character_output.reg(017) == 066025,
+            "21264 finishes in traced logical mode with zero RMR");
+
+    struct CharacterMapping {
+        std::uint16_t source;
+        std::uint16_t converted;
+    };
+    const CharacterMapping output_mappings[] = {
+        {012, 0377},
+        {040, 017},
+        {060, 000},
+    };
+    for (const CharacterMapping mapping : output_mappings) {
+        Machine converter;
+        install_character_converter(converter);
+        converter.accumulator() = Word48(
+            06400000000000000ULL | mapping.source);
+        converter.reg(015) = 01234;
+        require(converter.p21275_encode_character() == 01234
+                    && converter.accumulator()
+                        == Word48(mapping.converted),
+                "21275 reproduces an additional traced output mapping");
+    }
+
+    const CharacterMapping input_mappings[] = {
+        {031, 052},
+        {001, 061},
+    };
+    for (const CharacterMapping mapping : input_mappings) {
+        Machine converter;
+        install_character_converter(converter);
+        converter.accumulator() = Word48(mapping.source);
+        converter.reg(015) = 05670;
+        require(converter.p21274_decode_character() == 05670
+                    && converter.accumulator()
+                        == Word48(mapping.converted),
+                "21274 reproduces a traced input mapping");
+    }
+
+    Machine character_return;
+    install_character_converter(character_return);
+    character_return.accumulator() =
+        Word48(06400000000000052ULL);
+    character_return.reg(015) = 03235;
+    character_return.reg(017) = 066024;
+    require(character_return.p21255_begin_character_input() == 021275,
+            "21255 starts the output conversion return bracket");
+    require(character_return.p21275_encode_character() == 021260,
+            "21275 returns to the forwarding entry");
+    require(character_return.p21260_forward_converted_character()
+                == 025346
+                && character_return.reg(015) == 021261,
+            "21260 transfers to boundary 25346 with link 21261");
+    require(character_return.p21261_return_character() == 03235,
+            "21261 restores the saved environment-binding link");
+    require(character_return.accumulator() == Word48(03235)
+                && character_return.reg(015) == 03235
+                && character_return.reg(017) == 066024,
+            "21261 balances r17 while returning through 03235");
 
     // Snapshot at 03072 after CUCHIN and BIND_ENVIRONMENT return. This closes
     // the first formatter call and enters the packed-character sequence.

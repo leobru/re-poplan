@@ -35,6 +35,12 @@ public:
     Word48 &accumulator() { return accumulator_; }
     const Word48 &accumulator() const { return accumulator_; }
 
+    Word48 &remainder() { return remainder_; }
+    const Word48 &remainder() const { return remainder_; }
+
+    std::uint8_t &alu_mode() { return alu_mode_; }
+    std::uint8_t alu_mode() const { return alu_mode_; }
+
     std::uint16_t &reg(std::size_t index) { return registers_.at(index); }
     std::uint16_t reg(std::size_t index) const { return registers_.at(index); }
 
@@ -73,6 +79,11 @@ public:
     std::uint16_t p16321_dispatch_character();
     std::uint16_t p16325_continue_character_sequence();
     std::uint16_t p21255_begin_character_input();
+    std::uint16_t p21260_forward_converted_character();
+    std::uint16_t p21261_return_character();
+    std::uint16_t p21264_convert_character();
+    std::uint16_t p21274_decode_character();
+    std::uint16_t p21275_encode_character();
     std::uint16_t p21431_buffer_char();
 
 private:
@@ -83,6 +94,13 @@ private:
 
     static Word48 cyclic_add(Word48 left, Word48 right);
     static Word48 logical_shift(Word48 value, int count);
+    void select_alu_group(std::uint8_t group);
+    void normalize_and_round(std::int64_t mantissa, int exponent,
+                             std::uint64_t low, bool round);
+    void multiply(Word48 value);
+    void yta(int exponent_delta);
+    void reverse_subtract(Word48 value);
+    void modifier_add(std::size_t destination, std::size_t source);
     void hardware_push_acc();
     void hardware_pop_acc();
     void its(std::size_t index);
@@ -91,6 +109,8 @@ private:
     void stx(std::uint16_t address);
 
     Word48 accumulator_;
+    Word48 remainder_;
+    std::uint8_t alu_mode_ = 0;
     std::array<std::uint16_t, 020> registers_{};
     std::array<Word48, core_words> memory_{};
 };
