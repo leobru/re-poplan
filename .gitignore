@@ -1,0 +1,7 @@
+/build/
+__pycache__/
+*.py[cod]
+*.cov
+*.out
+*.trace
+!tests/expected/*.out

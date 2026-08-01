@@ -1,0 +1,53 @@
+VARS DEBPR DEBSP DEBUG;
+  
+  
+FUNCTI BUGIO F;
+VARS X;
+  1.NL; DEBSP.SP;.PR; .FNPROPS-> X;
+  IF X.NULL THEN L0: X.PR;  ";".PR EXIT;
+  X.HD -> X;
+  IF X.ATOM THEN GOTO L0 CLOSE;
+  X.HD.PR;  ";".PR; F(X.TL)->X; REV(MAPLIST(X,ERASE));
+  APPLIST(X,
+    LAMBDA U;
+      .DEST->X; 1.SP; U.PR;
+      IF NOT(U= "*") THEN PR("="); ->U; U.DEBPR; U CLOSE;
+       ",".PR; X
+    END); ->X
+END;
+   
+FUNCTION DEBFN X;
+  IF DEBUG THEN BUGIO(X, ">",HD); DEBSP+1->DEBSP; .X;
+    DEBSP-1->DEBSP; BUGIO(X, "<",LAMBDA; HD(.TL) END)
+  EXIT;.X
+END;
+   
+MACRO BUG;
+VARS X;
+  MACRESULTS([%
+(L0:
+  .ITEMREAD->X;
+  IF NOT(X= ";") THEN "DEBFN","(%",X,"%)","-> ",X,";";GOTO L0 CLOSE)%]) 
+END;
+   
+MACRO UNBUG;
+VARS X;
+  MACRESULTS([%
+(L0:
+  .ITEMREAD->X;
+  IF NOT(X= ";") THEN 1,",",X,".","FROZVAL","-> ",X,";";GOTO L0 CLOSE)%])
+END;
+   
+PR->DEBPR; 0->DEBSP; FALSE->DEBUG;
+MACRO SPEC;
+VARS FN X;
+  ITEMREAD()->FN;
+  [% [%
+    [% FN,
+       [% (L0: ITEMREAD()->X;
+         IF NOT(X= " ; " ) AND NOT(X= "=>") THEN X;GOTO L0 CLOSE) %],
+       IF X= ";" THEN NIL ELSE
+      [% (L1: ITEMREAD()->X; IF NOT(X= ";") THEN X;GOTO L1 CLOSE) %]
+      CLOSE %] %],
+     "->",FN,".","FNPROPS",";" %].MACRES
+END;
