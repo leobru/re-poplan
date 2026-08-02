@@ -31,9 +31,17 @@ The address-preserving machine layer now translates:
 - `03261..03264` function entry;
 - `03275`, `03277` POP value-stack operations;
 - `07475..07504` traced `CUCHIN` argument paths;
+- `11541..11545` tagged-value/frame-field match and diagnostic exit;
+- `15765..16003` special-function argument expansion and evaluator
+  redispatch;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
+- `16421..16434` tagged-low-byte validation and packed-table lookup;
+- `16457..16462` three-word record shift and continuation selection;
+- `16505..16510` record-shift call wrapper and caller restoration;
 - `20110..20123` activation argument transfer;
 - `20124..20140` activation construction;
+- `20245..20260` continuation-state selection, `Э71` readiness/output
+  transfers, and post-extracode status/completion entries;
 - `21255..21257` character-input wrapper entry;
 - `21260..21275` table-driven character forwarding, return, decode, and
   encode entries;
@@ -49,13 +57,28 @@ and reproduce the reduced arity-3 failure. Descriptor
 `65627`; because the record at `65632` has a zero address, the third call
 continues with shared slot `65763` at `K=0` instead of restoring outer `K=1`.
 
-This is an evaluator/activation milestone, not yet a source-level C++ POPLAN.
-The primitive runtime is now entered through the syntax-diagnostic output
-path, including the table-driven character converter. Entry `21260` now stops
-only when `25350` requests the console/input continuation at `20245`; the
-`20245` body and console calls remain untranslated. The original compiler,
-remaining runtime, I/O, and whole-system driver must still be translated
-before the closure fix can be validated end to end.
+The individually translated entries remain an evaluator/activation milestone,
+not yet a source-level translation of the complete compiler. The primitive
+runtime is entered through the syntax-diagnostic output path, including the
+table-driven character converter. Entry `21260` continues through the `Э71`
+operations at `20252` and `20256`, using the original indexed control words
+and packed GOST buffers. The alternate `Э64`/`Э74` paths and continuations
+`20261` and `20715` remain untranslated boundaries.
+
+Separately, the `poplan` executable can now load the extracted 036000-word
+image. Before fetching a BESM instruction, the machine dispatches a recognized
+left-half `pXXXXX` entry to its address-preserving semantic implementation;
+untranslated addresses fall back to the instruction interpreter. Its Э71
+adapter supplies prompts, line input, record output, and GOST-10859 UTF-8
+conversion. Э75 stores generated instruction words into memory, so the
+historical compiler and evaluator run unchanged inside this machine layer.
+`make cpp-quine` matches the existing normalized quine fixture, and its
+completed 136038-instruction sequence matches the saved native trace through
+the final host-EOF input request. This raw-image route is a whole-system
+conformance path, not a substitute for continuing the address-preserving
+routine translations. The instruction fallback can be disabled for
+differential testing with `POPLAN_INTERPRET_ONLY=1`; the long-term target is
+to make that fallback unnecessary by expanding the translated-entry set.
 
 ## Port Order
 

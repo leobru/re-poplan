@@ -14,7 +14,7 @@ ZONE_INPUTS := $(wildcard zone*.pop2)
 ZONE_COVERAGES := $(patsubst %.pop2,$(BUILD_DIR)/%.cov,$(ZONE_INPUTS))
 COVERAGE_CORPUS := $(BUILD_DIR)/coverage-corpus.md
 
-.PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test test clean
+.PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test cpp-run cpp-quine test clean
 
 all: listing calls dictionary
 
@@ -36,6 +36,16 @@ cpp:
 
 cpp-test: cpp
 	ctest --test-dir $(CPP_BUILD_DIR) --output-on-failure
+
+cpp-run: cpp
+	$(CPP_BUILD_DIR)/poplan
+
+cpp-quine: cpp image
+	$(CPP_BUILD_DIR)/poplan --image $(IMAGE) < quine.pop2 \
+		> $(BUILD_DIR)/cpp-quine.out
+	./tools/normalize-output.py $(BUILD_DIR)/cpp-quine.out \
+		> $(BUILD_DIR)/cpp-quine.normalized
+	diff -u tests/expected/quine.out $(BUILD_DIR)/cpp-quine.normalized
 
 test:
 	./tests/run.sh

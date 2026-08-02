@@ -68,8 +68,14 @@ The current labels are maintained in `poplan.sym`.
 | `03413` | `NUMERIC_UPDATE` | Numeric helper used by generated quine code |
 | `05230` | `COLD_START` | Initializes runtime state and enters POPLAN |
 | `07475` | `CUCHIN_ARG` | Consumes and normalizes a tagged character argument |
+| `11541` | `TAGGED_VALUE_MATCH` | Checks a nonzero `640` value against the high field of an object reached through the current frame |
+| `15765` | `SPECIAL_FUNCTION_DISPATCH` | Expands the counted values referenced by a `664` descriptor and redispatches its nested function |
 | `16313` | `CHAR_SEQUENCE` | Iterates a packed character sequence through `21431` |
+| `16421` | `TAGGED_BYTE_LOOKUP` | Validates a `640`-tagged low byte and extracts its packed-table result |
+| `16457` | `RECORD_SHIFT` | Shifts a nonempty three-word record left and selects an r1-relative continuation |
+| `16505` | `RECORD_SHIFT_WRAPPER` | Preserves caller state around `16457` and resumes at an r1-relative continuation |
 | `20170` | `INPUT_PRIMARY` | Reads or exposes the current console line |
+| `20245` | `INPUT_CONTINUE` | Selects console continuation paths and resumable `Э71` calls |
 | `20263` | `IO_INIT` | Initializes console and message state |
 | `20674` | `MESSAGE_OUTPUT` | Common interactive message output |
 | `21255` | `CHAR_INPUT` | Saves a character parameter and enters conversion |
@@ -94,7 +100,7 @@ The quine trace contains:
 - 10.1% word-address coverage of the 15,360-word static image;
 - 98 direct `vjm` targets.
 
-Only 21 direct targets currently have useful semantic descriptions. Leaf
+Twenty-seven direct targets currently have useful semantic descriptions. Leaf
 status in generated call inventories means that no nested `vjm` was observed
 while an invocation was active. It is dynamic evidence, not a static proof.
 
@@ -102,21 +108,17 @@ The most frequently called unnamed targets are:
 
 | Address | Calls | Observed kind |
 |---:|---:|---|
-| `11541` | 279 | leaf |
 | `11673` | 279 | nonleaf, linked through `r14` |
-| `16457` | 195 | nonleaf |
 | `11717` | 186 | nonleaf |
-| `16421` | 121 | leaf |
-| `16505` | 96 | nonleaf |
 | `05430` | 97 | nonleaf |
 | `05447` | 97 | leaf |
 
 ## Next Reverse-Engineering Targets
 
-1. Identify `11541`, `11673`, and `11717`, which dominate execution of the
-   generated quine loop.
-2. Continue the converted-character `0377` path through the console/input
-   continuation at `20245`.
+1. Identify `11673` and `11717`, which dominate execution of the generated
+   quine loop after the now-translated `11541` value check.
+2. Translate the console extracodes and alternate continuations selected by
+   `20245..20260` at `20321`, `20250`, `20261`, and `20715`.
 3. Separate executable code, tagged POP objects, jump tables, strings, and
    numeric constants in the static listing.
 4. Extend the focused POP-2 probes beyond the current arithmetic, list,

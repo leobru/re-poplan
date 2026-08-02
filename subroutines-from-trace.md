@@ -39,12 +39,21 @@ the quine trace is `11673`.
 | `03413` | `NUMERIC_UPDATE` | Numeric arithmetic helper, likely an integer decrement/update operation. | Called 279 times from `11707`; uses `ntr 6` and arithmetic on a small integer-like value. |
 | `05230` | `COLD_START` | Main initialization/cold-start routine. | Saves initial registers at `05400..05404`, establishes runtime areas and stack state, initializes I/O, prints the greeting, and enters the evaluator. |
 | `07475` | `CUCHIN_ARG` | Argument-taking entry within the dictionary `CUCHIN` routine. | Pops a tagged character; `0136` selects code `0012`, while ordinary tagged characters are forwarded unchanged to `21255`. |
+| `11541` | `TAGGED_VALUE_MATCH` | High-frequency leaf check in the generated quine loop. | Requires a nonzero `640` value, extracts and retags the high 24-bit field of the object addressed by frame word `r17-2`, and compares it with frame word `r17-1`. A mismatch selects diagnostic `10100`; the traced match leaves additive zero `6400000000000000`. |
+| `15765` | `SPECIAL_FUNCTION_DISPATCH` | Evaluator branch for `664` function descriptors. | Preserves evaluator registers, pushes the counted values reached through environment word `+4`, restores the saved context, and redispatches the descriptor at environment word `+3`. Static `NEWARR` at `6641223600000000` expands two values from `12244..12245` before dispatching `NEWANY`. |
 | `16313` | `CHAR_SEQUENCE` | Packed-character sequence loop. | Builds a tagged cursor for the sequence at `r16`, calls `21431`, tags each extracted character, and dispatches it through the descriptor at `01567`. During this diagnostic, `03075` copies the `CHARIN` entry at `01517` into the `CUCHOU` value slot at `01567`. |
+| `16421` | `TAGGED_BYTE_LOOKUP` | Packed lookup for tagged low bytes. | Rejects values outside the `640`-tagged low-byte form with code `015`; valid bytes select a packed word through bits 3..6 and an eight-bit field through bits 0..2. Traced mappings include `012` to `014`, `106` to `001`, and `040` to `000`. |
+| `16457` | `RECORD_SHIFT` | Three-word record advance used by the compiler/runtime path at `16346` and `16506`. | If word `r3+1` is nonzero, moves `+1` to the head, `+2` to `+1`, clears `+2`, and selects continuation `r1+74206`; otherwise it leaves the record unchanged and selects `r1+74202`. |
+| `16505` | `RECORD_SHIFT_WRAPPER` | Saved-state wrapper around `16457`. | Saves the incoming accumulator and caller link on `r17`, calls `16457`, and restores both at `16507` before selecting continuation `r1+74216`. The quine trace calls this entry 96 times. |
 | `20110` | `ARG_TRANSFER` | Move actual values from the POP stack into an activation. | Uses `r16` as the argument count, allocates through `r17`, and stores values backward through `r3`. |
 | `20124` | `BUILD_ACTIVATION` | Construct an activation and transfer actual values to the POP stack. | Computes the new `r17` boundary in `20141`; the traced one-argument call at `65576` moves one value to `67777`. |
 | `20144` | `SUPERVISOR_SETUP` | Runtime/supervisor setup helper. | Called once from `05265`; executes `*50` and `*67` through the table at `20564`. |
 | `20170` | `INPUT_PRIMARY` | Primary console line-input routine. | Checks `20377`; interactive calls expose packed text through the buffer at `20400`. |
-| `20245` | `INPUT_CONTINUE` | Secondary/continuation input routine. | Called from `25360`; checks input state and invokes `*71` to read another line. |
+| `20245` | `INPUT_CONTINUE` | Console/input continuation selector. | Called from `25360`; checks console and status state, then selects `Э74`, `Э64`, or one of the translated `Э71` entries. |
+| `20252` | `INPUT_CONTINUE_QUERY` | Execute `Э71 0146`. | Reads the POPLAN readiness-query word at `20336` and continues through `20253`. |
+| `20253` | `INPUT_CONTINUE_STATUS` | Post-`Э71 0146` status decoder. | Packs the returned status bits and selects `20261`, `20715`, or `20256`. |
+| `20256` | `INPUT_CONTINUE_IO` | Execute `Э71 0177`. | Interprets the runtime control word at `20367`, transfers the GOST bytes in its indexed buffer, and continues through `20257`. |
+| `20257` | `INPUT_CONTINUE_FINISH` | Post-`Э71 0177` completion entry. | Stores `1` at `20362` and returns through `r15`. |
 | `20263` | `IO_INIT` | Console and I/O-state initialization. | Probes `*71`, initializes state at `20362..20377`, and initializes message descriptors at `25415..25417`. |
 | `20456` | `FORMAT_STARTUP` | Numeric/time/message formatting during startup. | Calls `*53 10` and repeatedly invokes `25641`/`25660`. |
 | `20660` | `MEMORY_BOUND` | Memory-size or upper-bound initialization helper. | Uses constant `0016760000033064` and stores a computed bound through `r16`. |
@@ -79,13 +88,12 @@ the quine trace is `11673`.
 
 ## Dynamic Inventory
 
-The quine has 98 direct `vjm` targets. Nineteen currently have semantic
+The quine has 98 direct `vjm` targets. Twenty-seven currently have semantic
 descriptions above; the generated inventory in `build/calls.md` is the
 authoritative count/caller table.
 
-The highest-frequency unnamed targets are `11541`, `11673`, `16457`, `21275`,
-`25346`, `11717`, `16421`, `05430`, and `05447`. These are the next useful
-targets for trace-guided analysis.
+The highest-frequency unnamed targets are now `11673`, `11717`, `05430`,
+and `05447`. These are the next useful targets for trace-guided analysis.
 
 "Leaf" in generated output means no nested `vjm` was observed while a traced
 invocation was active. It is not proof that the routine is leaf for every

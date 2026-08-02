@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <string>
 
 namespace {
@@ -25,6 +26,69 @@ int main()
 
     require(Word48(077777777777777777ULL).raw() == Word48::mask,
             "Word48 masks values to 48 bits");
+
+    // POPLAN's compiler emits code through extracode 075, then branches to
+    // the newly written instruction words.
+    Machine e75_store;
+    constexpr std::uint32_t e75_left = (075U << 12) | 01234U;
+    constexpr std::uint32_t stop_right =
+        (1U << 19) | (0330U << 12);
+    e75_store.memory(01000) = Word48(
+        (static_cast<std::uint64_t>(e75_left) << 24) | stop_right);
+    e75_store.accumulator() = Word48(07246563567103301ULL);
+    e75_store.start(01000);
+    require(e75_store.step() == poplan::ExecutionStatus::running,
+            "E75 execution continues with the right half");
+    require(e75_store.memory(01234)
+                == Word48(07246563567103301ULL),
+            "E75 stores the accumulator in executable memory");
+    require(e75_store.reg(016) == 01234,
+            "E75 exposes its effective address in r16");
+    require(e75_store.step() == poplan::ExecutionStatus::halted,
+            "the synthetic E75 program reaches STOP");
+
+    auto semantic_push = std::make_unique<Machine>();
+    semantic_push->reg(006) = 070000;
+    semantic_push->reg(015) = 01234;
+    semantic_push->accumulator() = Word48(06400000000000001ULL);
+    semantic_push->start(03275);
+    require(semantic_push->step() == poplan::ExecutionStatus::running,
+            "translated routine dispatch is an executable machine step");
+    require(semantic_push->program_counter() == 01234
+                && !semantic_push->right_half(),
+            "translated PUSH_ACC returns through the BESM link");
+    require(semantic_push->reg(006) == 067777
+                && semantic_push->memory(067777)
+                    == Word48(06400000000000001ULL),
+            "translated PUSH_ACC replaces its instruction sequence");
+    require(semantic_push->translated_routine_count() == 1,
+            "the machine records semantic routine dispatches");
+
+    auto right_half_entry = std::make_unique<Machine>();
+    right_half_entry->accumulator() = Word48(012345);
+    right_half_entry->start(03275, true);
+    require(right_half_entry->step() == poplan::ExecutionStatus::running,
+            "a right-half entry still executes one BESM instruction");
+    require(right_half_entry->translated_routine_count() == 0
+                && right_half_entry->program_counter() == 03276,
+            "semantic dispatch only owns a routine's left-half entry");
+
+    auto interpreted_push = std::make_unique<Machine>();
+    constexpr std::uint32_t push_left =
+        (6U << 20) | (1U << 19) | (0250U << 12) | 077777U;
+    interpreted_push->memory(03275) = Word48(
+        static_cast<std::uint64_t>(push_left) << 24);
+    interpreted_push->reg(006) = 070000;
+    interpreted_push->start(03275);
+    interpreted_push->set_translated_routines_enabled(false);
+    require(interpreted_push->step() == poplan::ExecutionStatus::running,
+            "instruction fallback remains available for comparison");
+    require(interpreted_push->reg(006) == 067777
+                && interpreted_push->program_counter() == 03275
+                && interpreted_push->right_half(),
+            "interpret-only mode executes one half-instruction at a time");
+    require(interpreted_push->translated_routine_count() == 0,
+            "interpret-only mode bypasses translated routines");
 
     Machine machine;
     machine.reg(06) = 070000;
@@ -94,6 +158,41 @@ int main()
         target.memory(025417) = target.memory(025410);
     };
 
+    const auto install_tagged_byte_lookup = [](Machine &target) {
+        target.reg(001) = 022261;
+        target.memory(016756) =
+            Word48(06400000000000000ULL);
+        target.memory(016757) = Word48(015);
+        target.memory(016760) = Word48(0170);
+        target.memory(016761) = Word48(07);
+        target.memory(016762) = Word48(077);
+
+        // Trace-backed packed words for inputs 012, 040, and 106.
+        target.memory(016440) =
+            Word48(01515141515151515ULL);
+        target.memory(016443) =
+            Word48(00003041512060310ULL);
+        target.memory(016447) =
+            Word48(01501010101010101ULL);
+    };
+
+    const auto install_input_continue = [](Machine &target) {
+        target.memory(020322) =
+            Word48(02000000000000000ULL);
+        target.memory(020323) =
+            Word48(04000000000000000ULL);
+        target.memory(020326) = Word48(1);
+        target.memory(020333) = Word48(2);
+        target.memory(020365) =
+            Word48(00004000000040000ULL);
+        target.memory(020375) = Word48();
+        target.memory(020377) = Word48(012);
+        target.memory(020336) =
+            Word48(0100000077777777ULL);
+        target.memory(020367) =
+            Word48(04020025041120265ULL);
+    };
+
     Machine dispatch;
     install_dispatch_constants(dispatch);
     dispatch.accumulator() = Word48(06606562700065576ULL);
@@ -115,6 +214,233 @@ int main()
     special_dispatch.accumulator() = Word48(06640000000015765ULL);
     require(special_dispatch.p02750_dispatch() == 015765,
             "02750 sends a 664 function to the special path");
+
+    // Static NEWARR descriptor: 6641223600000000 expands the two values in
+    // its counted vector at 12243, then redispatches NEWANY at 12164.
+    auto special_function = std::make_unique<Machine>();
+    install_dispatch_constants(*special_function);
+    special_function->accumulator() =
+        Word48(06641223600000000ULL);
+    special_function->memory(012241) =
+        Word48(06600000000012164ULL);
+    special_function->memory(012242) =
+        Word48(07040000000012243ULL);
+    special_function->memory(012243) =
+        Word48(0000000200000003ULL);
+    special_function->memory(012244) =
+        Word48(06600000000011506ULL);
+    special_function->memory(012245) =
+        Word48(06601151700011524ULL);
+    special_function->reg(001) = 01111;
+    special_function->reg(003) = 03333;
+    special_function->reg(004) = 04444;
+    special_function->reg(006) = 070000;
+    special_function->reg(015) = 05555;
+    special_function->reg(017) = 04000;
+    require(special_function->p02750_dispatch() == 015765,
+            "02750 selects special dispatch for static NEWARR");
+    require(special_function->p15765_dispatch_special_function() == 03261,
+            "15765 redispatches NEWARR's environment +3 descriptor");
+    require(special_function->memory(067777)
+                == Word48(06600000000011506ULL)
+                && special_function->memory(067776)
+                    == Word48(06601151700011524ULL)
+                && special_function->reg(006) == 067776,
+            "15765 pushes the two static NEWARR vector values in order");
+    require(special_function->reg(001) == 01111
+                && special_function->reg(003) == 03333
+                && special_function->reg(004) == 04444
+                && special_function->reg(015) == 05555
+                && special_function->reg(017) == 04000,
+            "15765 restores its saved evaluator registers and hardware stack");
+    require(special_function->memory(016004) == Word48()
+                && special_function->memory(03272)
+                    == Word48(06600000000012164ULL)
+                && special_function->memory(03273) == Word48(),
+            "15765 clears its scratch word and installs the nested descriptor");
+
+    auto empty_special_function = std::make_unique<Machine>();
+    install_dispatch_constants(*empty_special_function);
+    empty_special_function->memory(03272) =
+        Word48(06640300000000000ULL);
+    empty_special_function->memory(03273) = Word48(03000);
+    empty_special_function->memory(03003) =
+        Word48(06600000000007667ULL);
+    empty_special_function->memory(03004) = Word48();
+    empty_special_function->reg(006) = 070000;
+    empty_special_function->reg(017) = 04100;
+    const std::uint16_t empty_special_next =
+        empty_special_function->p15765_dispatch_special_function();
+    require(empty_special_next == 03261,
+            "15765 redispatches an empty special function");
+    require(empty_special_function->reg(006) == 070000,
+            "15765 pushes no values for a zero vector pointer");
+    require(empty_special_function->reg(017) == 04100,
+            "15765 balances the empty special-function save area");
+
+    // Trace at 11702: tagged value 025 matches the high field of the object
+    // reached through frame word -2, producing additive zero at 11545.
+    auto tagged_match = std::make_unique<Machine>();
+    tagged_match->reg(010) = 011506;
+    tagged_match->reg(015) = 011703;
+    tagged_match->reg(016) = 0777;
+    tagged_match->reg(017) = 066064;
+    tagged_match->alu_mode() = 003;
+    tagged_match->memory(012000) =
+        Word48(06400000000000000ULL);
+    tagged_match->memory(012012) =
+        Word48(07777777770000000ULL);
+    tagged_match->memory(066062) = Word48(065741);
+    tagged_match->memory(065741) =
+        Word48(0000002500000005ULL);
+    tagged_match->memory(066063) =
+        Word48(06400000000000025ULL);
+    tagged_match->accumulator() =
+        Word48(06400000000000025ULL);
+    require(tagged_match->p11541_match_tagged_value() == 011703,
+            "11541 returns through r15 for the traced matching value");
+    require(tagged_match->accumulator()
+                == Word48(06400000000000000ULL),
+            "11541 reproduces the traced additive zero word");
+    require(tagged_match->reg(016) == 0777
+                && tagged_match->reg(017) == 066064,
+            "11541 does not change its diagnostic register or frame");
+
+    auto tagged_mismatch = std::make_unique<Machine>();
+    tagged_mismatch->reg(010) = 011506;
+    tagged_mismatch->reg(015) = 011703;
+    tagged_mismatch->reg(017) = 066064;
+    tagged_mismatch->alu_mode() = 003;
+    tagged_mismatch->memory(012000) =
+        Word48(06400000000000000ULL);
+    tagged_mismatch->memory(012012) =
+        Word48(07777777770000000ULL);
+    tagged_mismatch->memory(066062) = Word48(065741);
+    tagged_mismatch->memory(065741) =
+        Word48(0000002500000005ULL);
+    tagged_mismatch->memory(066063) =
+        Word48(06400000000000024ULL);
+    tagged_mismatch->accumulator() =
+        Word48(06400000000000024ULL);
+    require(tagged_mismatch->p11541_match_tagged_value() == 03014
+                && tagged_mismatch->reg(016) == 010100
+                && tagged_mismatch->accumulator()
+                    == Word48(06400000000000024ULL),
+            "11541 sends a mismatched value to diagnostic 10100");
+
+    // Trace at 16457 with r1=22261 and r3=20670: shift a nonempty three-word
+    // record and take continuation 16467; an empty +1 takes 16463 unchanged.
+    auto shifted_record = std::make_unique<Machine>();
+    shifted_record->reg(001) = 022261;
+    shifted_record->reg(003) = 020670;
+    shifted_record->memory(020670) = Word48(011);
+    shifted_record->memory(020671) =
+        Word48(06400000000000012ULL);
+    shifted_record->memory(020672) = Word48(077);
+    require(shifted_record->p16457_shift_record() == 016467,
+            "16457 takes the traced nonempty continuation");
+    require(shifted_record->memory(020670)
+                == Word48(06400000000000012ULL)
+                && shifted_record->memory(020671) == Word48(077)
+                && shifted_record->memory(020672) == Word48()
+                && shifted_record->accumulator() == Word48(),
+            "16457 shifts the record left and clears its final word");
+
+    auto empty_record = std::make_unique<Machine>();
+    empty_record->reg(001) = 022261;
+    empty_record->reg(003) = 020670;
+    empty_record->memory(020670) = Word48(011);
+    empty_record->memory(020671) = Word48();
+    empty_record->memory(020672) = Word48(077);
+    require(empty_record->p16457_shift_record() == 016463
+                && empty_record->memory(020670) == Word48(011)
+                && empty_record->memory(020672) == Word48(077),
+            "16457 leaves an empty record unchanged at continuation 16463");
+
+    // Trace at 16505 wraps 16457 with a balanced two-word save area. The
+    // translated entry stops at 16467; the translated 16507 resume models
+    // the return after that continuation has completed.
+    auto wrapped_record = std::make_unique<Machine>();
+    wrapped_record->reg(001) = 022261;
+    wrapped_record->reg(003) = 020670;
+    wrapped_record->reg(015) = 016406;
+    wrapped_record->reg(017) = 066033;
+    wrapped_record->accumulator() = Word48(055);
+    wrapped_record->memory(020670) = Word48(0106);
+    wrapped_record->memory(020671) = Word48(0125);
+    wrapped_record->memory(020672) = Word48();
+    require(wrapped_record->p16505_begin_record_shift() == 016467,
+            "16505 enters the nonempty 16457 continuation");
+    require(wrapped_record->reg(015) == 016507
+                && wrapped_record->reg(017) == 066034
+                && wrapped_record->memory(066033) == Word48(055)
+                && wrapped_record->memory(066034) == Word48(016406),
+            "16505 preserves the accumulator and caller link");
+    require(wrapped_record->memory(020670) == Word48(0125)
+                && wrapped_record->memory(020671) == Word48()
+                && wrapped_record->memory(020672) == Word48(),
+            "16505 retains 16457's traced record shift");
+    require(wrapped_record->p16507_resume_record_shift() == 016477,
+            "16507 selects the r1-relative continuation 74216");
+    require(wrapped_record->reg(015) == 016406
+                && wrapped_record->reg(017) == 066033
+                && wrapped_record->accumulator() == Word48(055),
+            "16507 restores the caller state and balances r17");
+
+    // The first traced 16421 call maps tagged byte 012 to code 014. It uses
+    // table word 16440, r12=1, and the r13-controlled 12-bit left shift.
+    auto tagged_byte_012 = std::make_unique<Machine>();
+    install_tagged_byte_lookup(*tagged_byte_012);
+    tagged_byte_012->reg(015) = 016350;
+    tagged_byte_012->accumulator() =
+        Word48(06400000000000012ULL);
+    require(tagged_byte_012->p16421_lookup_tagged_byte() == 016350,
+            "16421 returns tagged byte 012 through r15");
+    require(tagged_byte_012->accumulator() == Word48(014)
+                && tagged_byte_012->memory(016435) == Word48(014),
+            "16421 reproduces the traced 012 to 014 lookup");
+    require(tagged_byte_012->reg(012) == 01
+                && tagged_byte_012->reg(013) == 063
+                && tagged_byte_012->memory(016436) == Word48(04),
+            "16421 reproduces the traced table and field selectors");
+    require(tagged_byte_012->alu_mode() == 004,
+            "16421 leaves the ALU in logical mode");
+
+    auto tagged_byte_106 = std::make_unique<Machine>();
+    install_tagged_byte_lookup(*tagged_byte_106);
+    tagged_byte_106->reg(015) = 01234;
+    tagged_byte_106->accumulator() =
+        Word48(06400000000000106ULL);
+    require(tagged_byte_106->p16421_lookup_tagged_byte() == 01234
+                && tagged_byte_106->accumulator() == Word48(01)
+                && tagged_byte_106->reg(012) == 010
+                && tagged_byte_106->reg(013) == 033,
+            "16421 reproduces the traced 106 to 001 lookup");
+
+    auto tagged_byte_040 = std::make_unique<Machine>();
+    install_tagged_byte_lookup(*tagged_byte_040);
+    tagged_byte_040->reg(015) = 02345;
+    tagged_byte_040->accumulator() =
+        Word48(06400000000000040ULL);
+    require(tagged_byte_040->p16421_lookup_tagged_byte() == 02345
+                && tagged_byte_040->accumulator() == Word48()
+                && tagged_byte_040->reg(012) == 04
+                && tagged_byte_040->reg(013) == 077,
+            "16421 reproduces the traced 040 to 000 lookup");
+
+    auto untagged_byte = std::make_unique<Machine>();
+    install_tagged_byte_lookup(*untagged_byte);
+    untagged_byte->reg(015) = 03456;
+    untagged_byte->reg(012) = 071;
+    untagged_byte->reg(013) = 072;
+    untagged_byte->accumulator() = Word48(012);
+    require(untagged_byte->p16421_lookup_tagged_byte() == 03456
+                && untagged_byte->accumulator() == Word48(015)
+                && untagged_byte->memory(016435) == Word48(015),
+            "16421 returns code 015 for a value outside the tagged form");
+    require(untagged_byte->reg(012) == 071
+                && untagged_byte->reg(013) == 072,
+            "16421 rejects an untagged value before selecting a field");
 
     Machine invalid_dispatch;
     install_dispatch_constants(invalid_dispatch);
@@ -365,6 +691,7 @@ int main()
     Machine terminated_output;
     install_character_converter(terminated_output);
     install_character_output(terminated_output);
+    install_input_continue(terminated_output);
     terminated_output.accumulator() =
         Word48(06400000000000012ULL);
     terminated_output.reg(015) = 03235;
@@ -385,6 +712,12 @@ int main()
                 && terminated_output.memory(025412) == Word48(1)
                 && terminated_output.reg(017) == 066026,
             "the 0377 branch retains its frame across 20245");
+    require(terminated_output.p20245_begin_input_continue() == 020256,
+            "20245 selects the translated terminal-transfer entry");
+    require(terminated_output.p20256_transfer_console() == 025361
+                && terminated_output.console_output().empty()
+                && terminated_output.reg(016) == 0,
+            "20256 sends the EOF-terminated buffer through E71");
     require(terminated_output.p25361_resume_character_output() == 021261,
             "25361 resumes the 0377 output call after 20245");
     require(terminated_output.memory(025417)
@@ -441,6 +774,114 @@ int main()
                 && output_limit.reg(015) == 025361
                 && output_limit.memory(025412) == Word48(0120),
             "the injected 0377 reaches the same 20245 boundary");
+
+    // Trace at the first diagnostic 0377: no pending input/status word, so
+    // 20245 proceeds directly to the Э71 0177 boundary at 20256.
+    Machine input_continue;
+    install_input_continue(input_continue);
+    input_continue.memory(020440) =
+        Word48(std::uint64_t{0377} << 40);
+    input_continue.reg(015) = 025361;
+    input_continue.alu_mode() = 003;
+    require(input_continue.p20245_begin_input_continue() == 020256,
+            "20245 selects traced Э71 0177 when input state is clear");
+    require(input_continue.reg(010) == 020170
+                && input_continue.accumulator() == Word48()
+                && input_continue.remainder() == Word48()
+                && input_continue.alu_mode() == 007,
+            "20245 preserves the traced pre-extracode machine state");
+    require(input_continue.p20256_transfer_console() == 025361,
+            "20256 executes Э71 0177 and returns through the saved link");
+    require(input_continue.memory(020362) == Word48(1)
+                && input_continue.accumulator() == Word48(1),
+            "20257 marks the continuation state available");
+
+    // On later calls, state 20362 selects Э71 0146 first. Its traced result
+    // packs to 4000000000000000 and falls through to Э71 0177.
+    Machine input_status;
+    install_input_continue(input_status);
+    input_status.memory(020362) = Word48(1);
+    input_status.reg(015) = 025361;
+    require(input_status.p20245_begin_input_continue() == 020252
+                && input_status.accumulator() == Word48(1),
+            "20245 selects traced status extracode Э71 0146");
+    require(input_status.p20252_query_console() == 020256,
+            "20252 executes Э71 0146 and selects terminal transfer");
+    require(input_status.accumulator()
+                == Word48(02000000000000000ULL)
+                && input_status.remainder()
+                    == Word48(02000000000000000ULL),
+            "20253 reproduces traced APX and tag comparisons");
+
+    // The POPLAN output control word uses r10-relative buffer limits and an
+    // expanded right address to request the terminal status word.
+    auto e71_output = std::make_unique<Machine>();
+    install_input_continue(*e71_output);
+    e71_output->reg(010) = 020170;
+    e71_output->reg(015) = 07654;
+    e71_output->memory(020440) = Word48(
+        (std::uint64_t{031} << 40)
+        | (std::uint64_t{040} << 32)
+        | (std::uint64_t{0377} << 24));
+    require(e71_output->p20256_transfer_console() == 07654,
+            "20256 returns after the E71 output control word");
+    require(e71_output->console_output()
+                == std::vector<std::uint8_t>({031, 040})
+                && e71_output->memory(020362) == Word48(1),
+            "E71 emits GOST bytes up to 0377 and completes the continuation");
+
+    // The corresponding input control word writes a queued GOST line, its
+    // 0377 terminator, and zero padding into the r10-relative input buffer.
+    auto e71_input = std::make_unique<Machine>();
+    e71_input->reg(010) = 020170;
+    e71_input->memory(020364) =
+        Word48(04034021041120221ULL);
+    e71_input->queue_console_input({031, 052});
+    e71_input->emulate_e71(020364);
+    require(e71_input->memory(020400) == Word48(
+                (std::uint64_t{031} << 40)
+                | (std::uint64_t{052} << 32)
+                | (std::uint64_t{0377} << 24))
+                && e71_input->accumulator()
+                    == Word48(01000000200000012ULL)
+                && e71_input->reg(016) == 0,
+            "E71 input transfers GOST bytes and returns terminal 012 status");
+
+    auto e71_probe = std::make_unique<Machine>();
+    e71_probe->emulate_e71(0);
+    require(e71_probe->accumulator() == Word48(0004000000040000ULL),
+            "E71 zero-address probe reports an available terminal");
+    e71_probe->console_available() = false;
+    e71_probe->emulate_e71(0);
+    require(e71_probe->accumulator() == Word48(),
+            "E71 zero-address probe reports an unavailable terminal");
+
+    Machine unavailable_console;
+    install_input_continue(unavailable_console);
+    unavailable_console.memory(020377) = Word48();
+    require(unavailable_console.p20245_begin_input_continue() == 020321,
+            "20245 preserves the zero-console Э74 boundary");
+
+    Machine output_status;
+    install_input_continue(output_status);
+    output_status.memory(020375) = Word48(2);
+    require(output_status.p20245_begin_input_continue() == 020250
+                && output_status.accumulator() == Word48(2),
+            "20245 preserves the nonzero-status Э64 boundary");
+
+    Machine status_branches;
+    install_input_continue(status_branches);
+    status_branches.memory(020365) = Word48(Word48::mask);
+    status_branches.accumulator() =
+        Word48(02000000000000000ULL);
+    require(status_branches.p20253_resume_input_continue_status()
+                == 020261,
+            "20253 preserves the first exceptional status continuation");
+    status_branches.accumulator() =
+        Word48(06000000000000000ULL);
+    require(status_branches.p20253_resume_input_continue_status()
+                == 020715,
+            "20253 preserves the second exceptional status continuation");
 
     // Snapshot at 03072 after CUCHIN and BIND_ENVIRONMENT return. This closes
     // the first formatter call and enters the packed-character sequence.

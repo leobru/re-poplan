@@ -62,6 +62,44 @@ Build and test the address-preserving C++ evaluator/activation translation:
 make cpp-test
 ```
 
+Run the C++ Э71 I/O shell:
+
+```sh
+make cpp-run
+```
+
+The shell prints `:` through the translated Э71 output control word, reads
+ASCII POP-2 text from standard input through the translated Э71 input control
+word, and echoes the transferred GOST bytes through Э71 output. Type `^` to
+exit. This no-argument mode is a focused console-path demonstration.
+
+Run the extracted POPLAN image on the C++ BESM execution layer and emulated
+Э71 console:
+
+```sh
+make image cpp
+build/cpp/poplan --image build/poplan.bin
+```
+
+This mode boots the historical interpreter, prints its `ПОПЛАН 2.1` greeting,
+prompts with `:`, reads POP-2 source from standard input, compiles it into
+generated BESM instructions through Э75, and evaluates it. A reproducible
+quine check is available as:
+
+```sh
+make cpp-quine
+```
+
+The executable's GOST-10859 output conversion preserves the historical mixed
+Cyrillic/Latin glyphs used by the existing regression fixtures.
+
+Image execution is hybrid: whenever the PC reaches the left-half entry of an
+implemented `pXXXXX` routine, that semantic C++ routine runs as one machine
+step and returns its continuation address. All other addresses fall back to
+the BESM instruction interpreter. `POPLAN_ROUTINE_TRACE=1` prints each such
+dispatch; `POPLAN_INTERPRET_ONLY=1` disables semantic dispatch for differential
+trace comparisons.
+
 ## Running POPLAN
 
 Interactive session:

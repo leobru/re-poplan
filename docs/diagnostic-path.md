@@ -71,7 +71,12 @@ The translated path now continues through the first formatting bracket:
 | `p21260_forward_converted_character()` | Transfers the result to converted-character output at `25346` with link `21261` |
 | `p25346_begin_character_output()` | Saves the byte and link, then calls descriptor helper `21443` |
 | `p21443_advance_descriptor()` | Inserts one byte into packed output and advances or wraps descriptor `25417` |
-| `p25350_continue_character_output()` | Counts bytes, returns ordinary bytes, and calls boundary `20245` for `0377` |
+| `p25350_continue_character_output()` | Counts bytes, returns ordinary bytes, and calls `20245` for `0377` |
+| `p20245_begin_input_continue()` | Selects the `Э74`, `Э64`, or one of two translated `Э71` entries from console state |
+| `p20252_query_console()` | Executes `Э71 0146` with readiness word `20336`, then enters the status decoder |
+| `p20253_resume_input_continue_status()` | Decodes the result of `Э71 0146` and selects `20261`, `20715`, or `Э71 0177` |
+| `p20256_transfer_console()` | Executes the control program at `20367`, transfers its GOST-byte buffer, and enters `20257` |
+| `p20257_finish_input_continue()` | Marks state `20362` after `Э71 0177` and returns through `r15` |
 | `p25361_resume_character_output()` | Resets descriptor and count after the `20245` continuation |
 | `p21261_return_character()` | Restores the saved `03235` link from the hardware stack |
 | `p03072_resume_error_format()` | Restores the diagnostic state and selects the packed sequence at `03162` |
@@ -86,6 +91,11 @@ hardware-stack save areas, descriptor dispatches, and packed-text cursor.
 
 The nested-diagnostic branch beginning in the right half of `03024` is not yet
 translated. Character forwarding now continues through `25346` and its
-`21443` buffering dependency, stopping at continuation boundary `20245`; the
-later formatting blocks after `03101` are also pending. The syntax-error probe
-takes the normal path documented here.
+`21443` buffering dependency into the resumable `20245` continuation and
+through the `Э71` readiness and terminal-transfer operations at `20252` and
+`20256`. The in-memory console device consumes the original control words and
+keeps input/output in GOST byte form; it does not replace the converted buffer
+with a host character lookup. The alternate boundaries at `20321`, `20250`,
+`20261`, and `20715` remain pending. The later formatting blocks after `03101`
+are still pending. The syntax-error probe takes the normal path documented
+here.

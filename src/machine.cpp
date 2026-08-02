@@ -1,5 +1,10 @@
 #include "poplan/machine.hpp"
 
+#include <algorithm>
+#include <cstdlib>
+#include <sstream>
+#include <utility>
+
 namespace poplan {
 
 namespace {
@@ -51,6 +56,44 @@ struct MantissaExponent {
     std::int64_t mantissa = 0;
     int exponent = 0;
 };
+
+struct E71Instruction {
+    std::uint8_t reg = 0;
+    std::uint16_t opcode = 0;
+    std::uint16_t address = 0;
+};
+
+E71Instruction decode_e71_instruction(std::uint32_t half)
+{
+    E71Instruction instruction;
+    instruction.reg = static_cast<std::uint8_t>((half >> 20) & 017);
+
+    if ((half & (std::uint32_t{1} << 19)) != 0) {
+        instruction.opcode = static_cast<std::uint16_t>(
+            0100 | ((half >> 15) & 017));
+        instruction.address = static_cast<std::uint16_t>(half & 077777);
+    } else {
+        instruction.opcode = static_cast<std::uint16_t>(
+            (half >> 12) & 077);
+        instruction.address = static_cast<std::uint16_t>(half & 07777);
+        if ((half & (std::uint32_t{1} << 18)) != 0) {
+            instruction.address |= 070000;
+        }
+    }
+
+    // Э71 treats an expanded short address as the status/release flag. This
+    // is dispak's cwadj() transformation, used by POPLAN's generated words.
+    if (instruction.opcode >= 0100) {
+        instruction.opcode = static_cast<std::uint16_t>(
+            ((instruction.opcode - 060) << 3)
+            | (instruction.address >> 12));
+        instruction.address &= 07777;
+    } else if ((instruction.address & 070000) != 0) {
+        instruction.address &= 07777;
+        instruction.opcode |= 0100;
+    }
+    return instruction;
+}
 
 unsigned highest_bit(std::uint64_t value)
 {
@@ -110,6 +153,152 @@ bool FunctionDescriptor::is_function(Word48 value)
     return (value & tag_mask) == function_tag;
 }
 
+void Machine::queue_console_input(std::vector<std::uint8_t> line)
+{
+    console_input_.push_back(std::move(line));
+}
+
+std::uint8_t Machine::memory_byte(std::uint16_t address,
+                                  std::size_t byte_index) const
+{
+    const std::uint16_t word_address = address_add(
+        address, static_cast<int>(byte_index / 6));
+    const unsigned shift = static_cast<unsigned>(5 - byte_index % 6) * 8;
+    return static_cast<std::uint8_t>(
+        (memory_[word_address].raw() >> shift) & 0377);
+}
+
+void Machine::set_memory_byte(std::uint16_t address,
+                              std::size_t byte_index,
+                              std::uint8_t value)
+{
+    const std::uint16_t word_address = address_add(
+        address, static_cast<int>(byte_index / 6));
+    const unsigned shift = static_cast<unsigned>(5 - byte_index % 6) * 8;
+    const std::uint64_t mask = std::uint64_t{0377} << shift;
+    memory_[word_address] = Word48(
+        (memory_[word_address].raw() & ~mask)
+        | (static_cast<std::uint64_t>(value) << shift));
+}
+
+void Machine::emulate_e71(std::uint16_t control_address)
+{
+    constexpr std::uint8_t gost_end_of_information = 0172;
+    constexpr std::uint8_t gost_eof = 0377;
+    constexpr std::size_t maximum_transfer_bytes = 324 * 6;
+    constexpr Word48 terminal_probe_result{0004000000040000ULL};
+    constexpr Word48 poplan_ready_query{0100000077777777ULL};
+    constexpr Word48 terminal_ready_result{0004000000000000ULL};
+    constexpr Word48 terminal_status_result{01000000200000012ULL};
+
+    registers_[016] = 0;
+    if (control_address == 0) {
+        accumulator_ = console_available_ ? terminal_probe_result : Word48();
+        return;
+    }
+
+    if (memory_[control_address] == Word48(Word48::mask)
+        || memory_[control_address] == poplan_ready_query) {
+        accumulator_ = console_available_ ? terminal_ready_result : Word48();
+        return;
+    }
+
+    for (std::size_t control_count = 0;
+         control_count < core_words; ++control_count) {
+        const Word48 word = memory_[control_address];
+        const E71Instruction left = decode_e71_instruction(
+            static_cast<std::uint32_t>(word.raw() >> 24));
+        const E71Instruction right = decode_e71_instruction(
+            static_cast<std::uint32_t>(word.raw() & 077777777ULL));
+        const std::uint16_t start = address_add(
+            registers_[left.reg], left.address);
+        const std::uint16_t end = address_add(
+            registers_[right.reg], right.address);
+
+        if ((left.opcode & 0360) == 020) {
+            if (end < start) {
+                throw MachineError("E71: wrapped terminal buffer");
+            }
+            const std::size_t capacity = std::min<std::size_t>(
+                maximum_transfer_bytes,
+                (static_cast<std::size_t>(end - start) + 1) * 6);
+
+            if ((left.opcode & 010) != 0) {
+                if (!console_available_) {
+                    throw MachineError("E71: console is unavailable");
+                }
+                if (console_input_.empty()) {
+                    throw E71InputRequired("E71: console input is empty");
+                }
+
+                std::vector<std::uint8_t> line =
+                    std::move(console_input_.front());
+                console_input_.pop_front();
+                std::size_t count = std::min(capacity, line.size());
+                for (std::size_t index = 0; index < count; ++index) {
+                    set_memory_byte(start, index, line[index]);
+                }
+                if (count < capacity) {
+                    set_memory_byte(start, count++,
+                                    (left.opcode & 1) != 0 ? 0 : gost_eof);
+                }
+                while (count < capacity && count % 6 != 0) {
+                    set_memory_byte(start, count++, 0);
+                }
+            } else {
+                std::size_t index = left.opcode == 0220 ? 1 : 0;
+                for (; index < capacity; ++index) {
+                    const std::uint8_t byte = memory_byte(start, index);
+                    if ((left.opcode & 1) != 0) {
+                        if (byte == 0) {
+                            break;
+                        }
+                        console_output_.push_back(
+                            static_cast<std::uint8_t>(byte & 0177));
+                    } else {
+                        if (byte == gost_end_of_information
+                            || byte == gost_eof) {
+                            break;
+                        }
+                        console_output_.push_back(byte);
+                    }
+                }
+            }
+
+            if ((right.opcode & 0100) != 0) {
+                accumulator_ = terminal_status_result;
+                return;
+            }
+        } else if ((left.opcode & 0360) == 0120) {
+            accumulator_ = terminal_status_result;
+            return;
+        } else if ((left.opcode & 0360) == 0220) {
+            // Operator-console output uses the same byte transfer, but skips
+            // the leading channel byte and always returns after one word.
+            std::size_t index = 1;
+            const std::size_t capacity = std::min<std::size_t>(
+                maximum_transfer_bytes,
+                (static_cast<std::size_t>(end - start) + 1) * 6);
+            for (; index < capacity; ++index) {
+                const std::uint8_t byte = memory_byte(start, index);
+                if (byte == gost_end_of_information || byte == gost_eof) {
+                    break;
+                }
+                console_output_.push_back(byte);
+            }
+            return;
+        } else {
+            std::ostringstream message;
+            message << "E71: unsupported operation "
+                    << std::oct << left.opcode;
+            throw MachineError(message.str());
+        }
+
+        control_address = address_add(control_address, 1);
+    }
+    throw MachineError("E71: unterminated control program");
+}
+
 FunctionDescriptor FunctionDescriptor::decode(Word48 value)
 {
     if (!is_function(value)) {
@@ -143,6 +332,40 @@ Word48 Machine::logical_shift(Word48 value, int count)
         return Word48(value.raw() << -count);
     }
     return value;
+}
+
+Word48 Machine::pack_bits(Word48 value, Word48 mask)
+{
+    std::uint64_t result = 0;
+    std::uint64_t source = value.raw();
+    for (std::uint64_t selected = mask.raw(); selected != 0;
+         selected >>= 1, source >>= 1) {
+        if ((selected & 1) != 0) {
+            result >>= 1;
+            if ((source & 1) != 0) {
+                result |= 04000000000000000ULL;
+            }
+        }
+    }
+    return Word48(result);
+}
+
+Word48 Machine::unpack_bits(Word48 value, Word48 mask)
+{
+    std::uint64_t result = 0;
+    std::uint64_t source = value.raw();
+    std::uint64_t selected = mask.raw();
+    for (unsigned bit = 0; bit < 48; ++bit) {
+        result <<= 1;
+        if ((selected & 04000000000000000ULL) != 0) {
+            if ((source & 04000000000000000ULL) != 0) {
+                result |= 1;
+            }
+            source <<= 1;
+        }
+        selected <<= 1;
+    }
+    return Word48(result);
 }
 
 void Machine::shift_accumulator(int count)
@@ -295,28 +518,26 @@ void Machine::multiply(Word48 value)
     select_alu_group(rau_multiplicative);
 }
 
-void Machine::yta(int exponent_delta)
-{
-    if ((alu_mode_ & rau_group_mask) == rau_logical) {
-        accumulator_ = remainder_;
-        return;
-    }
-
-    const Word48 saved_remainder = remainder_;
-    MantissaExponent acc(Word48(
-        (accumulator_.raw() & ~bits41)
-        | (remainder_.raw() & bits40)));
-    acc.exponent += exponent_delta;
-    remainder_ = Word48();
-    normalize_and_round(acc.mantissa, acc.exponent, 0, false);
-    remainder_ = saved_remainder;
-}
-
-void Machine::reverse_subtract(Word48 value)
+void Machine::arithmetic_add(Word48 value, bool negate_accumulator,
+                             bool negate_value)
 {
     MantissaExponent acc(accumulator_);
     MantissaExponent operand(value);
-    acc.mantissa = -acc.mantissa;
+
+    if (!negate_accumulator) {
+        if (negate_value) {
+            operand.mantissa = -operand.mantissa;
+        }
+    } else if (!negate_value) {
+        acc.mantissa = -acc.mantissa;
+    } else {
+        if (acc.negative()) {
+            acc.mantissa = -acc.mantissa;
+        }
+        if (!operand.negative()) {
+            operand.mantissa = -operand.mantissa;
+        }
+    }
 
     int difference = acc.exponent - operand.exponent;
     MantissaExponent smaller;
@@ -377,6 +598,97 @@ void Machine::reverse_subtract(Word48 value)
     }
     normalize_and_round(acc.mantissa, acc.exponent, low, round);
     select_alu_group(rau_additive);
+}
+
+void Machine::divide(Word48 value)
+{
+    if (((value.raw() ^ (value.raw() << 1)) & bit41) == 0) {
+        throw MachineError("BESM-6 arithmetic division by zero");
+    }
+
+    MantissaExponent dividend(accumulator_);
+    MantissaExponent divisor(value);
+    MantissaExponent quotient;
+    if (divisor.mantissa == static_cast<std::int64_t>(bit40)) {
+        quotient.mantissa = dividend.mantissa;
+        quotient.exponent =
+            dividend.exponent - divisor.exponent + 65;
+    } else {
+        dividend.mantissa <<= 1;
+        divisor.mantissa <<= 1;
+        if (std::llabs(dividend.mantissa)
+            >= std::llabs(divisor.mantissa)) {
+            dividend.normalize_right();
+        }
+        quotient.exponent =
+            dividend.exponent - divisor.exponent + 64;
+        quotient.mantissa = 0;
+        for (std::int64_t bit = static_cast<std::int64_t>(bit40);
+             bit > 0; bit >>= 1) {
+            if (dividend.mantissa == 0) {
+                break;
+            }
+            if (std::llabs(dividend.mantissa)
+                < static_cast<std::int64_t>(bit40)) {
+                dividend.mantissa *= 2;
+            } else if ((dividend.mantissa > 0)
+                       == (divisor.mantissa > 0)) {
+                quotient.mantissa += bit;
+                dividend.mantissa =
+                    dividend.mantissa * 2 - divisor.mantissa;
+            } else {
+                quotient.mantissa -= bit;
+                dividend.mantissa =
+                    dividend.mantissa * 2 + divisor.mantissa;
+            }
+        }
+    }
+    normalize_and_round(quotient.mantissa, quotient.exponent, 0, false);
+    select_alu_group(rau_multiplicative);
+}
+
+void Machine::add_exponent(int delta)
+{
+    MantissaExponent acc(accumulator_);
+    acc.exponent += delta;
+    remainder_ = Word48();
+    normalize_and_round(acc.mantissa, acc.exponent, 0, false);
+}
+
+void Machine::change_sign(bool negate)
+{
+    MantissaExponent acc(accumulator_);
+    if (negate) {
+        acc.mantissa = -acc.mantissa;
+        if (acc.denormal()) {
+            acc.normalize_right();
+        }
+    }
+    remainder_ = Word48();
+    normalize_and_round(acc.mantissa, acc.exponent, 0, false);
+    select_alu_group(rau_additive);
+}
+
+void Machine::yta(int exponent_delta)
+{
+    if ((alu_mode_ & rau_group_mask) == rau_logical) {
+        accumulator_ = remainder_;
+        return;
+    }
+
+    const Word48 saved_remainder = remainder_;
+    MantissaExponent acc(Word48(
+        (accumulator_.raw() & ~bits41)
+        | (remainder_.raw() & bits40)));
+    acc.exponent += exponent_delta;
+    remainder_ = Word48();
+    normalize_and_round(acc.mantissa, acc.exponent, 0, false);
+    remainder_ = saved_remainder;
+}
+
+void Machine::reverse_subtract(Word48 value)
+{
+    arithmetic_add(value, true, false);
 }
 
 void Machine::modifier_add(std::size_t destination, std::size_t source)
@@ -477,6 +789,52 @@ std::uint16_t Machine::p02750_dispatch()
 
     accumulator_ = memory_[03273];
     return accumulator_.raw() == 0 ? 03261 : 03206;
+}
+
+std::uint16_t Machine::p15765_dispatch_special_function()
+{
+    // 15765..15770: preserve the caller's working registers and the complete
+    // 664 descriptor on the hardware stack. 16004 is the original scratch
+    // cell used while expanding the descriptor.
+    its(001);
+    its(003);
+    its(004);
+    its(015);
+    registers_[001] = 015765;
+    xts(03272);
+    memory_[016004] = accumulator_;
+
+    // 15771..15776: the environment's +4 word points at a counted vector.
+    // Its first word is one greater than the number of following values;
+    // push those values on the POP stack in their stored order.
+    const std::uint16_t environment = memory_[03273].address();
+    accumulator_ = memory_[address_add(environment, 4)];
+    registers_[003] = accumulator_.address();
+    if (registers_[003] != 0) {
+        accumulator_ = memory_[registers_[003]];
+        registers_[004] = accumulator_.address();
+        for (;;) {
+            registers_[004] = address_add(registers_[004], -1);
+            if (registers_[004] == 0) {
+                break;
+            }
+            registers_[003] = address_add(registers_[003], 1);
+            accumulator_ = memory_[registers_[003]];
+            registers_[015] = 015774;
+            p03275_push_acc();
+        }
+    }
+
+    // 15777..16003: clear the scratch cell while unwinding the saved machine
+    // context, then tail-dispatch the ordinary descriptor at environment +3.
+    accumulator_ = memory_[0];
+    stx(016004);
+    sti(015);
+    sti(004);
+    sti(003);
+    sti(001);
+    accumulator_ = memory_[address_add(environment, 3)];
+    return p02750_dispatch();
 }
 
 std::uint16_t Machine::p03014_dispatch_error()
@@ -640,6 +998,56 @@ std::uint16_t Machine::p07475_cuchin()
     return 021255;
 }
 
+std::uint16_t Machine::p11541_match_tagged_value()
+{
+    // 11541..11542: the caller supplies a nonzero 640-tagged value. Both
+    // failures share the original diagnostic-10100 exit at 11546/11552.
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[010], 0272)].raw());
+    select_alu_group(rau_logical);
+    if (accumulator_.raw() == 0) {
+        registers_[016] = 010100;
+        accumulator_ = memory_[address_add(registers_[017], -1)];
+        select_alu_group(rau_logical);
+        return 03014;
+    }
+
+    accumulator_ = accumulator_
+        & memory_[address_add(registers_[010], 0304)];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    if (accumulator_.raw() != 0) {
+        registers_[016] = 010100;
+        accumulator_ = memory_[address_add(registers_[017], -1)];
+        select_alu_group(rau_logical);
+        return 03014;
+    }
+
+    // 11543..11545: extract the high 24-bit field from the object addressed
+    // by frame word -2, retag it, and compare it arithmetically with -1.
+    const std::uint16_t object =
+        memory_[address_add(registers_[017], -2)].address();
+    accumulator_ = memory_[object];
+    shift_accumulator(24);
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[010], 0272)].raw());
+    select_alu_group(rau_logical);
+    reverse_subtract(memory_[address_add(registers_[017], -1)]);
+
+    // In additive mode UZA tests the mantissa, so 6400000000000000 is the
+    // traced arithmetic zero even though its exponent field is nonzero.
+    if ((accumulator_.raw() & bits41) == 0) {
+        return registers_[015];
+    }
+
+    registers_[016] = 010100;
+    accumulator_ = memory_[address_add(registers_[017], -1)];
+    select_alu_group(rau_logical);
+    return 03014;
+}
+
 std::uint16_t Machine::p16313_begin_character_sequence()
 {
     // 16313..16320: save the caller's machine context and construct the
@@ -698,6 +1106,189 @@ std::uint16_t Machine::p16325_continue_character_sequence()
     sti(002);
     sti(001);
     sti(015);
+    return registers_[015];
+}
+
+std::uint16_t Machine::p16421_lookup_tagged_byte()
+{
+    // 16421..16434: reject values outside the 640-tagged low-byte form with
+    // code 15. Valid bytes select one of sixteen packed table words through
+    // bits 3..6, then select an eight-bit field through bits 0..2.
+    const std::uint16_t scratch =
+        address_add(registers_[001], 074155);
+    const std::uint16_t output =
+        address_add(registers_[001], 074154);
+
+    memory_[scratch] = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074475)].raw());
+    select_alu_group(rau_logical);
+    shift_accumulator(7);
+    if (accumulator_.raw() != 0) {
+        accumulator_ =
+            memory_[address_add(registers_[001], 074476)];
+        select_alu_group(rau_logical);
+        memory_[output] = accumulator_;
+        return registers_[015];
+    }
+
+    accumulator_ = memory_[scratch]
+        & memory_[address_add(registers_[001], 074477)];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    shift_accumulator(3);
+    registers_[012] = accumulator_.address();
+
+    accumulator_ = memory_[scratch]
+        & memory_[address_add(registers_[001], 074500)];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    shift_accumulator(-1);
+    memory_[scratch] = accumulator_;
+
+    accumulator_ = cyclic_add(accumulator_, memory_[scratch]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    accumulator_ = cyclic_add(accumulator_, memory_[scratch]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074501)].raw());
+    select_alu_group(rau_logical);
+    registers_[013] = accumulator_.address();
+
+    accumulator_ = memory_[address_add(
+        address_add(registers_[001], 074156), registers_[012])];
+    select_alu_group(rau_logical);
+    const int field_shift =
+        static_cast<int>((1 + registers_[013]) & 0177) - 64;
+    shift_accumulator(field_shift);
+    shift_accumulator(42);
+    memory_[output] = accumulator_;
+    return registers_[015];
+}
+
+std::uint16_t Machine::p16457_shift_record()
+{
+    // 16457..16462: an empty +1 word selects the r1-relative continuation at
+    // 74202. Otherwise shift +1 and +2 toward the head, clear +2 from word 0,
+    // and select the r1-relative continuation at 74206.
+    accumulator_ = memory_[address_add(registers_[003], 1)];
+    select_alu_group(rau_logical);
+    if (accumulator_.raw() == 0) {
+        return address_add(registers_[001], 074202);
+    }
+
+    memory_[registers_[003]] = accumulator_;
+    accumulator_ = memory_[address_add(registers_[003], 2)];
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[003], 1)] = accumulator_;
+    accumulator_ = memory_[0];
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[003], 2)] = accumulator_;
+    return address_add(registers_[001], 074206);
+}
+
+std::uint16_t Machine::p16505_begin_record_shift()
+{
+    // 16505..16506: preserve the incoming accumulator and caller link on the
+    // hardware stack, then call the already translated record-shift entry.
+    // Its 16463/16467 continuations eventually return at 16507.
+    its(015);
+    memory_[registers_[017]] = accumulator_;
+    registers_[015] = 016507;
+    return p16457_shift_record();
+}
+
+std::uint16_t Machine::p16507_resume_record_shift()
+{
+    // 16507..16510: restore the caller link and incoming accumulator, balance
+    // r17, and select the original r1-relative continuation at 74216.
+    accumulator_ = memory_[registers_[017]];
+    select_alu_group(rau_logical);
+    sti(015);
+    return address_add(registers_[001], 074216);
+}
+
+std::uint16_t Machine::p20245_begin_input_continue()
+{
+    // 20245..20252: select the available console path. The returned addresses
+    // 20321, 20250, 20252, and 20256 are explicit Э74/Э64/Э71 boundaries;
+    // no host console behavior is substituted here.
+    registers_[010] = 020170;
+    accumulator_ = memory_[020377];
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (accumulator_.raw() == 0) {
+        return 020321;
+    }
+
+    accumulator_ = memory_[020375];
+    select_alu_group(rau_logical);
+    accumulator_ = accumulator_ & memory_[020333];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (accumulator_.raw() != 0) {
+        return 020250;
+    }
+
+    accumulator_ = memory_[020362];
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    return accumulator_.raw() == 0 ? 020256 : 020252;
+}
+
+std::uint16_t Machine::p20252_query_console()
+{
+    // 20252: Э71 uses the POPLAN readiness-query word at r10+0146, then
+    // continues directly with the status decoding at 20253.
+    emulate_e71(address_add(registers_[010], 0146));
+    return p20253_resume_input_continue_status();
+}
+
+std::uint16_t Machine::p20253_resume_input_continue_status()
+{
+    // 20253..20255: decode the word returned by Э71 0146 using the original
+    // APX mask and tag comparisons. The two exceptional continuations remain
+    // boundaries; the normal path proceeds to Э71 0177 at 20256.
+    accumulator_ = pack_bits(accumulator_, memory_[020365]);
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[020322].raw());
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (accumulator_.raw() == 0) {
+        return 020261;
+    }
+
+    remainder_ = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[020323].raw());
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    return accumulator_.raw() == 0 ? 020715 : 020256;
+}
+
+std::uint16_t Machine::p20256_transfer_console()
+{
+    // 20256: execute the runtime-built terminal control word at r10+0177.
+    // Its right instruction requests the standard Э71 status result.
+    emulate_e71(address_add(registers_[010], 0177));
+    return p20257_finish_input_continue();
+}
+
+std::uint16_t Machine::p20257_finish_input_continue()
+{
+    // 20257..20260: after Э71 0177, mark input/output continuation state as
+    // available and return through the caller's r15 link.
+    accumulator_ = memory_[020326];
+    select_alu_group(rau_logical);
+    memory_[020362] = accumulator_;
     return registers_[015];
 }
 

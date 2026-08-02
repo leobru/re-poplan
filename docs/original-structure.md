@@ -29,8 +29,16 @@ The first translated C++ routines retain their original addresses:
 | `03261` | `p03261_enter_function` | Enter a function through the saved descriptor |
 | `03275` | `p03275_push_acc` | Decrement `r6`, then store the accumulator |
 | `03277` | `p03277_pop_acc` | Load through `r6`, then increment `r6` |
+| `15765` | `p15765_dispatch_special_function` | Expand a `664` descriptor's counted values and redispatch its nested function |
 | `20110` | `p20110_transfer_arguments` | Transfer POP-stack arguments into an activation |
 | `20124` | `p20124_build_activation` | Build an activation and push its actual values |
+
+The static `NEWARR` value `6641223600000000` establishes the special branch's
+layout. Environment word `12242` points at the counted vector beginning at
+`12243`; count `3` causes values `12244` and `12245` to be pushed. Environment
+word `12241` contains `6600000000012164`, which is then sent back through
+`02750`. The C++ translation retains this indirection and stack order rather
+than replacing `NEWARR` with a host primitive.
 
 ## Dictionary
 
