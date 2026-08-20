@@ -21,6 +21,8 @@
 
 #include "poplan/machine.hpp"
 
+#include <chrono>
+#include <ctime>
 #include <istream>
 #include <sstream>
 
@@ -84,6 +86,28 @@ std::string unsupported_instruction(std::uint16_t pc,
     return message.str();
 }
 
+std::uint64_t jiffies_since_midnight()
+{
+    using namespace std::chrono;
+
+    const system_clock::time_point now = system_clock::now();
+    const system_clock::time_point whole_second =
+        time_point_cast<seconds>(now);
+    const std::time_t time = system_clock::to_time_t(whole_second);
+    const std::tm *local = std::localtime(&time);
+    if (local == nullptr) {
+        throw MachineError("cannot determine local time for E53/010");
+    }
+
+    const auto microseconds = duration_cast<std::chrono::microseconds>(
+        now - whole_second).count();
+    const std::uint64_t seconds_since_midnight =
+        static_cast<std::uint64_t>(
+            (local->tm_hour * 60 + local->tm_min) * 60 + local->tm_sec);
+    return seconds_since_midnight * 50
+        + static_cast<std::uint64_t>(microseconds / 20000);
+}
+
 } // namespace
 
 void Machine::load_image(std::istream &input)
@@ -112,6 +136,7 @@ void Machine::start(std::uint16_t address, bool right_half)
     instruction_modifier_ = 0;
     instruction_count_ = 0;
     translated_routine_count_ = 0;
+    execution_started_at_ = std::chrono::steady_clock::now();
 }
 
 void Machine::boot_static_image()
@@ -369,8 +394,21 @@ ExecutionStatus Machine::step()
         registers_[0] = 0;
         break;
     }
+    case 074: {
+        const std::uint16_t address = effective_address();
+        registers_[016] = address;
+        select_alu_group(rau_logical);
+        if (address != 0) {
+            throw MachineError(
+                "E74 nonzero exit operation is unsupported");
+        }
+        ++instruction_count_;
+        return ExecutionStatus::halted;
+    }
     case 050:
     case 053:
+    case 063:
+    case 064:
     case 067:
     case 070:
     case 071:
@@ -387,7 +425,18 @@ ExecutionStatus Machine::step()
                 break;
             case 053:
                 if (address == 010) {
-                    accumulator_ = Word48(0000000006025713ULL);
+                    accumulator_ = Word48(jiffies_since_midnight());
+                }
+                break;
+            case 063:
+                if (address == 04) {
+                    const auto elapsed =
+                        std::chrono::steady_clock::now()
+                        - execution_started_at_;
+                    accumulator_ = Word48(
+                        std::chrono::duration_cast<
+                            std::chrono::milliseconds>(elapsed).count()
+                        / 20);
                 }
                 break;
             case 071:
@@ -406,6 +455,9 @@ ExecutionStatus Machine::step()
             }
             case 070:
             case 072:
+            case 064:
+                // POPLAN only uses this formatted-output extracode as an
+                // optional reporting path; the C++ console path may ignore it.
                 break;
             case 075:
                 if (address != 0) {
@@ -495,10 +547,20 @@ bool Machine::dispatch_translated_routine()
     if (right_half_) {
         return false;
     }
+    for (const std::uint16_t address : disabled_translated_routines_) {
+        if (program_counter_ == address) {
+            return false;
+        }
+    }
 
     std::uint16_t continuation = 0;
     switch (program_counter_) {
+    case 01107: continuation = p01107(); break;
+    case 01140: continuation = p01140(); break;
+    case 01151: continuation = p01151(); break;
     case 02750: continuation = p02750_dispatch(); break;
+    case 02767: continuation = p02767(); break;
+    case 02770: continuation = p02770(); break;
     case 03014: continuation = p03014_dispatch_error(); break;
     case 03051: continuation = p03051_unpack_error(); break;
     case 03057: continuation = p03057_begin_error_format(); break;
@@ -514,35 +576,159 @@ bool Machine::dispatch_translated_routine()
         p03277_pop_acc();
         continuation = registers_[015];
         break;
+    case 03301: continuation = p03301(); break;
+    case 03303: continuation = p03303_store_stack_top(); break;
+    case 03413: continuation = p03413_numeric_update(); break;
+    case 03516: continuation = p03516(); break;
+    case 03536: continuation = p03536(); break;
+    case 04322: continuation = p04322(); break;
+    case 04330: continuation = p04330(); break;
+    case 04334: continuation = p04334(); break;
+    case 04335: continuation = p04335(); break;
+    case 04343: continuation = p04343(); break;
+    case 04350: continuation = p04350(); break;
+    case 04351: continuation = p04351(); break;
+    case 04352: continuation = p04352(); break;
+    case 04353: continuation = p04353(); break;
+    case 04354: continuation = p04354(); break;
+    case 04447: continuation = p04447(); break;
+    case 04455: continuation = p04455(); break;
+    case 04467: continuation = p04467(); break;
+    case 04471: continuation = p04471(); break;
+    case 04503: continuation = p04503(); break;
+    case 04504: continuation = p04504(); break;
+    case 05207: continuation = p05207(); break;
+    case 05211: continuation = p05211(); break;
+    case 05215: continuation = p05215(); break;
+    case 05221: continuation = p05221(); break;
+    case 05430: continuation = p05430(); break;
+    case 05433: continuation = p05433(); break;
+    case 05434: continuation = p05434(); break;
+    case 05435: continuation = p05435(); break;
+    case 05436: continuation = p05436(); break;
+    case 05440: continuation = p05440(); break;
+    case 05441: continuation = p05441(); break;
+    case 05447: continuation = p05447(); break;
+    case 06343: continuation = p06343(); break;
+    case 06346: continuation = p06346(); break;
+    case 06354: continuation = p06354(); break;
+    case 06372: continuation = p06372(); break;
+    case 06374: continuation = p06374(); break;
+    case 06401: continuation = p06401(); break;
+    case 06526: continuation = p06526(); break;
+    case 06534: continuation = p06534(); break;
+    case 06536: continuation = p06536(); break;
+    case 06545: continuation = p06545(); break;
+    case 06556: continuation = p06556(); break;
+    case 06560: continuation = p06560(); break;
+    case 06561: continuation = p06561(); break;
+    case 06650: continuation = p06650(); break;
+    case 06657: continuation = p06657(); break;
+    case 06660: continuation = p06660(); break;
+    case 06661: continuation = p06661(); break;
+    case 06712: continuation = p06712(); break;
+    case 06733: continuation = p06733(); break;
+    case 06734: continuation = p06734_error(); break;
+    case 06735: continuation = p06735_add(); break;
+    case 06740: continuation = p06740(); break;
+    case 06741: continuation = p06741_error(); break;
+    case 06742: continuation = p06742_subtract(); break;
+    case 06744: continuation = p06744(); break;
+    case 06745: continuation = p06745_error(); break;
+    case 06746: continuation = p06746_multiply(); break;
+    case 06750: continuation = p06750(); break;
+    case 06751: continuation = p06751_error(); break;
+    case 06752: continuation = p06752_divide(); break;
     case 07475: continuation = p07475_cuchin(); break;
-    case 11541: continuation = p11541_match_tagged_value(); break;
-    case 15765: continuation = p15765_dispatch_special_function(); break;
-    case 16313: continuation = p16313_begin_character_sequence(); break;
-    case 16321: continuation = p16321_dispatch_character(); break;
-    case 16325: continuation = p16325_continue_character_sequence(); break;
-    case 16421: continuation = p16421_lookup_tagged_byte(); break;
-    case 16457: continuation = p16457_shift_record(); break;
-    case 16505: continuation = p16505_begin_record_shift(); break;
-    case 16507: continuation = p16507_resume_record_shift(); break;
-    case 20110: continuation = p20110_transfer_arguments(); break;
-    case 20124: continuation = p20124_build_activation(); break;
-    case 20245: continuation = p20245_begin_input_continue(); break;
-    case 20252: continuation = p20252_query_console(); break;
-    case 20253: continuation = p20253_resume_input_continue_status(); break;
-    case 20256: continuation = p20256_transfer_console(); break;
-    case 20257: continuation = p20257_finish_input_continue(); break;
-    case 21255: continuation = p21255_begin_character_input(); break;
-    case 21260: continuation = p21260_forward_converted_character(); break;
-    case 21261: continuation = p21261_return_character(); break;
-    case 21264: continuation = p21264_convert_character(); break;
-    case 21274: continuation = p21274_decode_character(); break;
-    case 21275: continuation = p21275_encode_character(); break;
-    case 21431: continuation = p21431_buffer_char(); break;
-    case 21443: continuation = p21443_advance_descriptor(); break;
-    case 25346: continuation = p25346_begin_character_output(); break;
-    case 25350: continuation = p25350_continue_character_output(); break;
-    case 25361: continuation = p25361_resume_character_output(); break;
-    case 25364: continuation = p25364_return_character_output(); break;
+    case 011500: continuation = p11500(); break;
+    case 011536: continuation = p11536(); break;
+    case 011541: continuation = p11541_match_tagged_value(); break;
+    case 011673: continuation = p11673_begin_generated_update(); break;
+    case 011675: continuation = p11675_continue_generated_update(); break;
+    case 011701: continuation = p11701_match_generated_value(); break;
+    case 011703: continuation = p11703_update_generated_value(); break;
+    case 011710: continuation = p11710_finish_generated_update(); break;
+    case 011717: continuation = p11717_begin_generated_binding(); break;
+    case 011720: continuation = p11720_finish_generated_binding(); break;
+    case 011726: continuation = p11726_begin_generated_rebinding(); break;
+    case 011727: continuation = p11727_continue_generated_rebinding(); break;
+    case 011731: continuation = p11731_finish_generated_rebinding(); break;
+    case 015765: continuation = p15765_dispatch_special_function(); break;
+    case 016313: continuation = p16313_begin_character_sequence(); break;
+    case 016321: continuation = p16321_dispatch_character(); break;
+    case 016325: continuation = p16325_continue_character_sequence(); break;
+    case 016341: continuation = p16341(); break;
+    case 016347: continuation = p16347(); break;
+    case 016350: continuation = p16350(); break;
+    case 016421: continuation = p16421_lookup_tagged_byte(); break;
+    case 016457: continuation = p16457_shift_record(); break;
+    case 016477: continuation = p16477(); break;
+    case 016502: continuation = p16502(); break;
+    case 016503: continuation = p16503(); break;
+    case 016505: continuation = p16505_begin_record_shift(); break;
+    case 016507: continuation = p16507_resume_record_shift(); break;
+    case 017242: continuation = p17242(); break;
+    case 017253: continuation = p17253(); break;
+    case 017254: continuation = p17254_shared(); break;
+    case 017260: continuation = p17260(); break;
+    case 017266: continuation = p17266(); break;
+    case 017275: continuation = p17275_shared(); break;
+    case 017302: continuation = p17302(); break;
+    case 017306: continuation = p17306(); break;
+    case 017337: continuation = p17337(); break;
+    case 017340: continuation = p17340(); break;
+    case 017341: continuation = p17341(); break;
+    case 017342: continuation = p17342(); break;
+    case 017013: continuation = p17013(); break;
+    case 017015: continuation = p17015(); break;
+    case 017021: continuation = p17021(); break;
+    case 017023: continuation = p17023(); break;
+    case 017045: continuation = p17045(); break;
+    case 017047: continuation = p17047(); break;
+    case 020077: continuation = p20077(); break;
+    case 020101: continuation = p20101(); break;
+    case 020110: continuation = p20110_transfer_arguments(); break;
+    case 020124: continuation = p20124_build_activation(); break;
+    case 020170: continuation = p20170_input_primary(); break;
+    case 020175: continuation = p20175_resume_input_primary(); break;
+    case 020177: continuation = p20177_continue_input_primary(); break;
+    case 020201: continuation = p20201_resume_input_status(); break;
+    case 020202: continuation = p20202_prepare_input_transfer(); break;
+    case 020206: continuation = p20206_resume_input_transfer(); break;
+    case 020210: continuation = p20210_finish_input_primary(); break;
+    case 020245: continuation = p20245_begin_input_continue(); break;
+    case 020252: continuation = p20252_query_console(); break;
+    case 020253: continuation = p20253_resume_input_continue_status(); break;
+    case 020256: continuation = p20256_transfer_console(); break;
+    case 020257: continuation = p20257_finish_input_continue(); break;
+    case 020673: continuation = p20673_return(); break;
+    case 021251: continuation = p21251_extract_character(); break;
+    case 021253: continuation = p21253_resume_character_extract(); break;
+    case 021255: continuation = p21255_begin_character_input(); break;
+    case 021260: continuation = p21260_forward_converted_character(); break;
+    case 021261: continuation = p21261_return_character(); break;
+    case 021264: continuation = p21264_convert_character(); break;
+    case 021274: continuation = p21274_decode_character(); break;
+    case 021275: continuation = p21275_encode_character(); break;
+    case 021431: continuation = p21431_buffer_char(); break;
+    case 021443: continuation = p21443_advance_descriptor(); break;
+    case 021464: continuation = p21464(); break;
+    case 021473: continuation = p21473(); break;
+    case 021476: continuation = p21476(); break;
+    case 021501: continuation = p21501(); break;
+    case 021502: continuation = p21502(); break;
+    case 021510: continuation = p21510(); break;
+    case 021511: continuation = p21511(); break;
+    case 021516: continuation = p21516(); break;
+    case 025346: continuation = p25346_begin_character_output(); break;
+    case 025350: continuation = p25350_continue_character_output(); break;
+    case 025356: continuation = p25356_emit_end_character(); break;
+    case 025361: continuation = p25361_resume_character_output(); break;
+    case 025364: continuation = p25364_return_character_output(); break;
+    case 025370: continuation = p25370_begin_token_source(); break;
+    case 025373: continuation = p25373_resume_token_source(); break;
+    case 025376: continuation = p25376_fetch_token_character(); break;
+    case 025377: continuation = p25377_finish_token_source(); break;
     default:
         return false;
     }

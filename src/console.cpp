@@ -83,6 +83,104 @@ std::uint8_t ascii_to_gost(unsigned char byte)
     }
 }
 
+std::uint8_t unicode_to_gost(std::uint32_t codepoint)
+{
+    if (codepoint <= 0x7f) {
+        return ascii_to_gost(static_cast<unsigned char>(codepoint));
+    }
+
+    // GOST-10859 follows Russian alphabetical order through Щ, then places
+    // Ъ at 0135 and resumes Ы..Я at 0072..0076. Lowercase Unicode input uses
+    // the same uppercase-only terminal codes.
+    if (codepoint >= 0x0410 && codepoint <= 0x0429) {
+        return static_cast<std::uint8_t>(0040 + codepoint - 0x0410);
+    }
+    if (codepoint >= 0x0430 && codepoint <= 0x0449) {
+        return static_cast<std::uint8_t>(0040 + codepoint - 0x0430);
+    }
+    if (codepoint == 0x042a || codepoint == 0x044a) {
+        return 0135;
+    }
+    if (codepoint >= 0x042b && codepoint <= 0x042f) {
+        return static_cast<std::uint8_t>(0072 + codepoint - 0x042b);
+    }
+    if (codepoint >= 0x044b && codepoint <= 0x044f) {
+        return static_cast<std::uint8_t>(0072 + codepoint - 0x044b);
+    }
+
+    switch (codepoint) {
+    case 0x2018: return 0032;
+    case 0x2019: return 0033;
+    case 0x2015: return 0131;
+    case 0x2032: return 0137;
+    case 0x203e: return 0115;
+    case 0x2191: return 0021;
+    case 0x2227: return 0121;
+    case 0x2228: return 0120;
+    case 0x2260: return 0034;
+    case 0x2261: return 0125;
+    case 0x2264: return 0116;
+    case 0x2265: return 0117;
+    case 0x2283: return 0122;
+    case 0x23e8: return 0020;
+    case 0x25c7: return 0127;
+    case 0x2a7d: return 0116;
+    case 0x2a7e: return 0117;
+    default: return 0017;
+    }
+}
+
+std::vector<std::uint8_t> utf8_to_gost(const std::string &text)
+{
+    std::vector<std::uint8_t> encoded;
+    encoded.reserve(text.size());
+
+    for (std::size_t index = 0; index < text.size();) {
+        const auto first = static_cast<unsigned char>(text[index]);
+        std::uint32_t codepoint = first;
+        std::size_t length = 1;
+        std::uint32_t minimum = 0;
+        if ((first & 0xe0) == 0xc0) {
+            codepoint = first & 0x1f;
+            length = 2;
+            minimum = 0x80;
+        } else if ((first & 0xf0) == 0xe0) {
+            codepoint = first & 0x0f;
+            length = 3;
+            minimum = 0x800;
+        } else if ((first & 0xf8) == 0xf0) {
+            codepoint = first & 0x07;
+            length = 4;
+            minimum = 0x10000;
+        } else if (first >= 0x80) {
+            encoded.push_back(0017);
+            ++index;
+            continue;
+        }
+
+        bool valid = index + length <= text.size();
+        for (std::size_t offset = 1; valid && offset < length; ++offset) {
+            const auto continuation =
+                static_cast<unsigned char>(text[index + offset]);
+            if ((continuation & 0xc0) != 0x80) {
+                valid = false;
+                break;
+            }
+            codepoint = (codepoint << 6) | (continuation & 0x3f);
+        }
+        if (!valid || codepoint < minimum || codepoint > 0x10ffff
+            || (codepoint >= 0xd800 && codepoint <= 0xdfff)) {
+            encoded.push_back(0017);
+            ++index;
+            continue;
+        }
+
+        encoded.push_back(unicode_to_gost(codepoint));
+        index += length;
+    }
+    return encoded;
+}
+
 char gost_to_ascii(std::uint8_t byte)
 {
     if (byte <= 0011) {
@@ -250,11 +348,7 @@ int run_io_shell(Machine &machine, std::istream &input,
             line.pop_back();
         }
 
-        std::vector<std::uint8_t> encoded;
-        encoded.reserve(line.size());
-        for (const unsigned char byte : line) {
-            encoded.push_back(ascii_to_gost(byte));
-        }
+        std::vector<std::uint8_t> encoded = utf8_to_gost(line);
         if (encoded.size() >= input_capacity) {
             encoded.resize(input_capacity - 1);
         }
@@ -287,6 +381,27 @@ int run_image_shell(Machine &machine, std::istream &input,
         std::getenv("POPLAN_ROUTINE_TRACE") != nullptr;
     if (std::getenv("POPLAN_INTERPRET_ONLY") != nullptr) {
         machine.set_translated_routines_enabled(false);
+    }
+    if (const char *disabled =
+            std::getenv("POPLAN_DISABLE_TRANSLATED_ROUTINES")) {
+        const char *cursor = disabled;
+        while (*cursor != '\0') {
+            char *end = nullptr;
+            const unsigned long address = std::strtoul(cursor, &end, 8);
+            if (end == cursor || address > 077777) {
+                throw MachineError(
+                    "invalid POPLAN_DISABLE_TRANSLATED_ROUTINES address");
+            }
+            machine.disable_translated_routine(
+                static_cast<std::uint16_t>(address));
+            cursor = end;
+            if (*cursor == ',') {
+                ++cursor;
+            } else if (*cursor != '\0') {
+                throw MachineError(
+                    "invalid POPLAN_DISABLE_TRANSLATED_ROUTINES separator");
+            }
+        }
     }
     bool prompt_pending = false;
     std::string line;
@@ -338,11 +453,7 @@ int run_image_shell(Machine &machine, std::istream &input,
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
-        std::vector<std::uint8_t> encoded;
-        encoded.reserve(line.size());
-        for (const unsigned char byte : line) {
-            encoded.push_back(ascii_to_gost(byte));
-        }
+        std::vector<std::uint8_t> encoded = utf8_to_gost(line);
         machine.queue_console_input(std::move(encoded));
     }
     std::ostringstream message;

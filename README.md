@@ -91,14 +91,36 @@ make cpp-quine
 ```
 
 The executable's GOST-10859 output conversion preserves the historical mixed
-Cyrillic/Latin glyphs used by the existing regression fixtures.
+Cyrillic/Latin glyphs used by the existing regression fixtures. Input is
+decoded as UTF-8; uppercase and lowercase Russian letters are mapped to the
+uppercase-only GOST alphabet, including its noncontiguous `Ъ` code.
 
 Image execution is hybrid: whenever the PC reaches the left-half entry of an
 implemented `pXXXXX` routine, that semantic C++ routine runs as one machine
 step and returns its continuation address. All other addresses fall back to
 the BESM instruction interpreter. `POPLAN_ROUTINE_TRACE=1` prints each such
 dispatch; `POPLAN_INTERPRET_ONLY=1` disables semantic dispatch for differential
-trace comparisons.
+trace comparisons. `POPLAN_DISABLE_TRANSLATED_ROUTINES=03235,03261` disables
+selected octal entries when isolating a semantic mismatch.
+
+The saved quine trace currently has semantic dispatch for 50 of its 98 direct
+`vjm` targets; the remaining 48 addresses are listed in
+`subroutines-from-trace.md`.
+
+Extracode `053` with address `010` returns local time since midnight in
+1/50-second jiffies, including the current 20 ms fraction.
+Extracode `063` with address `004` returns elapsed image-execution time in the
+same 1/50-second units.
+Extracode `064` formatted output is accepted as a no-op; POPLAN's emulated
+console path uses `Э71` for observable terminal I/O.
+Extracode `074` with address `000` terminates image execution normally.
+
+The historical UTF-8 Cyrillic example corpus can be checked in both hybrid
+and instruction-only modes with:
+
+```sh
+make cpp-zone1224
+```
 
 ## Running POPLAN
 

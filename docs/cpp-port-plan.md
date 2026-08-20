@@ -22,33 +22,69 @@ introduced only after that baseline is observable in a focused C++ test.
 
 The address-preserving machine layer now translates:
 
+- `01107..01166` traced hash construction, collision-chain lookup, allocation
+  continuations, and register restoration for entry `01107`;
 - `02750..02763` function validation and dispatch;
+- `02767..03005` indirect evaluator selection and validation;
 - `03014..03071` normal diagnostic packaging, unpacking, and first formatter
   call;
 - `03072..03100` first formatter-call restoration and heading setup;
 - `03206..03234` ordinary-call setup and captured-slot preparation;
 - `03235..03260` environment binding and restoration;
 - `03261..03264` function entry;
-- `03275`, `03277` POP value-stack operations;
+- `03275`, `03277`, `03301`, and `03303` POP value-stack operations;
+- `03413..03423` traced numeric-update arithmetic;
+- `03516..03520` addressed-word replacement;
+- `03536..03541` computed-continuation frame construction;
+- `04322..04355` classification, record update, and nested dispatch
+  continuations;
+- `04447..04455` allocator wrapper and generated-store continuation;
+- `04467..04504` compiler/evaluator wrapper and record-result continuation;
+- `05207` and `05211` indirect object-word loads;
+- `05215..05225` tagged two-word allocation and initialization;
+- `05430..05447` allocation wrapper, common-list allocator, and return
+  continuations;
+- `06343..06561` trace-confirmed compiler/evaluator entry cluster and its
+  translated continuations;
+- `06650..06661` generated comparison and diagnostic continuations;
+- `06712..06754` arithmetic normalization and add, subtract, multiply, and
+  divide entry paths;
 - `07475..07504` traced `CUCHIN` argument paths;
-- `11541..11545` tagged-value/frame-field match and diagnostic exit;
+- `11500..11502` frame-relative indexed load;
+- `11536..11545` tagged-value precheck, frame-field match, and diagnostic
+  exits;
+- `11673..11745` generated quine update/binding cluster, including its unique
+  `r14` linkage;
 - `15765..16003` special-function argument expansion and evaluator
   redispatch;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
+- `16341..16350` trace-confirmed compiler dispatch frame and restoration;
 - `16421..16434` tagged-low-byte validation and packed-table lookup;
 - `16457..16462` three-word record shift and continuation selection;
+- `16477..16504` record-word presence check, evaluator call, and result store;
 - `16505..16510` record-shift call wrapper and caller restoration;
+- `17013..17052` trace-confirmed evaluator wrapper paths;
+- `17242..17253` shared long/short table-scan entries;
+- `17254..17266` shared table read and its allocation continuation;
+- `17275..17306` shared table write and its allocation continuation;
+- `17337..17342` descriptor-selecting wrappers for those shared table bodies;
+- `20077..20106` generated return selection and restoration;
 - `20110..20123` activation argument transfer;
 - `20124..20140` activation construction;
+- `20170..20223` traced primary-input readiness and transfer continuations;
 - `20245..20260` continuation-state selection, `Э71` readiness/output
   transfers, and post-extracode status/completion entries;
+- `20673` trivial register return;
 - `21255..21257` character-input wrapper entry;
+- `21251..21254` character extraction and conversion return;
 - `21260..21275` table-driven character forwarding, return, decode, and
   encode entries;
 - `21431..21440` packed-text character extraction and cursor advance;
 - `21443..21454` packed-byte insertion and descriptor advance;
+- `21464..21522` trace-confirmed evaluator classification and return paths;
 - `25346..25365` converted-character output, counting, continuation resume,
-  and return entries.
+  and return entries;
+- `25356` and `25370..25405` end-character and packed token-source paths.
 
 The C++ tests compare the one-argument `20124` transition at generated entry
 `65576` with the BESM trace, exercise a three-argument activation round trip,
@@ -70,15 +106,17 @@ image. Before fetching a BESM instruction, the machine dispatches a recognized
 left-half `pXXXXX` entry to its address-preserving semantic implementation;
 untranslated addresses fall back to the instruction interpreter. Its Э71
 adapter supplies prompts, line input, record output, and GOST-10859 UTF-8
-conversion. Э75 stores generated instruction words into memory, so the
+conversion in both directions, including Unicode Cyrillic input. Э75 stores
+generated instruction words into memory, so the
 historical compiler and evaluator run unchanged inside this machine layer.
-`make cpp-quine` matches the existing normalized quine fixture, and its
-completed 136038-instruction sequence matches the saved native trace through
-the final host-EOF input request. This raw-image route is a whole-system
+`make cpp-quine` matches the existing normalized quine fixture through the
+final host-EOF input request. This raw-image route is a whole-system
 conformance path, not a substitute for continuing the address-preserving
-routine translations. The instruction fallback can be disabled for
-differential testing with `POPLAN_INTERPRET_ONLY=1`; the long-term target is
-to make that fallback unnecessary by expanding the translated-entry set.
+routine translations. Semantic dispatch can be disabled for differential
+testing with `POPLAN_INTERPRET_ONLY=1`; the long-term target is to make the
+fallback unnecessary by expanding the translated-entry set.
+`zone1224.pop2` now completes identically in hybrid and instruction-only
+modes; that run also exercises captured-slot paths through translated `03206`.
 
 ## Port Order
 

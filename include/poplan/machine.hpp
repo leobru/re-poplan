@@ -4,6 +4,7 @@
 #include "poplan/word48.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <iosfwd>
@@ -96,14 +97,69 @@ public:
     {
         return translated_routines_enabled_;
     }
+    void disable_translated_routine(std::uint16_t address)
+    {
+        disabled_translated_routines_.push_back(address & 077777);
+    }
 
     // Literal translations of POPLAN entries 03275 and 03277.
     void p03275_push_acc();
     void p03277_pop_acc();
+    std::uint16_t p03301();
+    std::uint16_t p03303_store_stack_top();
+    std::uint16_t p03516();
+    std::uint16_t p03536();
+
+    // Short indirect-load helpers used by the evaluator and record code.
+    std::uint16_t p05207();
+    std::uint16_t p05211();
+    std::uint16_t p05215();
+    std::uint16_t p05221();
+
+    // Numeric helper reached by the generated quine evaluator loop.
+    std::uint16_t p03413_numeric_update();
+    std::uint16_t p05430();
+    std::uint16_t p05433();
+    std::uint16_t p05434();
+    std::uint16_t p05435();
+    std::uint16_t p05436();
+    std::uint16_t p05440();
+    std::uint16_t p05441();
+    std::uint16_t p05447();
 
     // Decode performed by the first part of EVAL_DISPATCH at 02750.
     FunctionDescriptor p02750_decode_function() const;
     std::uint16_t p02750_dispatch();
+    std::uint16_t p02767();
+    std::uint16_t p02770();
+    std::uint16_t p01107();
+
+    // Trace-confirmed compiler/evaluator entries.  The neutral address names
+    // are intentional until the original dictionary establishes stronger
+    // semantics for these blocks.
+    std::uint16_t p06343();
+    std::uint16_t p06526();
+    std::uint16_t p06712();
+    std::uint16_t p06733();
+    std::uint16_t p06740();
+    std::uint16_t p06744();
+    std::uint16_t p06750();
+    std::uint16_t p11500();
+    std::uint16_t p16341();
+    std::uint16_t p16477();
+    std::uint16_t p06650();
+    std::uint16_t p04322();
+    std::uint16_t p04447();
+    std::uint16_t p04467();
+    std::uint16_t p17013();
+    std::uint16_t p17021();
+    std::uint16_t p17045();
+    std::uint16_t p17337();
+    std::uint16_t p17340();
+    std::uint16_t p17341();
+    std::uint16_t p17342();
+    std::uint16_t p20077();
+    std::uint16_t p21464();
 
     // Literal translations of the ordinary-function call cluster.
     // The return value is the next BESM-6 instruction address.
@@ -114,6 +170,13 @@ public:
     // Literal translations of the activation/argument-transfer entries.
     std::uint16_t p20110_transfer_arguments();
     std::uint16_t p20124_build_activation();
+    std::uint16_t p20170_input_primary();
+    std::uint16_t p20175_resume_input_primary();
+    std::uint16_t p20177_continue_input_primary();
+    std::uint16_t p20201_resume_input_status();
+    std::uint16_t p20202_prepare_input_transfer();
+    std::uint16_t p20206_resume_input_transfer();
+    std::uint16_t p20210_finish_input_primary();
 
     // Literal translations of the diagnostic call path. 03014 packages the
     // source object and tagged error code; 03051 unpacks them for 03057,
@@ -125,7 +188,18 @@ public:
 
     // Primitive-runtime entries reached by the first diagnostic-format call.
     std::uint16_t p07475_cuchin();
+    std::uint16_t p11536();
     std::uint16_t p11541_match_tagged_value();
+    std::uint16_t p11673_begin_generated_update();
+    std::uint16_t p11675_continue_generated_update();
+    std::uint16_t p11701_match_generated_value();
+    std::uint16_t p11703_update_generated_value();
+    std::uint16_t p11710_finish_generated_update();
+    std::uint16_t p11717_begin_generated_binding();
+    std::uint16_t p11720_finish_generated_binding();
+    std::uint16_t p11726_begin_generated_rebinding();
+    std::uint16_t p11727_continue_generated_rebinding();
+    std::uint16_t p11731_finish_generated_rebinding();
     std::uint16_t p16313_begin_character_sequence();
     std::uint16_t p16321_dispatch_character();
     std::uint16_t p16325_continue_character_sequence();
@@ -134,12 +208,17 @@ public:
     std::uint16_t p16457_shift_record();
     std::uint16_t p16505_begin_record_shift();
     std::uint16_t p16507_resume_record_shift();
+    std::uint16_t p17242();
+    std::uint16_t p17253();
     std::uint16_t p20245_begin_input_continue();
     std::uint16_t p20252_query_console();
     std::uint16_t p20253_resume_input_continue_status();
     std::uint16_t p20256_transfer_console();
     std::uint16_t p20257_finish_input_continue();
+    std::uint16_t p20673_return();
     std::uint16_t p21255_begin_character_input();
+    std::uint16_t p21251_extract_character();
+    std::uint16_t p21253_resume_character_extract();
     std::uint16_t p21260_forward_converted_character();
     std::uint16_t p21261_return_character();
     std::uint16_t p21264_convert_character();
@@ -151,6 +230,11 @@ public:
     std::uint16_t p25350_continue_character_output();
     std::uint16_t p25361_resume_character_output();
     std::uint16_t p25364_return_character_output();
+    std::uint16_t p25356_emit_end_character();
+    std::uint16_t p25370_begin_token_source();
+    std::uint16_t p25373_resume_token_source();
+    std::uint16_t p25376_fetch_token_character();
+    std::uint16_t p25377_finish_token_source();
 
 private:
     static std::uint16_t address_add(std::uint16_t value, int delta)
@@ -181,6 +265,77 @@ private:
     void xts(std::uint16_t address);
     void sti(std::size_t index);
     void stx(std::uint16_t address);
+    std::uint16_t p06727_finish_arithmetic();
+    std::uint16_t p01122_shared();
+    std::uint16_t p01140();
+    std::uint16_t p01151();
+    std::uint16_t p01154_finish();
+    std::uint16_t p01160_finish();
+    std::uint16_t p04330();
+    std::uint16_t p04334();
+    std::uint16_t p04335();
+    std::uint16_t p04343();
+    std::uint16_t p04350();
+    std::uint16_t p04351();
+    std::uint16_t p04352();
+    std::uint16_t p04353();
+    std::uint16_t p04354();
+    std::uint16_t p04455();
+    std::uint16_t p04471();
+    std::uint16_t p04503();
+    std::uint16_t p04504();
+    std::uint16_t p06734_error();
+    std::uint16_t p06735_add();
+    std::uint16_t p06741_error();
+    std::uint16_t p06742_subtract();
+    std::uint16_t p06745_error();
+    std::uint16_t p06746_multiply();
+    std::uint16_t p06751_error();
+    std::uint16_t p06752_divide();
+    std::uint16_t p06346();
+    std::uint16_t p06345();
+    std::uint16_t p06352();
+    std::uint16_t p06354();
+    std::uint16_t p06360();
+    std::uint16_t p06363();
+    std::uint16_t p06367();
+    std::uint16_t p06372();
+    std::uint16_t p06374();
+    std::uint16_t p06375();
+    std::uint16_t p06401();
+    std::uint16_t p06403();
+    std::uint16_t p06530();
+    std::uint16_t p06534();
+    std::uint16_t p06536();
+    std::uint16_t p06545();
+    std::uint16_t p06556();
+    std::uint16_t p06560();
+    std::uint16_t p06561();
+    std::uint16_t p16347();
+    std::uint16_t p16350();
+    std::uint16_t p16502();
+    std::uint16_t p16503();
+    std::uint16_t p06657();
+    std::uint16_t p06660();
+    std::uint16_t p06661();
+    std::uint16_t p17015();
+    std::uint16_t p17023();
+    std::uint16_t p17047();
+    std::uint16_t p17254_shared();
+    std::uint16_t p17260();
+    std::uint16_t p17266();
+    std::uint16_t p17275_shared();
+    std::uint16_t p17302();
+    std::uint16_t p17306();
+    std::uint16_t p20101();
+    std::uint16_t p21473();
+    std::uint16_t p21476();
+    std::uint16_t p21501();
+    std::uint16_t p21502();
+    std::uint16_t p21510();
+    std::uint16_t p21511();
+    std::uint16_t p21516();
+    std::uint16_t p17243_scan();
     std::uint8_t memory_byte(std::uint16_t address,
                              std::size_t byte_index) const;
     void set_memory_byte(std::uint16_t address, std::size_t byte_index,
@@ -200,7 +355,10 @@ private:
     std::uint16_t instruction_modifier_ = 0;
     std::uint64_t instruction_count_ = 0;
     std::uint64_t translated_routine_count_ = 0;
+    std::chrono::steady_clock::time_point execution_started_at_ =
+        std::chrono::steady_clock::now();
     bool translated_routines_enabled_ = true;
+    std::vector<std::uint16_t> disabled_translated_routines_;
 };
 
 } // namespace poplan

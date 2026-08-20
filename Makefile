@@ -9,12 +9,16 @@ LISTING := $(BUILD_DIR)/poplan.lst
 CALLS := $(BUILD_DIR)/calls.md
 DICTIONARY := $(BUILD_DIR)/dictionary.md
 CPP_BUILD_DIR := $(BUILD_DIR)/cpp
+CPP_ZONE1224_OUTPUT := $(BUILD_DIR)/cpp-zone1224.out
+CPP_ZONE1224_INTERPRETED := $(BUILD_DIR)/cpp-zone1224-interpreted.out
+CPP_ZONE1224_NORMALIZED := $(BUILD_DIR)/cpp-zone1224.normalized
+CPP_ZONE1224_INTERPRETED_NORMALIZED := $(BUILD_DIR)/cpp-zone1224-interpreted.normalized
 DISPAK_RUNNER ?= ./tools/run-dispak.sh
 ZONE_INPUTS := $(wildcard zone*.pop2)
 ZONE_COVERAGES := $(patsubst %.pop2,$(BUILD_DIR)/%.cov,$(ZONE_INPUTS))
 COVERAGE_CORPUS := $(BUILD_DIR)/coverage-corpus.md
 
-.PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test cpp-run cpp-quine test clean
+.PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test cpp-run cpp-quine cpp-zone1224 test clean
 
 all: listing calls dictionary
 
@@ -46,6 +50,18 @@ cpp-quine: cpp image
 	./tools/normalize-output.py $(BUILD_DIR)/cpp-quine.out \
 		> $(BUILD_DIR)/cpp-quine.normalized
 	diff -u tests/expected/quine.out $(BUILD_DIR)/cpp-quine.normalized
+
+cpp-zone1224: cpp image
+	$(CPP_BUILD_DIR)/poplan --image $(IMAGE) < zone1224.pop2 \
+		> $(CPP_ZONE1224_OUTPUT)
+	POPLAN_INTERPRET_ONLY=1 $(CPP_BUILD_DIR)/poplan --image $(IMAGE) \
+		< zone1224.pop2 > $(CPP_ZONE1224_INTERPRETED)
+	./tools/normalize-output.py $(CPP_ZONE1224_OUTPUT) \
+		> $(CPP_ZONE1224_NORMALIZED)
+	./tools/normalize-output.py $(CPP_ZONE1224_INTERPRETED) \
+		> $(CPP_ZONE1224_INTERPRETED_NORMALIZED)
+	diff -u $(CPP_ZONE1224_INTERPRETED_NORMALIZED) \
+		$(CPP_ZONE1224_NORMALIZED)
 
 test:
 	./tests/run.sh

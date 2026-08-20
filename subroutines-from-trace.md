@@ -26,6 +26,7 @@ the quine trace is `11673`.
 | Address | Symbol | Description | Evidence |
 |---:|---|---|---|
 | `01000` | `ENTRY` | Runtime entry trampoline. | Executes `uj 01001`, then calls `05230`. |
+| `01107` | — | Hash and collision-chain lookup entry. | Builds a hash in `01172`, selects a bucket through the table based at `01200`, follows its links, and allocates a record through `05430` only when the value is absent. The first tic-tac-toe call resolves bucket `01354` through `01534` to matching record `01624`. |
 | `02750` | `EVAL_DISPATCH` | POP value dispatch/evaluator trampoline. | Decodes high tag bits, stores temporaries at `03272/03273`, and dispatches through the decoded value or runtime tables. |
 | `03014` | `ERROR_DISPATCH` | Diagnostic context and POP-argument packager. | The `1+*2;` trace saves code `04020`, pushes source object `7200000000016750` and tagged code `6400000000004020`, then dispatches descriptor `6600000000003051`. |
 | `03051` | `ERROR_UNPACK` | Diagnostic argument unpacker. | Pops the tagged code and source object, restores `r16=04020`, and transfers to `03057`. |
@@ -35,16 +36,36 @@ the quine trace is `11673`.
 | `03261` | `ENTER_FUNCTION` | Function-entry trampoline. | Saves the current descriptor and link on the `r17` stack, installs `03272`, and returns generated code through `03235`. |
 | `03275` | `PUSH_ACC` | Push accumulator to the POP data stack. | Decrements `r6`, stores the accumulator at `(r6)`, returns through `r15`. |
 | `03277` | `POP_ACC` | Pop accumulator from the POP data stack. | Loads `(r6)`, increments `r6`, returns through `r15`. |
-| `03303` | `STORE_STACK_TOP` | Store the top POP stack item through `r16`. | Pops through `stx (16)`; used while constructing objects or frames. |
-| `03413` | `NUMERIC_UPDATE` | Numeric arithmetic helper, likely an integer decrement/update operation. | Called 279 times from `11707`; uses `ntr 6` and arithmetic on a small integer-like value. |
+| `03301` | — | Load and push an indirect POP value. | Loads `(r16)`, decrements `r6`, stores the value at `(r6)`, and returns through `r15`. |
+| `03303` | `STORE_STACK_TOP` | Store the top POP stack item through `r16`. | Uses the hardware stack to preserve the accumulator while moving `(r6)` to `(r16)` and incrementing `r6`. |
+| `03413` | `NUMERIC_UPDATE` | Numeric arithmetic helper in the generated quine update loop. | Called 279 times from `11707`; preserves the original `ntr 6/7`, divide, multiply, reverse-subtract, and RMR path. |
+| `03516` | — | Replace one addressed word while preserving its old value through another address. | Loads `(r13)` into `(r16)`, replaces `(r13)` with `r16`, and returns through `r15`; the partial tic-tac-toe trace calls it 5,572 times. |
+| `03536` | — | Computed-continuation frame builder. | Saves the accumulator, `r2`, `r1`, `r15`, and scratch word `04364` on `r17`, clears that scratch word, and transfers through `r16`. A complete fixed-seed game exercised 1,331 calls. |
+| `04322` | — | Classification and nested-dispatch entry. | Applies masks based at `03536`; common values return directly, while other branches preserve the caller around `04467`, update a selected record word, and retain the original `16313`/`02764` dispatch sequence through `04354`. |
+| `04447` | — | Allocation and generated-store wrapper. | Preserves its two input words in `04505/04506`, allocates through `05215`, installs the result through the indirection at `04464`, advances `03645`, and returns through the stacked caller. |
+| `04467` | — | Compiler/evaluator result wrapper. | Preserves its caller around `06343`; continuation `04471` stores the returned value and address fields in the record at `r3`, retaining the original mask and branch behavior through `04503/04504`. |
+| `05207` | — | Load word zero through an object address. | Copies the accumulator address to `r16`, loads `(r16)`, and returns through `r15`; the quine calls it directly 46 times. |
+| `05211` | — | Load word one through an object address. | Copies the accumulator address to `r16`, loads `1(r16)`, and returns through `r15`; the quine calls it directly 91 times. |
+| `05215` | — | Allocate and initialize a tagged two-word pair. | Builds the four-word caller frame, allocates through `05430`, stores the two source values, tags the allocated address with `05227`, and returns through the stacked link. |
 | `05230` | `COLD_START` | Main initialization/cold-start routine. | Saves initial registers at `05400..05404`, establishes runtime areas and stack state, initializes I/O, prints the greeting, and enters the evaluator. |
+| `05430` | — | Allocation wrapper and recovery bracket. | Returns zero-size requests directly, saves nonzero requests for `05447`, retries through `05523`, and returns through the stacked caller link at `05436`. |
+| `05447` | — | Table-driven free-block allocator. | Searches size-specific or common free lists, splits or unlinks the selected block, and initializes it with the tagged template at `02213`. |
+| `06650` | — | Two-stage generated comparison entry. | Preserves the original `r14` continuation, RMR flags, and diagnostic continuations `06654` and `06657`; the completed tic-tac-toe session called it 1,929 times before translation. |
 | `07475` | `CUCHIN_ARG` | Argument-taking entry within the dictionary `CUCHIN` routine. | Pops a tagged character; `0136` selects code `0012`, while ordinary tagged characters are forwarded unchanged to `21255`. |
-| `11541` | `TAGGED_VALUE_MATCH` | High-frequency leaf check in the generated quine loop. | Requires a nonzero `640` value, extracts and retags the high 24-bit field of the object addressed by frame word `r17-2`, and compares it with frame word `r17-1`. A mismatch selects diagnostic `10100`; the traced match leaves additive zero `6400000000000000`. |
+| `11536` | — | Tagged-frame precheck before `11541`. | Masks frame word `r17-2` against `11777`, compares it with `11522`, and either passes frame word `r17-1` to `11541` or selects diagnostic boundary `11547`. |
+| `11541` | `TAGGED_VALUE_MATCH` | High-frequency leaf check in the generated quine loop. | Requires a nonzero `640` value, extracts and retags the high 24-bit field of the object addressed by frame word `r17-2`, and compares it with frame word `r17-1`. A negative comparison selects diagnostic `10100`; traced nonnegative results return through `r15`. |
+| `11673` | — | Shared generated-value update body. | Uses the unique `r14` link, two POP values, `11541`, and `03413`, then computes continuation `11720` or `11727` from its saved frame. |
+| `11717` | — | Generated character-binding wrapper around `11673`. | Extracts and tags one selected byte, releases seven hardware-stack words, and tail-enters `03275`/`03235`; sibling entry `11726` updates two fields and releases ten words. |
 | `15765` | `SPECIAL_FUNCTION_DISPATCH` | Evaluator branch for `664` function descriptors. | Preserves evaluator registers, pushes the counted values reached through environment word `+4`, restores the saved context, and redispatches the descriptor at environment word `+3`. Static `NEWARR` at `6641223600000000` expands two values from `12244..12245` before dispatching `NEWANY`. |
 | `16313` | `CHAR_SEQUENCE` | Packed-character sequence loop. | Builds a tagged cursor for the sequence at `r16`, calls `21431`, tags each extracted character, and dispatches it through the descriptor at `01567`. During this diagnostic, `03075` copies the `CHARIN` entry at `01517` into the `CUCHOU` value slot at `01567`. |
 | `16421` | `TAGGED_BYTE_LOOKUP` | Packed lookup for tagged low bytes. | Rejects values outside the `640`-tagged low-byte form with code `015`; valid bytes select a packed word through bits 3..6 and an eight-bit field through bits 0..2. Traced mappings include `012` to `014`, `106` to `001`, and `040` to `000`. |
 | `16457` | `RECORD_SHIFT` | Three-word record advance used by the compiler/runtime path at `16346` and `16506`. | If word `r3+1` is nonzero, moves `+1` to the head, `+2` to `+1`, clears `+2`, and selects continuation `r1+74206`; otherwise it leaves the record unchanged and selects `r1+74202`. |
+| `16477` | — | Record-word presence and fill entry. | Returns word `r3+1` when populated; otherwise preserves the caller, evaluates the descriptor at `r3-2`, pops the result, and stores it at `r3+1`. |
 | `16505` | `RECORD_SHIFT_WRAPPER` | Saved-state wrapper around `16457`. | Saves the incoming accumulator and caller link on `r17`, calls `16457`, and restores both at `16507` before selecting continuation `r1+74216`. The quine trace calls this entry 96 times. |
+| `17242` | — | Longer entry to a shared table scan. | Sets `r13=-030`, validates the descriptor at `r3`, and scans through base `03677` until it finds `2(r3)` or exhausts the range. |
+| `17253` | — | Shorter entry to the `17242` shared table scan. | Sets `r13=-020` and enters the same `17243..17252` body. |
+| `17337`, `17341` | — | Descriptor-selecting wrappers for the shared table-read body at `17254`. | Select descriptors `17353` and `17355`; ordinary calls decrement the stored index and return the selected table word, while the exhausted path retains the original allocation and diagnostic continuations. |
+| `17340`, `17342` | — | Descriptor-selecting wrappers for the shared table-write body at `17275`. | Select descriptors `17353` and `17355`; ordinary calls store the accumulator and advance the descriptor, while the full path allocates and links another table block. |
 | `20110` | `ARG_TRANSFER` | Move actual values from the POP stack into an activation. | Uses `r16` as the argument count, allocates through `r17`, and stores values backward through `r3`. |
 | `20124` | `BUILD_ACTIVATION` | Construct an activation and transfer actual values to the POP stack. | Computes the new `r17` boundary in `20141`; the traced one-argument call at `65576` moves one value to `67777`. |
 | `20144` | `SUPERVISOR_SETUP` | Runtime/supervisor setup helper. | Called once from `05265`; executes `*50` and `*67` through the table at `20564`. |
@@ -71,6 +92,7 @@ the quine trace is `11673`.
 | `25346` | `CHARACTER_OUTPUT` | Converted-character packing entry. | Preserves the byte and return link, inserts it through `21443`, and continues at `25350`. |
 | `25350` | `CHARACTER_OUTPUT_CONTINUE` | Packed-output count and boundary logic. | Returns ordinary bytes, injects `0377` at count `0117`, and calls `20245` for `0377`. |
 | `25361` | `CHARACTER_OUTPUT_RESUME` | Output continuation resume entry. | Restores descriptor `1400000000020440`, clears the count, and releases the `25346` frame. |
+| `25356` | — | Emit the packed-input end marker. | Loads `0377` from `25407` and tail-enters `25346`; `20170` uses it before refilling a noninitial descriptor. |
 | `25370` | `TOKEN_SOURCE` | Input-token source wrapper. | Refills through `20170`, stores descriptor `6400000000020400` at `25413`, then calls `21431`. |
 | `25641` | `FORMAT_NUMBER` | Octal/decimal number-formatting driver. | Performs arithmetic conversion and calls `25660` three times. |
 | `25660` | `PACK_DIGIT` | Digit/field packing helper for `25641`. | Combines the arithmetic result with the `r17` frame and returns through `r15`. |
@@ -88,12 +110,32 @@ the quine trace is `11673`.
 
 ## Dynamic Inventory
 
-The quine has 98 direct `vjm` targets. Twenty-seven currently have semantic
-descriptions above; the generated inventory in `build/calls.md` is the
-authoritative count/caller table.
+The quine has 98 direct `vjm` targets. Fifty now have executable semantic
+dispatch. The latest sequence additionally removes `04322` from instruction
+fallback, including its continuations and the boundaries where it enters
+`04467`, `16313`, `03275`, and `02764`. The generated inventory in
+`build/calls.md` remains the authoritative quine count/caller table.
 
-The highest-frequency unnamed targets are now `11673`, `11717`, `05430`,
-and `05447`. These are the next useful targets for trace-guided analysis.
+A complete host tic-tac-toe session after this sequence executed 537,647
+semantic routine dispatches and 1,765,728 individual BESM instructions. Its
+74 remaining detected fallback call targets received 13,113 calls. The most
+frequent were `06631` (1,118), `03724` (906), `06623` (883), `17762` (872),
+`03736` (617), `17417` (617), and `17774` (592). These counts rank future
+work; they do not by themselves establish routine boundaries or semantic
+names.
+
+The 48 direct quine targets still using instruction fallback are:
+
+`01004`, `01167`, `02764`, `03330`, `03506`,
+`03531`, `03702`, `03716`, `03724`, `03736`, `04074`,
+`04161`, `04426`, `04536`, `04665`, `04675`,
+`05007`, `05160`, `05213`, `05230`, `05405`, `05410`, `06134`,
+`06424`, `07673`,
+`11464`, `16005`, `16254`, `16605`, `16742`,
+`17070`,
+`17417`, `17472`, `17571`, `17602`, `17614`, `17624`, `17762`, `17774`,
+`20144`, `20263`, `20456`, `20660`, `21107`, `25427`,
+`25556`, `25641`, and `25660`.
 
 "Leaf" in generated output means no nested `vjm` was observed while a traced
 invocation was active. It is not proof that the routine is leaf for every

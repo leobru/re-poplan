@@ -1,7 +1,7 @@
 #!/usr/bin/expect --
 #
-# Игра на Поплане.
-# Вызов:
+# Play the POPLAN tic-tac-toe game.
+# Usage:
 #	poplan.expect
 #
 if { $::argc != 0 } {
@@ -12,27 +12,38 @@ if { $::argc != 0 } {
 set timeout 10
 
 #
-# Запускаем Поплан.
+# Start POPLAN with Latin terminal output.
 #
-spawn dispak --bootstrap -q poplan.b6
-expect 	"ПОПЛАН*\r\n:"
+spawn dispak -l --bootstrap -q poplan.b6
+expect 	"*2.1*\r\n:"
 
 #
-# Запускаем игру.
+# Start the game stored on the historical disk.
 #
 send	{[% "MI", 8:421220, 0, 8:421221, 1023 %].popmess.compile;}
 send	"\r"
-expect 	"ТО ЕNТЕR РRОGRАМ, ТУРЕ  FОURS;\r\n:"
+expect 	"TO ENTER PROGRAM, TYPE  FOURS;\r\n:"
 send	"FOURS;\r"
 
-expect 	"DО УОU КNОW НОW ТО РLАУ АGАINSТ ТНIS РRОGRАМ\r\n:"
-send	"н\r"
-expect 	"\r\n:\r"
+expect 	"DO YOU KNOW HOW TO PLAY AGAINST THIS PROGRAM\r\n:"
+send	"YES\r"
+expect 	"DO YOU WANT TO START\r\n:"
+send	"YES\r"
+
+expect 	"YOUR MOVE\r\n:"
+send	"0 0 0\r"
+expect 	"YOUR MOVE\r\n:"
+send	"1 1 1\r"
+
+expect 	"YOUR MOVE\r\n:"
+send	"RESIGN\r"
+expect 	"DO YOU WANT TO PLAY AGAIN\r\n:"
+send	"NO\r"
+expect 	"BACK TO POP2 THEN\r\n:"
 
 #
-# Завершаем работу.
+# Terminate POPLAN.
 #
 send	"^\r"
-expect	"ВСЕГО ВАМ ДОБРОГО"
 expect	eof
 puts ""

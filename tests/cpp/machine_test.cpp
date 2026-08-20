@@ -1,5 +1,6 @@
 #include "poplan/machine.hpp"
 
+#include <ctime>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -13,6 +14,22 @@ void require(bool condition, const std::string &message)
         std::cerr << "FAIL: " << message << '\n';
         std::exit(1);
     }
+}
+
+std::uint64_t whole_second_jiffies(std::time_t time)
+{
+    const std::tm *local = std::localtime(&time);
+    require(local != nullptr, "the test can determine local time");
+    return static_cast<std::uint64_t>(
+        (local->tm_hour * 60 + local->tm_min) * 60 + local->tm_sec) * 50;
+}
+
+std::uint64_t circular_distance(std::uint64_t left, std::uint64_t right,
+                                std::uint64_t modulus)
+{
+    const std::uint64_t forward = (left + modulus - right) % modulus;
+    const std::uint64_t backward = (right + modulus - left) % modulus;
+    return forward < backward ? forward : backward;
 }
 
 } // namespace
@@ -47,6 +64,237 @@ int main()
     require(e75_store.step() == poplan::ExecutionStatus::halted,
             "the synthetic E75 program reaches STOP");
 
+    auto e53_time = std::make_unique<Machine>();
+    constexpr std::uint32_t e53_left = (053U << 12) | 010U;
+    e53_time->memory(01000) = Word48(
+        (static_cast<std::uint64_t>(e53_left) << 24) | stop_right);
+    const std::time_t time_before = std::time(nullptr);
+    e53_time->start(01000);
+    require(e53_time->step() == poplan::ExecutionStatus::running,
+            "E53/010 execution continues with the right half");
+    const std::time_t time_after = std::time(nullptr);
+    constexpr std::uint64_t jiffies_per_day = 24 * 60 * 60 * 50;
+    const std::uint64_t actual_jiffies = e53_time->accumulator().raw();
+    require(actual_jiffies < jiffies_per_day,
+            "E53/010 returns a time within the local day");
+    const bool matches_clock =
+        circular_distance(actual_jiffies,
+                          whole_second_jiffies(time_before),
+                          jiffies_per_day) < 50
+        || circular_distance(actual_jiffies,
+                             whole_second_jiffies(time_after),
+                             jiffies_per_day) < 50;
+    require(matches_clock,
+            "E53/010 returns current local time in 1/50-second jiffies");
+    require(e53_time->reg(016) == 010,
+            "E53/010 exposes its effective address in r16");
+
+    auto e63_time = std::make_unique<Machine>();
+    constexpr std::uint32_t e63_left = (063U << 12) | 04U;
+    e63_time->memory(01000) = Word48(
+        (static_cast<std::uint64_t>(e63_left) << 24) | stop_right);
+    e63_time->accumulator() = Word48(07777777777777777ULL);
+    e63_time->start(01000);
+    require(e63_time->step() == poplan::ExecutionStatus::running,
+            "E63/004 execution continues with the right half");
+    require(e63_time->accumulator().raw() < 50,
+            "E63/004 returns elapsed execution time in 1/50-second jiffies");
+    require(e63_time->reg(016) == 04,
+            "E63/004 exposes its effective address in r16");
+
+    auto e64_ignored = std::make_unique<Machine>();
+    constexpr std::uint32_t e64_left = (064U << 12) | 07536U;
+    e64_ignored->memory(01000) = Word48(
+        (static_cast<std::uint64_t>(e64_left) << 24) | stop_right);
+    e64_ignored->accumulator() = Word48(07100000000012345ULL);
+    e64_ignored->remainder() = Word48(07654);
+    e64_ignored->alu_mode() = 020;
+    e64_ignored->start(01000);
+    require(e64_ignored->step() == poplan::ExecutionStatus::running,
+            "E64 execution continues with the right half");
+    require(e64_ignored->accumulator()
+                == Word48(07100000000012345ULL)
+                && e64_ignored->remainder() == Word48(07654)
+                && e64_ignored->reg(016) == 07536
+                && e64_ignored->alu_mode() == 004,
+            "ignored E64 preserves data state and exposes its address");
+
+    auto e74_exit = std::make_unique<Machine>();
+    constexpr std::uint32_t e74_left = (074U << 12);
+    e74_exit->memory(01000) = Word48(
+        static_cast<std::uint64_t>(e74_left) << 24);
+    e74_exit->accumulator() = Word48(012345);
+    e74_exit->alu_mode() = 020;
+    e74_exit->start(01000);
+    require(e74_exit->step() == poplan::ExecutionStatus::halted
+                && e74_exit->accumulator() == Word48(012345)
+                && e74_exit->reg(016) == 0
+                && e74_exit->alu_mode() == 004,
+            "E74/000 terminates image execution without changing data");
+
+    auto numeric_update = std::make_unique<Machine>();
+    numeric_update->accumulator() = Word48(06400000000000006ULL);
+    numeric_update->reg(015) = 011710;
+    numeric_update->reg(017) = 066064;
+    numeric_update->memory(066063) =
+        Word48(06400000000000024ULL);
+    numeric_update->memory(03453) =
+        Word48(06400000000000000ULL);
+    numeric_update->memory(03457) =
+        Word48(00751003537173474ULL);
+    require(numeric_update->p03413_numeric_update() == 011710,
+            "03413 returns through the traced r15 link");
+    require(numeric_update->accumulator()
+                == Word48(06400000000000003ULL)
+                && numeric_update->memory(03451)
+                    == Word48(06400000000000003ULL),
+            "03413 reproduces the traced numeric update");
+    require(numeric_update->remainder() == Word48()
+                && numeric_update->alu_mode() == 007
+                && numeric_update->reg(013) == 03310
+                && numeric_update->reg(017) == 066064,
+            "03413 preserves the traced arithmetic and stack state");
+
+    auto allocate_two_words = std::make_unique<Machine>();
+    allocate_two_words->accumulator() = Word48(2);
+    allocate_two_words->reg(015) = 05433;
+    allocate_two_words->reg(017) = 066004;
+    allocate_two_words->memory(066003) = Word48(2);
+    allocate_two_words->memory(06102) = Word48(021);
+    allocate_two_words->memory(06103) = Word48(077777);
+    allocate_two_words->memory(06104) =
+        Word48(07777777770000000ULL);
+    allocate_two_words->memory(05502) = Word48(033064);
+    allocate_two_words->memory(033064) =
+        Word48(0003271400000000ULL);
+    allocate_two_words->memory(02213) =
+        Word48(06500000000000000ULL);
+    require(allocate_two_words->p05447() == 05433,
+            "05447 returns through the traced allocator link");
+    require(allocate_two_words->reg(016) == 065776
+                && allocate_two_words->memory(033064)
+                    == Word48(0003271200000000ULL),
+            "05447 splits the traced common-list block");
+    require(allocate_two_words->memory(065776)
+                == Word48(06500000000000000ULL)
+                && allocate_two_words->memory(065777)
+                    == Word48(06500000000000000ULL),
+            "05447 initializes every allocated word");
+
+    auto allocator_return = std::make_unique<Machine>();
+    allocator_return->reg(017) = 066004;
+    allocator_return->memory(066002) = Word48(016022);
+    allocator_return->memory(066003) = Word48(2);
+    require(allocator_return->p05436() == 016022
+                && allocator_return->reg(017) == 066002,
+            "05436 restores the saved caller through stacked WTC addressing");
+
+    auto zero_allocation = std::make_unique<Machine>();
+    zero_allocation->reg(015) = 01234;
+    zero_allocation->reg(016) = 0;
+    zero_allocation->reg(017) = 066004;
+    require(zero_allocation->p05430() == 01234
+                && zero_allocation->reg(017) == 066004,
+            "05430 returns a zero-size allocation without changing the stack");
+
+    auto exhausted_allocator = std::make_unique<Machine>();
+    exhausted_allocator->accumulator() = Word48(021);
+    exhausted_allocator->reg(015) = 05433;
+    exhausted_allocator->reg(017) = 066004;
+    exhausted_allocator->memory(066003) = Word48(021);
+    exhausted_allocator->memory(06102) = Word48(021);
+    exhausted_allocator->memory(05502) = Word48();
+    require(exhausted_allocator->p05447() == 05433
+                && exhausted_allocator->reg(016) == 0,
+            "05447 reports exhaustion when the common free list is empty");
+
+    auto generated_binding = std::make_unique<Machine>();
+    generated_binding->accumulator() =
+        Word48(02400000000000050ULL);
+    generated_binding->reg(010) = 011506;
+    generated_binding->reg(015) = 011710;
+    generated_binding->reg(017) = 066031;
+    generated_binding->memory(066026) =
+        Word48(07100000000065741ULL);
+    generated_binding->memory(066030) =
+        Word48(06400000000000000ULL);
+    generated_binding->memory(066025) = Word48(011760);
+    generated_binding->memory(065742) =
+        Word48(00244312523441524ULL);
+    generated_binding->memory(011762) = Word48(0377);
+    generated_binding->memory(012000) =
+        Word48(06400000000000000ULL);
+    require(generated_binding->p11720_finish_generated_binding() == 03275,
+            "11720 tail-enters the traced PUSH_ACC bracket");
+    require(generated_binding->accumulator()
+                == Word48(06400000000000012ULL)
+                && generated_binding->reg(016) == 050
+                && generated_binding->reg(014) == 065742
+                && generated_binding->reg(015) == 03235
+                && generated_binding->reg(017) == 066022,
+            "11720 reproduces the traced generated character binding");
+
+    auto token_fast_path = std::make_unique<Machine>();
+    token_fast_path->accumulator() = Word48(07473);
+    token_fast_path->reg(015) = 021253;
+    token_fast_path->reg(017) = 066037;
+    token_fast_path->memory(025420) = Word48(1);
+    require(token_fast_path->p25370_begin_token_source() == 025376,
+            "25370 skips refill when packed input is available");
+    require(token_fast_path->reg(017) == 066041
+                && token_fast_path->memory(066037) == Word48(07473)
+                && token_fast_path->memory(066040) == Word48(021253),
+            "25370 builds the traced two-word token frame");
+
+    auto character_extract_resume = std::make_unique<Machine>();
+    character_extract_resume->accumulator() = Word48(0100);
+    character_extract_resume->reg(017) = 066040;
+    character_extract_resume->memory(066037) = Word48(07473);
+    require(character_extract_resume->p21253_resume_character_extract()
+                == 021274,
+            "21253 resumes at the input conversion entry");
+    require(character_extract_resume->accumulator() == Word48(0100)
+                && character_extract_resume->reg(015) == 07473
+                && character_extract_resume->reg(017) == 066037,
+            "21253 restores its traced caller and character");
+
+    auto input_prepare = std::make_unique<Machine>();
+    input_prepare->reg(015) = 025373;
+    input_prepare->memory(020377) = Word48(012);
+    input_prepare->memory(025417) =
+        Word48(01400000000020440ULL);
+    input_prepare->memory(020361) =
+        Word48(01400000000020440ULL);
+    require(input_prepare->p20170_input_primary() == 020177,
+            "20170 selects the traced ready descriptor path");
+
+    auto input_refill = std::make_unique<Machine>();
+    input_refill->reg(015) = 025373;
+    input_refill->reg(017) = 066004;
+    input_refill->memory(020377) = Word48(012);
+    input_refill->memory(025417) = Word48(1);
+    input_refill->memory(020361) = Word48(2);
+    require(input_refill->p20170_input_primary() == 025356
+                && input_refill->reg(015) == 020175
+                && input_refill->reg(017) == 066005
+                && input_refill->memory(066004) == Word48(025373),
+            "20170 preserves its caller before emitting the refill terminator");
+
+    input_prepare->memory(020362) = Word48();
+    require(input_prepare->p20177_continue_input_primary() == 020202,
+            "20177 selects a fresh input transfer");
+    input_prepare->memory(020372) =
+        Word48(00777740000000000ULL);
+    input_prepare->memory(020374) = Word48();
+    input_prepare->memory(020363) =
+        Word48(04034021041120234ULL);
+    require(input_prepare->p20202_prepare_input_transfer() == 020205
+                && input_prepare->memory(020400)
+                    == Word48(00777740000000000ULL)
+                && input_prepare->memory(020364)
+                    == Word48(04034021041120234ULL),
+            "20202 builds the traced blocking E71 control word");
+
     auto semantic_push = std::make_unique<Machine>();
     semantic_push->reg(006) = 070000;
     semantic_push->reg(015) = 01234;
@@ -63,6 +311,16 @@ int main()
             "translated PUSH_ACC replaces its instruction sequence");
     require(semantic_push->translated_routine_count() == 1,
             "the machine records semantic routine dispatches");
+
+    auto high_address_dispatch = std::make_unique<Machine>();
+    high_address_dispatch->memory(025407) = Word48(0377);
+    high_address_dispatch->start(025356);
+    require(high_address_dispatch->step()
+                == poplan::ExecutionStatus::running
+                && high_address_dispatch->program_counter() == 025346
+                && high_address_dispatch->accumulator() == Word48(0377)
+                && high_address_dispatch->translated_routine_count() == 1,
+            "five-digit octal entries above 10000 dispatch semantically");
 
     auto right_half_entry = std::make_unique<Machine>();
     right_half_entry->accumulator() = Word48(012345);
@@ -103,6 +361,373 @@ int main()
     require(machine.accumulator() == Word48(06400000000000001ULL),
             "03277 loads the POP stack top");
     require(machine.reg(06) == 070000, "03277 increments r6");
+
+    auto stack_value_push = std::make_unique<Machine>();
+    stack_value_push->reg(006) = 070000;
+    stack_value_push->reg(015) = 04567;
+    stack_value_push->reg(016) = 04000;
+    stack_value_push->memory(04000) =
+        Word48(06400000000000123ULL);
+    require(stack_value_push->p03301() == 04567
+                && stack_value_push->accumulator()
+                    == Word48(06400000000000123ULL)
+                && stack_value_push->reg(006) == 067777
+                && stack_value_push->memory(067777)
+                    == Word48(06400000000000123ULL),
+            "03301 loads through r16 and pushes the value on the POP stack");
+
+    auto store_stack_top = std::make_unique<Machine>();
+    store_stack_top->accumulator() =
+        Word48(07100000000012345ULL);
+    store_stack_top->alu_mode() = 020;
+    store_stack_top->reg(006) = 067777;
+    store_stack_top->reg(015) = 05670;
+    store_stack_top->reg(016) = 04100;
+    store_stack_top->reg(017) = 066000;
+    store_stack_top->memory(067777) =
+        Word48(06400000000000456ULL);
+    require(store_stack_top->p03303_store_stack_top() == 05670
+                && store_stack_top->memory(04100)
+                    == Word48(06400000000000456ULL)
+                && store_stack_top->accumulator()
+                    == Word48(07100000000012345ULL)
+                && store_stack_top->reg(006) == 070000
+                && store_stack_top->reg(017) == 066000
+                && store_stack_top->alu_mode() == 004,
+            "03303 stores the POP top while balancing the hardware stack");
+
+    auto indirect_loads = std::make_unique<Machine>();
+    indirect_loads->reg(015) = 06701;
+    indirect_loads->accumulator() =
+        Word48(06400000000042000ULL);
+    indirect_loads->memory(042000) =
+        Word48(07100000000000007ULL);
+    indirect_loads->memory(042001) =
+        Word48(07200000000000011ULL);
+    require(indirect_loads->p05207() == 06701
+                && indirect_loads->reg(016) == 042000
+                && indirect_loads->accumulator()
+                    == Word48(07100000000000007ULL),
+            "05207 loads word zero through the accumulator address");
+    indirect_loads->accumulator() =
+        Word48(06500000000042000ULL);
+    require(indirect_loads->p05211() == 06701
+                && indirect_loads->reg(016) == 042000
+                && indirect_loads->accumulator()
+                    == Word48(07200000000000011ULL),
+            "05211 loads word one through the accumulator address");
+
+    auto semantic_indirect_load = std::make_unique<Machine>();
+    semantic_indirect_load->reg(015) = 07001;
+    semantic_indirect_load->accumulator() = Word48(04300);
+    semantic_indirect_load->memory(04301) = Word48(07654);
+    semantic_indirect_load->start(05211);
+    require(semantic_indirect_load->step()
+                == poplan::ExecutionStatus::running
+                && semantic_indirect_load->program_counter() == 07001
+                && semantic_indirect_load->accumulator() == Word48(07654)
+                && semantic_indirect_load->translated_routine_count() == 1,
+            "05211 is selected by semantic dispatch");
+
+    auto indirect_evaluator = std::make_unique<Machine>();
+    indirect_evaluator->reg(015) = 07000;
+    indirect_evaluator->reg(016) = 04000;
+    indirect_evaluator->memory(04000) =
+        Word48(06601175000011755ULL);
+    indirect_evaluator->memory(011752) =
+        Word48(0660000000011756ULL);
+    indirect_evaluator->memory(03007) =
+        Word48(07700000000000000ULL);
+    indirect_evaluator->memory(03012) =
+        Word48(06600000000000000ULL);
+    indirect_evaluator->memory(03011) =
+        Word48(06500000000000000ULL);
+    indirect_evaluator->start(02770);
+    require(indirect_evaluator->step()
+                == poplan::ExecutionStatus::running
+                && indirect_evaluator->program_counter() == 02750
+                && indirect_evaluator->reg(010) == 02745
+                && indirect_evaluator->reg(016) == 011750
+                && indirect_evaluator->accumulator()
+                    == Word48(0660000000011756ULL),
+            "02770 validates an indirect function and selects its environment");
+
+    auto frame_index = std::make_unique<Machine>();
+    frame_index->reg(015) = 07001;
+    frame_index->reg(017) = 066001;
+    frame_index->accumulator() = Word48(04000);
+    frame_index->memory(066000) = Word48(3);
+    frame_index->memory(04003) = Word48(07654321);
+    frame_index->start(011500);
+    require(frame_index->step() == poplan::ExecutionStatus::running
+                && frame_index->program_counter() == 07001
+                && frame_index->reg(016) == 04000
+                && frame_index->reg(017) == 066000
+                && frame_index->accumulator() == Word48(07654321),
+            "11500 indexes through frame word -1 and consumes it");
+
+    auto arithmetic_finish = std::make_unique<Machine>();
+    arithmetic_finish->reg(010) = 06712;
+    arithmetic_finish->reg(011) = 06734;
+    arithmetic_finish->reg(013) = 0;
+    arithmetic_finish->reg(015) = 063752;
+    arithmetic_finish->reg(017) = 066025;
+    arithmetic_finish->accumulator() = Word48();
+    arithmetic_finish->remainder() =
+        Word48(04000000000000000ULL);
+    arithmetic_finish->alu_mode() = 022;
+    arithmetic_finish->memory(01637) =
+        Word48(06400000000000000ULL);
+    arithmetic_finish->memory(06755) =
+        Word48(0560000000000000ULL);
+    arithmetic_finish->memory(06756) =
+        Word48(0020000000000000ULL);
+    arithmetic_finish->memory(066023) =
+        Word48(06400000000000000ULL);
+    arithmetic_finish->memory(066024) =
+        Word48(04050000000000000ULL);
+    arithmetic_finish->start(06735);
+    require(arithmetic_finish->step()
+                == poplan::ExecutionStatus::running
+                && arithmetic_finish->program_counter() == 063752
+                && arithmetic_finish->reg(017) == 066023
+                && arithmetic_finish->memory(066023)
+                    == Word48(06400000000000001ULL)
+                && arithmetic_finish->accumulator()
+                    == Word48(06400000000000001ULL)
+                && arithmetic_finish->remainder()
+                    == Word48(03760000000000000ULL)
+                && arithmetic_finish->alu_mode() == 007,
+            "06735 preserves the traced normalized-add stack transition");
+
+    auto compiler_entry = std::make_unique<Machine>();
+    compiler_entry->reg(005) = 05005;
+    compiler_entry->reg(007) = 05007;
+    compiler_entry->reg(015) = 07002;
+    compiler_entry->reg(017) = 066000;
+    compiler_entry->accumulator() = Word48(012345);
+    compiler_entry->start(06343);
+    require(compiler_entry->step() == poplan::ExecutionStatus::running
+                && compiler_entry->program_counter() == 06526
+                && compiler_entry->reg(005) == 06143
+                && compiler_entry->reg(015) == 06346
+                && compiler_entry->reg(017) == 066004
+                && compiler_entry->memory(066000) == Word48(012345)
+                && compiler_entry->memory(066001) == Word48(05005)
+                && compiler_entry->memory(066002) == Word48(05007)
+                && compiler_entry->memory(066003) == Word48(07002),
+            "06343 saves its compiler frame and enters 06526");
+
+    auto compiler_helper = std::make_unique<Machine>();
+    compiler_helper->reg(007) = 05007;
+    compiler_helper->reg(015) = 07003;
+    compiler_helper->reg(017) = 066000;
+    compiler_helper->accumulator() = Word48(012345);
+    compiler_helper->memory(02117) = Word48(03000);
+    compiler_helper->memory(03001) = Word48(07654321);
+    compiler_helper->memory(01403) = Word48(01234);
+    compiler_helper->start(06526);
+    require(compiler_helper->step() == poplan::ExecutionStatus::running
+                && compiler_helper->program_counter() == 017045
+                && compiler_helper->reg(007) == 01200
+                && compiler_helper->reg(015) == 06534
+                && compiler_helper->reg(017) == 066004
+                && compiler_helper->memory(066000) == Word48(012345)
+                && compiler_helper->memory(066001) == Word48(05007)
+                && compiler_helper->memory(066002) == Word48(07003),
+            "06526 builds its trace-confirmed frame and calls 17045");
+
+    auto compiler_dispatch = std::make_unique<Machine>();
+    compiler_dispatch->reg(001) = 05001;
+    compiler_dispatch->reg(003) = 05003;
+    compiler_dispatch->reg(015) = 07004;
+    compiler_dispatch->reg(017) = 066000;
+    compiler_dispatch->accumulator() = Word48(07654);
+    compiler_dispatch->start(016341);
+    require(compiler_dispatch->step() == poplan::ExecutionStatus::running
+                && compiler_dispatch->program_counter() == 016457
+                && compiler_dispatch->reg(001) == 022261
+                && compiler_dispatch->reg(003) == 07004
+                && compiler_dispatch->reg(015) == 016347
+                && compiler_dispatch->reg(017) == 066007,
+            "16341 preserves its compiler registers before 16457");
+
+    auto generated_return = std::make_unique<Machine>();
+    generated_return->reg(006) = 05000;
+    generated_return->reg(015) = 07005;
+    generated_return->reg(016) = 04321;
+    generated_return->reg(017) = 066000;
+    generated_return->memory(05000) =
+        Word48(06400000000000001ULL);
+    generated_return->memory(020107) =
+        Word48(06400000000000000ULL);
+    generated_return->start(020077);
+    require(generated_return->step() == poplan::ExecutionStatus::running
+                && generated_return->program_counter() == 03277
+                && generated_return->reg(015) == 020101,
+            "20077 enters the POP-stack return selector");
+    require(generated_return->step() == poplan::ExecutionStatus::running
+                && generated_return->program_counter() == 020101,
+            "20077 resumes after popping its selector");
+    require(generated_return->step() == poplan::ExecutionStatus::running
+                && generated_return->program_counter() == 07005
+                && generated_return->reg(015) == 07005
+                && generated_return->reg(017) == 066000
+                && generated_return->accumulator() == Word48(04321),
+            "20101 restores the saved link and r16 value");
+
+    auto evaluator_classify = std::make_unique<Machine>();
+    evaluator_classify->reg(001) = 05001;
+    evaluator_classify->reg(015) = 07006;
+    evaluator_classify->reg(017) = 066000;
+    evaluator_classify->accumulator() =
+        Word48(06440000000002044ULL);
+    evaluator_classify->memory(021524) =
+        Word48(07740000000000000ULL);
+    evaluator_classify->memory(021525) =
+        Word48(07200000000000000ULL);
+    evaluator_classify->memory(021532) =
+        Word48(06440000000002044ULL);
+    evaluator_classify->start(021464);
+    require(evaluator_classify->step() == poplan::ExecutionStatus::running
+                && evaluator_classify->program_counter() == 021511
+                && evaluator_classify->reg(001) == 021464
+                && evaluator_classify->reg(017) == 066003
+                && evaluator_classify->memory(021535)
+                    == Word48(06440000000002044ULL),
+            "21464 classifies the traced direct-return value");
+    require(evaluator_classify->step() == poplan::ExecutionStatus::running
+                && evaluator_classify->program_counter() == 07006
+                && evaluator_classify->reg(001) == 05001
+                && evaluator_classify->reg(017) == 066000
+                && evaluator_classify->accumulator()
+                    == Word48(06440000000002044ULL),
+            "21511 restores the evaluator frame and caller link");
+
+    auto replace_address = std::make_unique<Machine>();
+    replace_address->reg(013) = 04000;
+    replace_address->reg(015) = 07002;
+    replace_address->reg(016) = 04100;
+    replace_address->remainder() = Word48(07654);
+    replace_address->memory(04000) =
+        Word48(07100000000000123ULL);
+    require(replace_address->p03516() == 07002
+                && replace_address->memory(04100)
+                    == Word48(07100000000000123ULL)
+                && replace_address->memory(04000) == Word48(04100)
+                && replace_address->accumulator() == Word48(04100)
+                && replace_address->remainder() == Word48(07654)
+                && replace_address->alu_mode() == 004,
+            "03516 replaces the r13 word and preserves it through r16");
+
+    auto pair_begin = std::make_unique<Machine>();
+    pair_begin->accumulator() = Word48(012345);
+    pair_begin->reg(015) = 06701;
+    pair_begin->reg(017) = 066000;
+    pair_begin->memory(05227) =
+        Word48(07200000000000000ULL);
+    require(pair_begin->p05215() == 05430
+                && pair_begin->reg(010) == 05213
+                && pair_begin->reg(015) == 05221
+                && pair_begin->reg(016) == 2
+                && pair_begin->reg(017) == 066003
+                && pair_begin->memory(066000) == Word48(012345)
+                && pair_begin->memory(066001)
+                    == Word48(07200000000000000ULL)
+                && pair_begin->memory(066002) == Word48(06701)
+                && pair_begin->accumulator() == Word48(06701),
+            "05215 builds the traced allocation frame and calls 05430");
+
+    auto pair_finish = std::make_unique<Machine>();
+    pair_finish->reg(016) = 044000;
+    pair_finish->reg(017) = 066003;
+    pair_finish->memory(065777) =
+        Word48(06400000000000011ULL);
+    pair_finish->memory(066000) =
+        Word48(06400000000000022ULL);
+    pair_finish->memory(066001) =
+        Word48(07200000000000000ULL);
+    pair_finish->memory(066002) = Word48(06701);
+    require(pair_finish->p05221() == 06701
+                && pair_finish->reg(010) == 05213
+                && pair_finish->reg(017) == 065777
+                && pair_finish->memory(044000)
+                    == Word48(06400000000000011ULL)
+                && pair_finish->memory(044001)
+                    == Word48(06400000000000022ULL)
+                && pair_finish->accumulator()
+                    == Word48(07200000000044000ULL)
+                && pair_finish->remainder() == Word48(044000)
+                && pair_finish->alu_mode() == 004,
+            "05221 initializes and tags the allocated pair before returning");
+
+    auto tagged_precheck = std::make_unique<Machine>();
+    tagged_precheck->reg(015) = 07003;
+    tagged_precheck->reg(017) = 066002;
+    tagged_precheck->memory(066000) = Word48(0123);
+    tagged_precheck->memory(066001) = Word48(0456);
+    tagged_precheck->memory(011777) = Word48(0770);
+    tagged_precheck->memory(011522) = Word48(0120);
+    require(tagged_precheck->p11536() == 011541
+                && tagged_precheck->reg(010) == 011506
+                && tagged_precheck->accumulator() == Word48(0456)
+                && tagged_precheck->remainder() == Word48()
+                && tagged_precheck->alu_mode() == 004,
+            "11536 passes a matching tagged frame value to 11541");
+    tagged_precheck->memory(066000) = Word48(0223);
+    require(tagged_precheck->p11536() == 011547
+                && tagged_precheck->accumulator() == Word48(0300),
+            "11536 retains the original diagnostic boundary on mismatch");
+
+    auto scan_match = std::make_unique<Machine>();
+    scan_match->reg(003) = 04200;
+    scan_match->reg(015) = 07004;
+    scan_match->memory(04202) = Word48(0555);
+    scan_match->memory(04204) =
+        Word48(std::uint64_t{012} << 43);
+    scan_match->memory(03647) = Word48(0444);
+    scan_match->memory(03650) = Word48(0555);
+    require(scan_match->p17242() == 07004
+                && scan_match->reg(013) == 077751
+                && scan_match->reg(016) == 0
+                && scan_match->accumulator() == Word48()
+                && scan_match->remainder() == Word48()
+                && scan_match->alu_mode() == 004,
+            "17242 finds a value in the longer r13-selected scan range");
+
+    auto scan_miss = std::make_unique<Machine>();
+    scan_miss->reg(003) = 04300;
+    scan_miss->reg(015) = 07005;
+    scan_miss->memory(04302) = Word48(0666);
+    scan_miss->memory(04304) =
+        Word48(std::uint64_t{012} << 43);
+    require(scan_miss->p17253() == 07005
+                && scan_miss->reg(013) == 0
+                && scan_miss->reg(016) == 1
+                && scan_miss->accumulator() == Word48(0666)
+                && scan_miss->remainder() == Word48(0666),
+            "17253 exhausts the shorter scan range and reports no match");
+
+    auto semantic_scan = std::make_unique<Machine>();
+    semantic_scan->reg(003) = 04300;
+    semantic_scan->reg(015) = 07006;
+    semantic_scan->start(017253);
+    require(semantic_scan->step() == poplan::ExecutionStatus::running
+                && semantic_scan->program_counter() == 07006
+                && semantic_scan->reg(013) == 077760
+                && semantic_scan->reg(016) == 1
+                && semantic_scan->translated_routine_count() == 1,
+            "17253 is selected by semantic dispatch");
+
+    auto semantic_return = std::make_unique<Machine>();
+    semantic_return->reg(015) = 07123;
+    semantic_return->accumulator() = Word48(012345);
+    semantic_return->start(020673);
+    require(semantic_return->step() == poplan::ExecutionStatus::running
+                && semantic_return->program_counter() == 07123
+                && semantic_return->accumulator() == Word48(012345)
+                && semantic_return->translated_routine_count() == 1,
+            "20673 semantically returns through r15 without changing state");
 
     machine.accumulator() = Word48(06606563700065620ULL);
     const FunctionDescriptor closure = machine.p02750_decode_function();
@@ -317,15 +942,15 @@ int main()
         Word48(07777777770000000ULL);
     tagged_mismatch->memory(066062) = Word48(065741);
     tagged_mismatch->memory(065741) =
-        Word48(0000002500000005ULL);
+        Word48(0000002400000005ULL);
     tagged_mismatch->memory(066063) =
-        Word48(06400000000000024ULL);
+        Word48(06400000000000025ULL);
     tagged_mismatch->accumulator() =
-        Word48(06400000000000024ULL);
+        Word48(06400000000000025ULL);
     require(tagged_mismatch->p11541_match_tagged_value() == 03014
                 && tagged_mismatch->reg(016) == 010100
                 && tagged_mismatch->accumulator()
-                    == Word48(06400000000000024ULL),
+                    == Word48(06400000000000025ULL),
             "11541 sends a mismatched value to diagnostic 10100");
 
     // Trace at 16457 with r1=22261 and r3=20670: shift a nonempty three-word
@@ -372,7 +997,7 @@ int main()
     require(wrapped_record->p16505_begin_record_shift() == 016467,
             "16505 enters the nonempty 16457 continuation");
     require(wrapped_record->reg(015) == 016507
-                && wrapped_record->reg(017) == 066034
+                && wrapped_record->reg(017) == 066035
                 && wrapped_record->memory(066033) == Word48(055)
                 && wrapped_record->memory(066034) == Word48(016406),
             "16505 preserves the accumulator and caller link");
@@ -386,6 +1011,364 @@ int main()
                 && wrapped_record->reg(017) == 066033
                 && wrapped_record->accumulator() == Word48(055),
             "16507 restores the caller state and balances r17");
+
+    auto continuation_frame = std::make_unique<Machine>();
+    continuation_frame->accumulator() = Word48(0123);
+    continuation_frame->remainder() = Word48(066);
+    continuation_frame->reg(001) = 0111;
+    continuation_frame->reg(002) = 0222;
+    continuation_frame->reg(015) = 05555;
+    continuation_frame->reg(016) = 04444;
+    continuation_frame->reg(017) = 04000;
+    continuation_frame->memory(04364) = Word48(0777);
+    require(continuation_frame->p03536() == 04444,
+            "03536 transfers through the continuation installed in r16");
+    require(continuation_frame->reg(002) == 03536,
+            "03536 installs its frame base in r2");
+    require(continuation_frame->reg(017) == 04005,
+            "03536 advances r17 over its five-word continuation frame");
+    require(continuation_frame->accumulator() == Word48(),
+            "03536 leaves the zero word in the accumulator");
+    require(continuation_frame->remainder() == Word48(066),
+            "03536 preserves RMR while building its continuation frame");
+    require(continuation_frame->memory(04000) == Word48(0123),
+            "03536 saves the incoming accumulator first");
+    require(continuation_frame->memory(04001) == Word48(0222),
+            "03536 saves the incoming r2 second");
+    require(continuation_frame->memory(04002) == Word48(0111),
+            "03536 saves the incoming r1 third");
+    require(continuation_frame->memory(04003) == Word48(05555),
+            "03536 saves the incoming link fourth");
+    require(continuation_frame->memory(04004) == Word48(0777),
+            "03536 saves the scratch word fifth");
+    require(continuation_frame->memory(04364) == Word48(),
+            "03536 clears its scratch word after saving it");
+
+    auto classifier_fast = std::make_unique<Machine>();
+    classifier_fast->reg(015) = 01234;
+    classifier_fast->reg(017) = 04000;
+    classifier_fast->memory(03637) = Word48(0123);
+    classifier_fast->memory(04421) = Word48(0777);
+    classifier_fast->memory(04422) = Word48();
+    require(classifier_fast->p04322() == 01234
+                && classifier_fast->reg(014) == 03536
+                && classifier_fast->reg(016) == 1
+                && classifier_fast->reg(017) == 04000,
+            "04322 takes its common immediate-return classification");
+    require(classifier_fast->accumulator() == Word48(0123)
+                && classifier_fast->remainder() == Word48(0123),
+            "04322 preserves the common classification branch flag");
+
+    auto classifier_return = std::make_unique<Machine>();
+    classifier_return->reg(015) = 02345;
+    classifier_return->reg(017) = 04100;
+    classifier_return->memory(03637) = Word48(0123);
+    classifier_return->memory(03641) = Word48(1);
+    classifier_return->memory(03643) = Word48(2);
+    classifier_return->memory(04421) = Word48(0777);
+    classifier_return->memory(04422) = Word48(0123);
+    classifier_return->memory(04423) = Word48();
+    classifier_return->memory(04424) = Word48(1);
+    classifier_return->memory(04425) = Word48(1);
+    require(classifier_return->p04322() == 02345
+                && classifier_return->reg(015) == 02345
+                && classifier_return->reg(016) == 1
+                && classifier_return->reg(017) == 04100,
+            "04322 restores its stacked caller after the secondary checks");
+    require(classifier_return->accumulator() == Word48(02345)
+                && classifier_return->remainder() == Word48(3),
+            "04322 retains the final secondary comparison flag");
+
+    auto classifier_nested = std::make_unique<Machine>();
+    classifier_nested->reg(015) = 03456;
+    classifier_nested->reg(017) = 04200;
+    classifier_nested->memory(03637) = Word48(0123);
+    classifier_nested->memory(03641) = Word48(03000);
+    classifier_nested->memory(03643) = Word48(2);
+    classifier_nested->memory(04421) = Word48(0777);
+    classifier_nested->memory(04422) = Word48(0123);
+    classifier_nested->memory(04423) = Word48();
+    classifier_nested->memory(04424) = Word48(2);
+    classifier_nested->memory(04425) = Word48(1);
+    classifier_nested->memory(04377) = Word48(017);
+    classifier_nested->memory(02777) = Word48(077);
+    require(classifier_nested->p04322() == 016313
+                && classifier_nested->reg(013) == 03000
+                && classifier_nested->reg(014) == 020
+                && classifier_nested->reg(015) == 04350
+                && classifier_nested->reg(016) == 04357,
+            "04322 enters the original character-sequence dependency");
+    require(classifier_nested->memory(02777) == Word48(060)
+                && classifier_nested->memory(04200) == Word48(03456)
+                && classifier_nested->reg(017) == 04201,
+            "04322 updates the selected slot while retaining its caller");
+
+    auto classifier_continuations = std::make_unique<Machine>();
+    classifier_continuations->reg(003) = 03000;
+    classifier_continuations->memory(03000) = Word48(06500000000000000ULL);
+    classifier_continuations->start(04350);
+    require(classifier_continuations->step()
+                == poplan::ExecutionStatus::running
+                && classifier_continuations->program_counter() == 03275
+                && classifier_continuations->reg(015) == 04351,
+            "04350 forwards the selected record through PUSH_ACC");
+    classifier_continuations->start(04351);
+    classifier_continuations->step();
+    require(classifier_continuations->program_counter() == 02764
+                && classifier_continuations->reg(015) == 04352
+                && classifier_continuations->reg(016) == 07667,
+            "04351 enters the first original 02764 dependency");
+    classifier_continuations->reg(007) = 02000;
+    classifier_continuations->memory(03007) = Word48(07100000000000001ULL);
+    classifier_continuations->start(04352);
+    classifier_continuations->step();
+    require(classifier_continuations->program_counter() == 03275
+                && classifier_continuations->reg(015) == 04353
+                && classifier_continuations->accumulator()
+                    == Word48(07100000000000001ULL),
+            "04352 forwards the r7-relative value through PUSH_ACC");
+    classifier_continuations->start(04353);
+    classifier_continuations->step();
+    require(classifier_continuations->program_counter() == 02764
+                && classifier_continuations->reg(015) == 04354
+                && classifier_continuations->reg(016) == 07601,
+            "04353 enters the second original 02764 dependency");
+    classifier_continuations->reg(017) = 04301;
+    classifier_continuations->memory(04300) = Word48(04567);
+    classifier_continuations->start(04354);
+    classifier_continuations->step();
+    require(classifier_continuations->program_counter() == 04567
+                && classifier_continuations->reg(015) == 04567
+                && classifier_continuations->reg(016) == 0
+                && classifier_continuations->reg(017) == 04300,
+            "04354 restores the original classifier caller and stack");
+
+    auto compiler_wrapper = std::make_unique<Machine>();
+    compiler_wrapper->accumulator() = Word48(077);
+    compiler_wrapper->reg(015) = 01234;
+    compiler_wrapper->reg(017) = 04100;
+    require(compiler_wrapper->p04467() == 06343
+                && compiler_wrapper->reg(015) == 04471
+                && compiler_wrapper->reg(017) == 04101,
+            "04467 enters the translated 06343 cluster with link 04471");
+    require(compiler_wrapper->accumulator() == Word48(01234)
+                && compiler_wrapper->memory(04100) == Word48(01234),
+            "04467 preserves its incoming link on the hardware stack");
+
+    auto allocator_wrapper = std::make_unique<Machine>();
+    allocator_wrapper->accumulator() = Word48(0123);
+    allocator_wrapper->reg(015) = 02345;
+    allocator_wrapper->reg(017) = 04401;
+    allocator_wrapper->memory(04400) = Word48();
+    allocator_wrapper->memory(04446) = Word48(077777);
+    require(allocator_wrapper->p04447() == 05215
+                && allocator_wrapper->reg(013) == 04426
+                && allocator_wrapper->reg(015) == 04455
+                && allocator_wrapper->reg(017) == 04402,
+            "04447 prepares its argument and enters the two-word allocator");
+    require(allocator_wrapper->memory(04505) == Word48(0123)
+                && allocator_wrapper->memory(04506) == Word48()
+                && allocator_wrapper->memory(04400) == Word48(02345)
+                && allocator_wrapper->memory(04401) == Word48(0123)
+                && allocator_wrapper->accumulator() == Word48(),
+            "04447 preserves its value, caller link, and computed argument");
+
+    auto allocator_resume = std::make_unique<Machine>();
+    allocator_resume->accumulator() = Word48(06600000000003000ULL);
+    allocator_resume->reg(007) = 02000;
+    allocator_resume->reg(017) = 04501;
+    allocator_resume->memory(04500) = Word48(03456);
+    allocator_resume->memory(03645) = Word48(7);
+    allocator_resume->memory(04463) = Word48(0777);
+    allocator_resume->memory(04464) = Word48(03000);
+    allocator_resume->memory(04530) = Word48(1);
+    allocator_resume->start(04455);
+    require(allocator_resume->step() == poplan::ExecutionStatus::running
+                && allocator_resume->program_counter() == 03456
+                && allocator_resume->reg(017) == 04500,
+            "04455 returns through the caller restored from r17");
+    require(allocator_resume->memory(03001)
+                == Word48(06600000000003000ULL)
+                && allocator_resume->memory(04464)
+                    == Word48(06600000000003000ULL),
+            "04455 installs the allocated pair in both generated slots");
+    require(allocator_resume->memory(03645) == Word48(010)
+                && allocator_resume->memory(03163) == Word48(0777)
+                && allocator_resume->accumulator() == Word48(0777),
+            "04455 advances its counter and executes the generated store");
+
+    auto compiler_resume_nonzero = std::make_unique<Machine>();
+    compiler_resume_nonzero->accumulator() = Word48(0671);
+    compiler_resume_nonzero->reg(003) = 03000;
+    compiler_resume_nonzero->reg(016) = 04567;
+    compiler_resume_nonzero->reg(017) = 04201;
+    compiler_resume_nonzero->memory(04200) = Word48(02345);
+    compiler_resume_nonzero->memory(04532) = Word48(0777);
+    compiler_resume_nonzero->memory(04533) = Word48();
+    compiler_resume_nonzero->start(04471);
+    require(compiler_resume_nonzero->step()
+                == poplan::ExecutionStatus::running
+                && compiler_resume_nonzero->program_counter() == 02345,
+            "04471 returns through the saved caller on its nonzero path");
+    require(compiler_resume_nonzero->memory(03000) == Word48(0671)
+                && compiler_resume_nonzero->memory(03002) == Word48()
+                && compiler_resume_nonzero->memory(03005) == Word48(0671)
+                && compiler_resume_nonzero->accumulator() == Word48(0671),
+            "04471 preserves the nonzero masked result and clears word +2");
+
+    auto compiler_resume_zero = std::make_unique<Machine>();
+    compiler_resume_zero->accumulator() = Word48(012345);
+    compiler_resume_zero->reg(003) = 03100;
+    compiler_resume_zero->reg(016) = 05000;
+    compiler_resume_zero->reg(017) = 04301;
+    compiler_resume_zero->memory(04300) = Word48(03456);
+    compiler_resume_zero->memory(04446) = Word48(077777);
+    compiler_resume_zero->memory(04532) = Word48(0777);
+    compiler_resume_zero->memory(04533) = Word48(0345);
+    compiler_resume_zero->memory(04534) = Word48(0777);
+    compiler_resume_zero->memory(04777) = Word48(0666);
+    compiler_resume_zero->start(04471);
+    require(compiler_resume_zero->step()
+                == poplan::ExecutionStatus::running
+                && compiler_resume_zero->program_counter() == 03456,
+            "04471 returns through the saved caller on its zero path");
+    require(compiler_resume_zero->memory(03100) == Word48(012345)
+                && compiler_resume_zero->memory(03101) == Word48(012345)
+                && compiler_resume_zero->memory(03102) == Word48(05000)
+                && compiler_resume_zero->memory(03104) == Word48(0666)
+                && compiler_resume_zero->memory(03105) == Word48()
+                && compiler_resume_zero->accumulator() == Word48(),
+            "04471 fills the zero-result record from the saved continuation");
+
+    // The hottest untranslated tic-tac-toe entry hashes a source word and
+    // follows the selected collision chain.  This is the first live trace:
+    // bucket 01354 reaches the matching object through 01534 -> 01624.
+    auto interned_record = std::make_unique<Machine>();
+    interned_record->accumulator() = Word48(02125110124642400ULL);
+    interned_record->reg(001) = 022261;
+    interned_record->reg(002) = 1;
+    interned_record->reg(003) = 020670;
+    interned_record->reg(004) = 077777;
+    interned_record->reg(005) = 00100;
+    interned_record->reg(006) = 070000;
+    interned_record->reg(007) = 01200;
+    interned_record->reg(010) = 03206;
+    interned_record->reg(012) = 5;
+    interned_record->reg(013) = 041;
+    interned_record->reg(014) = 021302;
+    interned_record->reg(015) = 016420;
+    interned_record->reg(016) = 021301;
+    interned_record->reg(017) = 066033;
+    interned_record->memory(01173) = Word48(0377);
+    interned_record->memory(01174) = Word48(1);
+    interned_record->memory(01175) = Word48(03000000000000000ULL);
+    interned_record->memory(01176) = Word48(06500000000000000ULL);
+    interned_record->memory(01177) = Word48(06440000000000000ULL);
+    interned_record->memory(01354) = Word48(0000153400001660ULL);
+    interned_record->memory(01534) = Word48(02064751624650101ULL);
+    interned_record->memory(01536) = Word48(04000000000001624ULL);
+    interned_record->memory(01624) = Word48(02125110124642400ULL);
+    require(interned_record->p01107() == 016420,
+            "01107 returns through the traced evaluator link");
+    require(interned_record->accumulator()
+                == Word48(06440000000001624ULL)
+                && interned_record->remainder() == Word48(01624)
+                && interned_record->reg(016) == 01624,
+            "01107 reproduces the traced collision-chain hit");
+    require(interned_record->reg(001) == 022261
+                && interned_record->reg(003) == 020670
+                && interned_record->reg(004) == 077777
+                && interned_record->reg(005) == 00100
+                && interned_record->reg(007) == 01200
+                && interned_record->reg(017) == 066033,
+            "01107 restores its seven-word register save area");
+    require(interned_record->memory(01171)
+                == Word48(02125110124642400ULL)
+                && interned_record->memory(01172) == Word48(04330),
+            "01107 preserves the traced descriptor and hash value");
+
+    auto generated_compare = std::make_unique<Machine>();
+    generated_compare->accumulator() = Word48(2);
+    generated_compare->reg(014) = 01234;
+    generated_compare->reg(016) = 02000;
+    generated_compare->reg(017) = 04000;
+    generated_compare->memory(03777) = Word48(4);
+    require(generated_compare->p06650() == 01234,
+            "06650 takes its r14 continuation when both comparisons differ");
+    require(generated_compare->reg(013) == 06600
+                && generated_compare->reg(017) == 04001
+                && generated_compare->memory(04000) == Word48(2)
+                && generated_compare->accumulator() == Word48(2)
+                && generated_compare->remainder() == Word48(2),
+            "06650 retains the generated template's comparison state");
+
+    auto generated_compare_error = std::make_unique<Machine>();
+    generated_compare_error->reg(016) = 02000;
+    generated_compare_error->reg(017) = 04100;
+    require(generated_compare_error->p06650() == 03014
+                && generated_compare_error->reg(015) == 06654
+                && generated_compare_error->reg(016) == 02001,
+            "06650 selects diagnostic continuation 06654 on its first match");
+    require(generated_compare_error->reg(017) == 04100
+                && generated_compare_error->accumulator() == Word48(),
+            "06650 balances its temporary stack word on the diagnostic path");
+
+    auto populated_record = std::make_unique<Machine>();
+    populated_record->reg(003) = 03000;
+    populated_record->reg(015) = 04567;
+    populated_record->memory(03001) = Word48(06400000000000017ULL);
+    require(populated_record->p16477() == 04567
+                && populated_record->accumulator()
+                    == Word48(06400000000000017ULL)
+                && populated_record->remainder()
+                    == Word48(06400000000000017ULL),
+            "16477 returns an already populated record word directly");
+
+    auto empty_record_word = std::make_unique<Machine>();
+    empty_record_word->accumulator() = Word48(055);
+    empty_record_word->reg(003) = 03000;
+    empty_record_word->reg(015) = 04567;
+    empty_record_word->reg(017) = 04200;
+    empty_record_word->memory(02776) = Word48(0666);
+    require(empty_record_word->p16477() == 02750
+                && empty_record_word->reg(015) == 016502
+                && empty_record_word->reg(017) == 04202,
+            "16477 enters the evaluator for an empty record word");
+    require(empty_record_word->memory(04200) == Word48()
+                && empty_record_word->memory(04201) == Word48(04567)
+                && empty_record_word->accumulator() == Word48(0666),
+            "16477 preserves its caller and loads the traced descriptor");
+
+    auto table_read = std::make_unique<Machine>();
+    table_read->reg(015) = 05670;
+    table_read->memory(017353) = Word48(03000);
+    table_read->memory(017354) = Word48(3);
+    table_read->memory(03002) = Word48(0123456701234567ULL);
+    require(table_read->p17337() == 05670
+                && table_read->reg(016) == 017353
+                && table_read->reg(011) == 2
+                && table_read->memory(017354) == Word48(2)
+                && table_read->accumulator()
+                    == Word48(0123456701234567ULL),
+            "17337 consumes and reads the next shared table slot");
+
+    auto table_write = std::make_unique<Machine>();
+    table_write->accumulator() = Word48(0765432107654321ULL);
+    table_write->reg(015) = 06701;
+    table_write->reg(017) = 04300;
+    table_write->memory(017353) = Word48(03100);
+    table_write->memory(017354) = Word48(022);
+    require(table_write->p17340() == 06701
+                && table_write->reg(016) == 017353
+                && table_write->reg(011) == 023
+                && table_write->reg(017) == 04300,
+            "17340 advances the shared table descriptor and balances r17");
+    require(table_write->memory(03122)
+                == Word48(0765432107654321ULL)
+                && table_write->memory(017354) == Word48(023)
+                && table_write->accumulator()
+                    == Word48(0765432107654321ULL),
+            "17340 stores the value in the selected shared table slot");
 
     // The first traced 16421 call maps tagged byte 012 to code 014. It uses
     // table word 16440, r12=1, and the r13-controlled 12-bit left shift.
@@ -1066,6 +2049,33 @@ int main()
     require(ordinary.reg(017) == 04100,
             "03206/03235 balance the hardware stack");
 
+    auto captured_call = std::make_unique<Machine>();
+    captured_call->memory(03265) = Word48(07600000000000000ULL);
+    captured_call->memory(03266) = Word48(0000000200000000ULL);
+    captured_call->memory(03271) = Word48(06500000000000000ULL);
+    captured_call->memory(03272) =
+        Word48(06606511500007555ULL);
+    captured_call->memory(03273) = Word48(065115);
+    captured_call->memory(03274) = Word48();
+    captured_call->memory(065120) = Word48(065524);
+    captured_call->memory(065524) = Word48(2);
+    captured_call->memory(065525) = Word48(065110);
+    captured_call->memory(065107) =
+        Word48(00300000000000000ULL);
+    captured_call->memory(065110) =
+        Word48(06500000000000000ULL);
+    captured_call->reg(015) = 06374;
+    captured_call->reg(017) = 066007;
+    require(captured_call->p03206_prepare_ordinary_call() == 07555,
+            "03206 dispatches a function with one captured slot");
+    require(captured_call->reg(017) == 066013,
+            "03206 retains both XTS words for one captured slot");
+    require(captured_call->memory(065110)
+                == Word48(06500000000000000ULL),
+            "03206 installs the original 03271 captured-slot constant");
+    require(captured_call->remainder() == Word48(),
+            "03206 reproduces the zero flag branch's RMR state");
+
     // Reduced arity-3 Man-or-Boy baseline from the traced generated object.
     // The B descriptor always selects entry 65576 through environment 65627,
     // whose +3 record has a zero address. No older K is rebound at 65763.
@@ -1133,8 +2143,8 @@ int main()
 
     // Trace snapshot at 20124 from generated entry 65576 (one argument).
     Machine activation;
-    activation.memory(20142) = Word48(077777);
-    activation.memory(20143) = Word48(1);
+    activation.memory(020142) = Word48(077777);
+    activation.memory(020143) = Word48(1);
     activation.reg(017) = 066013;
     activation.reg(016) = 1;
     activation.reg(015) = 065576;
@@ -1154,7 +2164,7 @@ int main()
             "20124 restores r2");
     require(activation.accumulator() == Word48(01001),
             "20124 leaves the restored r2 value in the accumulator");
-    require(activation.memory(20141) == Word48(0166017),
+    require(activation.memory(020141) == Word48(0166017),
             "20124 reproduces the traced activation-end scratch word");
 
     Machine no_arguments;
@@ -1187,8 +2197,8 @@ int main()
     // Three arguments exercise both 20124's transfer loop and 20110's
     // activation layout.
     Machine arguments;
-    arguments.memory(20142) = Word48(077777);
-    arguments.memory(20143) = Word48(1);
+    arguments.memory(020142) = Word48(077777);
+    arguments.memory(020143) = Word48(1);
     arguments.reg(017) = 066013;
     arguments.reg(016) = 3;
     arguments.reg(015) = 05555;

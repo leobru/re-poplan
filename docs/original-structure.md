@@ -23,15 +23,40 @@ The first translated C++ routines retain their original addresses:
 
 | Address | C++ routine | Original operation |
 |---:|---|---|
+| `01107` | `p01107` | Build the observed hash value, search its collision chain, and allocate a record when absent |
 | `02750` | `p02750_dispatch` | Validate and dispatch a POP function |
+| `02767` | `p02767` | Load an indirect evaluator value and redispatch it |
+| `02770` | `p02770` | Validate an indirect function record through the original table and tag tests |
 | `03206` | `p03206_prepare_ordinary_call` | Install an ordinary function and prepare captured slots |
 | `03235` | `p03235_bind_environment` | Bind captured values and restore the caller environment |
 | `03261` | `p03261_enter_function` | Enter a function through the saved descriptor |
 | `03275` | `p03275_push_acc` | Decrement `r6`, then store the accumulator |
 | `03277` | `p03277_pop_acc` | Load through `r6`, then increment `r6` |
+| `03536` | `p03536` | Build the observed five-word frame and transfer through the continuation in `r16` |
+| `04322` | `p04322` | Apply the observed classification masks and preserve its nested `04467`, `16313`, and `02764` continuations |
+| `04447` | `p04447` | Preserve two scratch values, allocate a pair through `05215`, and resume at `04455` |
+| `04467` | `p04467` | Preserve the caller around `06343` and install its result through the `04471` continuation |
+| `06343` | `p06343` | Build the observed compiler frame before entering `06526` |
+| `06526` | `p06526` | Build the observed helper frame and call the `17045` path |
+| `06650` | `p06650` | Perform the generated two-stage comparison and preserve its diagnostic continuations |
+| `06712` | `p06712` | Shared numeric normalization and result-packaging path |
+| `06733` | `p06733` | Checked add entry into the shared `06712` path |
+| `06740` | `p06740` | Checked reverse-subtract entry into the shared `06712` path |
+| `06744` | `p06744` | Checked multiply entry into the shared `06712` path |
+| `06750` | `p06750` | Checked divide entry into the shared `06712` path |
+| `11500` | `p11500` | Load a word indexed by the frame word at `r17-1` |
 | `15765` | `p15765_dispatch_special_function` | Expand a `664` descriptor's counted values and redispatch its nested function |
+| `16341` | `p16341` | Preserve the observed compiler registers around record processing |
+| `16477` | `p16477` | Return a populated record word or evaluate and install its missing value |
+| `17013` | `p17013` | Preserve an evaluator argument around the `21464` call path |
+| `17021` | `p17021` | Sibling evaluator wrapper with its original continuation offset |
+| `17045` | `p17045` | Preserve two evaluator arguments around the `21464` call path |
+| `17337`, `17341` | `p17337`, `p17341` | Select one of two descriptors and enter the shared table-read body |
+| `17340`, `17342` | `p17340`, `p17342` | Select one of two descriptors and enter the shared table-write body |
+| `20077` | `p20077` | Select and restore a generated return through the POP value stack |
 | `20110` | `p20110_transfer_arguments` | Transfer POP-stack arguments into an activation |
 | `20124` | `p20124_build_activation` | Build an activation and push its actual values |
+| `21464` | `p21464` | Classify the traced evaluator value and select its original continuation |
 
 The static `NEWARR` value `6641223600000000` establishes the special branch's
 layout. Environment word `12242` points at the counted vector beginning at
