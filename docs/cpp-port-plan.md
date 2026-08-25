@@ -24,6 +24,7 @@ The address-preserving machine layer now translates:
 
 - `01107..01166` traced hash construction, collision-chain lookup, allocation
   continuations, and register restoration for entry `01107`;
+- `01167..01170` alternate register setup for the shared `01122` body;
 - `02750..02763` function validation and dispatch;
 - `02767..03005` indirect evaluator selection and validation;
 - `03014..03071` normal diagnostic packaging, unpacking, and first formatter
@@ -36,20 +37,37 @@ The address-preserving machine layer now translates:
 - `03413..03423` traced numeric-update arithmetic;
 - `03516..03520` addressed-word replacement;
 - `03536..03541` computed-continuation frame construction;
+- `03716..03723` addressed cyclic update, computed transfer, and ordinary
+  return;
+- `03724..03735` table read, transform, allocation re-entry, and table write;
+- `03736..03761` compiler selection, nested classification, and saved-frame
+  restoration continuations;
+- `04074..04110` repeated shared-table writes and two-word frame cleanup;
 - `04322..04355` classification, record update, and nested dispatch
   continuations;
+- `04426..04434` two-marker record-field selection and replacement;
 - `04447..04455` allocator wrapper and generated-store continuation;
 - `04467..04504` compiler/evaluator wrapper and record-result continuation;
+- `04665..04674` compiler repeat wrapper, record-field comparison,
+  `04467` re-entry, and saved-state restoration;
+- `04675..04756` second compiler-chain wrapper, marker branches, shared scan,
+  record update, nested allocation, and saved-frame continuations;
 - `05207` and `05211` indirect object-word loads;
 - `05215..05225` tagged two-word allocation and initialization;
 - `05430..05447` allocation wrapper, common-list allocator, and return
   continuations;
 - `06343..06561` trace-confirmed compiler/evaluator entry cluster and its
   translated continuations;
-- `06650..06661` generated comparison and diagnostic continuations;
+- `06623..06647` four generated comparison templates, including their
+  alternating `A-X`/`X-A` operations and result branches;
+- `06650..06661` shared generated comparison and diagnostic continuations;
 - `06712..06754` arithmetic normalization and add, subtract, multiply, and
   divide entry paths;
 - `07475..07504` traced `CUCHIN` argument paths;
+- `07673..07745` compiler frame, classification branches, recursive helper
+  continuations, six-pass bit loop, and five-word restoration;
+- `11464..11477` address-based allocation wrapper, `05430` continuation,
+  transformed-word store, and three-word frame restoration;
 - `11500..11502` frame-relative indexed load;
 - `11536..11545` tagged-value precheck, frame-field match, and diagnostic
   exits;
@@ -57,17 +75,27 @@ The address-preserving machine layer now translates:
   `r14` linkage;
 - `15765..16003` special-function argument expansion and evaluator
   redispatch;
+- `16254..16303` trace-confirmed arithmetic table search, including its
+  multiply/RMR offset path and two-value narrowing loop;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
 - `16341..16350` trace-confirmed compiler dispatch frame and restoration;
 - `16421..16434` tagged-low-byte validation and packed-table lookup;
 - `16457..16462` three-word record shift and continuation selection;
 - `16477..16504` record-word presence check, evaluator call, and result store;
 - `16505..16510` record-shift call wrapper and caller restoration;
+- `16742..16744` record-byte lookup wrapper, result adjustment, and indirect
+  `r7` return;
 - `17013..17052` trace-confirmed evaluator wrapper paths;
 - `17242..17253` shared long/short table-scan entries;
 - `17254..17266` shared table read and its allocation continuation;
 - `17275..17306` shared table write and its allocation continuation;
 - `17337..17342` descriptor-selecting wrappers for those shared table bodies;
+- `17417..17461` object/compiler classification, nested call continuations,
+  generated transfer, and saved-frame restoration;
+- `17762..17773` two-word object allocation, tagged-link installation, and
+  shared counter update;
+- `17774..20007` record-chain classification, counter stamping, link
+  traversal, and ordinary counter update;
 - `20077..20106` generated return selection and restoration;
 - `20110..20123` activation argument transfer;
 - `20124..20140` activation construction;

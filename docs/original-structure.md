@@ -24,6 +24,7 @@ The first translated C++ routines retain their original addresses:
 | Address | C++ routine | Original operation |
 |---:|---|---|
 | `01107` | `p01107` | Build the observed hash value, search its collision chain, and allocate a record when absent |
+| `01167` | `p01167` | Select the alternate modifier-register setup and enter the shared `01122` body |
 | `02750` | `p02750_dispatch` | Validate and dispatch a POP function |
 | `02767` | `p02767` | Load an indirect evaluator value and redispatch it |
 | `02770` | `p02770` | Validate an indirect function record through the original table and tag tests |
@@ -33,26 +34,42 @@ The first translated C++ routines retain their original addresses:
 | `03275` | `p03275_push_acc` | Decrement `r6`, then store the accumulator |
 | `03277` | `p03277_pop_acc` | Load through `r6`, then increment `r6` |
 | `03536` | `p03536` | Build the observed five-word frame and transfer through the continuation in `r16` |
+| `03716` | `p03716` | Follow two address fields, cyclically update the selected word, and retain the computed-transfer exit |
+| `03724` | `p03724` | Transform a shared table value and preserve the `03725` allocation re-entry |
+| `03736` | `p03736` | Preserve compiler selection state and retain the nested `17417`, `04467`, `04214`, and generated continuations |
+| `04074` | `p04074` | Preserve a two-word frame around five writes through the shared `17340` table body |
 | `04322` | `p04322` | Apply the observed classification masks and preserve its nested `04467`, `16313`, and `02764` continuations |
+| `04426` | `p04426` | Recognize and replace either of the two table-defined record-field markers |
 | `04447` | `p04447` | Preserve two scratch values, allocate a pair through `05215`, and resume at `04455` |
 | `04467` | `p04467` | Preserve the caller around `06343` and install its result through the `04471` continuation |
+| `04665` | `p04665` | Preserve compiler state around repeated `03536` and `04467` entries and restore it at `04673` |
+| `04675` | `p04675` | Preserve compiler state around the observed marker, table-scan, record-update, and allocation branches through `04756` |
+| `04740` | `p04740` | Traverse or construct the selected two-word chain while retaining its stacked return protocol |
 | `06343` | `p06343` | Build the observed compiler frame before entering `06526` |
 | `06526` | `p06526` | Build the observed helper frame and call the `17045` path |
+| `06623`, `06631`, `06637`, `06645` | `p06623`, `p06631`, `p06637`, `p06645` | Execute the four generated comparison templates through their shared `06650` body |
 | `06650` | `p06650` | Perform the generated two-stage comparison and preserve its diagnostic continuations |
 | `06712` | `p06712` | Shared numeric normalization and result-packaging path |
 | `06733` | `p06733` | Checked add entry into the shared `06712` path |
 | `06740` | `p06740` | Checked reverse-subtract entry into the shared `06712` path |
 | `06744` | `p06744` | Checked multiply entry into the shared `06712` path |
 | `06750` | `p06750` | Checked divide entry into the shared `06712` path |
+| `07673` | `p07673` | Preserve a five-word compiler frame around the original classification, helper, bit-loop, and cleanup paths through `07745` |
+| `11464` | `p11464` | Preserve an address and caller frame, allocate through `05430` when nonzero, and resume at `11471` to store the transformed word |
 | `11500` | `p11500` | Load a word indexed by the frame word at `r17-1` |
 | `15765` | `p15765_dispatch_special_function` | Expand a `664` descriptor's counted values and redispatch its nested function |
+| `16254` | `p16254` | Narrow two scratch values through the original multiply/RMR-derived table offsets and return the selected address |
 | `16341` | `p16341` | Preserve the observed compiler registers around record processing |
 | `16477` | `p16477` | Return a populated record word or evaluate and install its missing value |
+| `16742` | `p16742` | Look up the record byte through `16421`, adjust its code, and return through `r7` |
 | `17013` | `p17013` | Preserve an evaluator argument around the `21464` call path |
 | `17021` | `p17021` | Sibling evaluator wrapper with its original continuation offset |
 | `17045` | `p17045` | Preserve two evaluator arguments around the `21464` call path |
 | `17337`, `17341` | `p17337`, `p17341` | Select one of two descriptors and enter the shared table-read body |
 | `17340`, `17342` | `p17340`, `p17342` | Select one of two descriptors and enter the shared table-write body |
+| `17417` | `p17417` | Classify the compiler object while preserving its nested calls and two-word saved frame |
+| `17762` | `p17762` | Allocate a two-word object and complete its tagged links at `17764` |
+| `17774` | `p17774` | Classify and traverse the selected record chain, retaining the `20002` stamping continuation |
 | `20077` | `p20077` | Select and restore a generated return through the POP value stack |
 | `20110` | `p20110_transfer_arguments` | Transfer POP-stack arguments into an activation |
 | `20124` | `p20124_build_activation` | Build an activation and push its actual values |

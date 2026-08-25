@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -1044,6 +1045,96 @@ int main()
     require(continuation_frame->memory(04364) == Word48(),
             "03536 clears its scratch word after saving it");
 
+    const auto compare_table_transform = [](
+        std::uint16_t entry, bool allocation_path) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        const std::pair<std::uint16_t, Word48> code[] = {
+            {03724, Word48(00043001500430015ULL)},
+            {03725, Word48(00220000067117337ULL)},
+            {03726, Word48(01000010400400001ULL)},
+            {03727, Word48(00510777710110641ULL)},
+            {03730, Word48(01012064210130105ULL)},
+            {03731, Word48(01013062712600176ULL)},
+            {03732, Word48(01010010410030636ULL)},
+            {03733, Word48(06640372503004447ULL)},
+            {03734, Word48(00041001500410015ULL)},
+            {03735, Word48(01010010403017340ULL)},
+        };
+        for (const auto &[address, word] : code) {
+            semantic->memory(address) = interpreted->memory(address) = word;
+        }
+        const auto initialize = [entry, allocation_path](Machine &machine) {
+            machine.accumulator() = Word48(02200000000000123ULL);
+            machine.remainder() = Word48(077);
+            machine.alu_mode() = 031;
+            machine.reg(0) = 0;
+            machine.reg(002) = 03536;
+            machine.reg(015) = entry == 03724 ? 03631 : 03725;
+            machine.reg(017) = entry == 03724 ? 04000 : 04002;
+            if (entry == 03725) {
+                machine.memory(04000) = Word48(02200000000000123ULL);
+                machine.memory(04001) = Word48(03631);
+            }
+
+            machine.memory(017353) = Word48(05000);
+            machine.memory(017354) = Word48(3);
+            machine.memory(05002) = Word48(06000);
+            machine.memory(05777) = allocation_path
+                ? Word48() : Word48(04000000000000000ULL);
+            machine.memory(04377) = Word48(07777777777777777ULL);
+            machine.memory(04400) = Word48();
+            machine.memory(03643) = Word48();
+            machine.memory(04365) = Word48();
+            machine.memory(04374) = Word48(07100000000000456ULL);
+        };
+        initialize(*semantic);
+        initialize(*interpreted);
+
+        semantic->start(entry);
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                "03724 semantic path keeps running");
+        const std::uint16_t continuation = semantic->program_counter();
+
+        interpreted->start(entry);
+        interpreted->disable_translated_routine(03724);
+        interpreted->disable_translated_routine(03725);
+        interpreted->disable_translated_routine(03726);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 64;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "03724 instruction path keeps running");
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "03724 instruction path reaches its semantic continuation");
+        require(semantic->accumulator() == interpreted->accumulator()
+                    && semantic->remainder() == interpreted->remainder()
+                    && semantic->alu_mode() == interpreted->alu_mode(),
+                "03724 preserves BESM ALU state");
+        for (std::size_t index = 0; index != 020; ++index) {
+            require(semantic->reg(index) == interpreted->reg(index),
+                    "03724 preserves all modifier registers");
+        }
+        for (std::size_t address = 0;
+             address != Machine::core_words; ++address) {
+            require(semantic->memory(static_cast<std::uint16_t>(address))
+                        == interpreted->memory(
+                            static_cast<std::uint16_t>(address)),
+                    "03724 preserves complete BESM memory state");
+        }
+        return continuation;
+    };
+
+    require(compare_table_transform(03724, false) == 03631,
+            "03724 completes its common table read/write path");
+    require(compare_table_transform(03724, true) == 04447,
+            "03724 retains the generated-item allocation boundary");
+    require(compare_table_transform(03725, false) == 03631,
+            "03725 resumes the table transform after allocation");
+
     auto classifier_fast = std::make_unique<Machine>();
     classifier_fast->reg(015) = 01234;
     classifier_fast->reg(017) = 04000;
@@ -1313,6 +1404,89 @@ int main()
                 && generated_compare_error->accumulator() == Word48(),
             "06650 balances its temporary stack word on the diagnostic path");
 
+    const auto compare_generated_template = [](
+        std::uint16_t entry, Word48 newer, Word48 older) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        const std::pair<std::uint16_t, Word48> code[] = {
+            {06623, Word48(07241404063106650ULL)},
+            {06624, Word48(07410000074050000ULL)},
+            {06625, Word48(05660006057000057ULL)},
+            {06631, Word48(07241403063106650ULL)},
+            {06632, Word48(07410000074060000ULL)},
+            {06633, Word48(05660006057000057ULL)},
+            {06637, Word48(07241405063106650ULL)},
+            {06640, Word48(07410000074050000ULL)},
+            {06641, Word48(05660005757000060ULL)},
+            {06645, Word48(07241406063106650ULL)},
+            {06646, Word48(07410000074060000ULL)},
+            {06647, Word48(05660005757000060ULL)},
+            {06650, Word48(05640660074000000ULL)},
+            {06651, Word48(00036010154130071ULL)},
+            {06652, Word48(05670005474100000ULL)},
+            {06653, Word48(07250000167103014ULL)},
+            {06654, Word48(07510777600360101ULL)},
+            {06655, Word48(05413007162700000ULL)},
+            {06656, Word48(07510777667103014ULL)},
+        };
+        for (const auto &[address, word] : code) {
+            semantic->memory(address) = word;
+            interpreted->memory(address) = word;
+        }
+        semantic->reg(0) = interpreted->reg(0) = 012;
+        semantic->reg(016) = interpreted->reg(016) = 02000;
+        semantic->reg(017) = interpreted->reg(017) = 04000;
+        semantic->accumulator() = interpreted->accumulator() = newer;
+        semantic->memory(03777) = interpreted->memory(03777) = older;
+
+        std::uint16_t continuation = 0;
+        switch (entry) {
+        case 06623: continuation = semantic->p06623(); break;
+        case 06631: continuation = semantic->p06631(); break;
+        case 06637: continuation = semantic->p06637(); break;
+        case 06645: continuation = semantic->p06645(); break;
+        default: require(false, "generated template entry is recognized");
+        }
+
+        interpreted->start(entry);
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 64;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "generated template instruction path keeps running");
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "generated template reaches its semantic continuation");
+        require(semantic->accumulator() == interpreted->accumulator()
+                    && semantic->remainder() == interpreted->remainder()
+                    && semantic->alu_mode() == interpreted->alu_mode(),
+                "generated template preserves BESM ALU state");
+        for (std::size_t index = 0; index != 020; ++index) {
+            require(semantic->reg(index) == interpreted->reg(index),
+                    "generated template preserves all modifier registers");
+        }
+        require(semantic->memory(03777) == interpreted->memory(03777)
+                    && semantic->memory(04000)
+                        == interpreted->memory(04000),
+                "generated template preserves its two stack operands");
+        return continuation;
+    };
+
+    const std::uint16_t template_06623 =
+        compare_generated_template(06623, Word48(2), Word48(4));
+    const std::uint16_t template_06631 =
+        compare_generated_template(06631, Word48(4), Word48(2));
+    const std::uint16_t template_06637 =
+        compare_generated_template(06637, Word48(2), Word48(4));
+    const std::uint16_t template_06645 =
+        compare_generated_template(06645, Word48(4), Word48(2));
+    require(template_06623 == 06660 && template_06631 == 06660
+                && template_06637 == 06657 && template_06645 == 06657,
+            "06623/06631/06637/06645 retain both destination layouts");
+
     auto populated_record = std::make_unique<Machine>();
     populated_record->reg(003) = 03000;
     populated_record->reg(015) = 04567;
@@ -1369,6 +1543,1789 @@ int main()
                 && table_write->accumulator()
                     == Word48(0765432107654321ULL),
             "17340 stores the value in the selected shared table slot");
+
+    const auto require_same_architectural_state = [](
+        const Machine &semantic, const Machine &interpreted,
+        const std::string &label) {
+        require(semantic.program_counter() == interpreted.program_counter()
+                    && semantic.right_half() == interpreted.right_half()
+                    && semantic.accumulator() == interpreted.accumulator()
+                    && semantic.remainder() == interpreted.remainder()
+                    && semantic.alu_mode() == interpreted.alu_mode(),
+                label + " preserves control and ALU state");
+        for (std::size_t index = 0; index != 020; ++index) {
+            require(semantic.reg(index) == interpreted.reg(index),
+                    label + " preserves all modifier registers");
+        }
+        for (std::size_t address = 0;
+             address != Machine::core_words; ++address) {
+            require(semantic.memory(static_cast<std::uint16_t>(address))
+                        == interpreted.memory(
+                            static_cast<std::uint16_t>(address)),
+                    label + " preserves complete BESM memory state");
+        }
+    };
+
+    const std::pair<std::uint16_t, Word48> record_marker_code[] = {
+        {004426, Word48(05640442614100002ULL)},
+        {004427, Word48(05412007656700003ULL)},
+        {004430, Word48(05410007757000005ULL)},
+        {004431, Word48(01410000254120100ULL)},
+        {004432, Word48(06670000054100101ULL)},
+        {004433, Word48(01400000200100000ULL)},
+        {004434, Word48(06700000002200000ULL)},
+    };
+    const auto compare_record_marker = [
+        &record_marker_code,
+        &require_same_architectural_state](Word48 field,
+                                           std::uint16_t modifier = 0) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : record_marker_code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(0) = modifier;
+            machine->reg(003) = 03000;
+            machine->reg(013) = 07123;
+            machine->reg(015) = 05670;
+            machine->reg(017) = 04000;
+            machine->memory(0) = Word48(0666);
+            machine->memory(03002) = field;
+            machine->memory(04524) = Word48(01423);
+            machine->memory(04525) = Word48(04517);
+            machine->memory(04526) = Word48(01427);
+            machine->memory(04527) = Word48(04436);
+            machine->start(04426);
+        }
+
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                "04426 semantic path keeps running");
+        const std::uint16_t continuation = semantic->program_counter();
+        interpreted->disable_translated_routine(04426);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 32;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "04426 instruction path keeps running");
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "04426 instruction path reaches its semantic boundary");
+        require_same_architectural_state(
+            *semantic, *interpreted, "04426 record marker");
+        return semantic;
+    };
+
+    const auto first_record_marker =
+        compare_record_marker(Word48(01423));
+    require(first_record_marker->memory(03002) == Word48(04517)
+                && first_record_marker->accumulator() == Word48(0666),
+            "04426 replaces the first record marker");
+    const auto second_record_marker =
+        compare_record_marker(Word48(01427));
+    require(second_record_marker->memory(03002) == Word48(04436)
+                && second_record_marker->accumulator() == Word48(0666),
+            "04426 replaces the second record marker");
+    const auto ordinary_record_marker =
+        compare_record_marker(Word48(01234), 7);
+    require(ordinary_record_marker->memory(03002) == Word48(01234)
+                && ordinary_record_marker->accumulator()
+                    == Word48(01234 ^ 01427)
+                && ordinary_record_marker->remainder()
+                    == Word48(01234 ^ 01427),
+            "04426 preserves its ordinary mismatch result");
+
+    const std::pair<std::uint16_t, Word48> record_byte_code[] = {
+        {016742, Word48(01410000164440007ULL)},
+        {016743, Word48(06711642102200000ULL)},
+        {016744, Word48(00512451137000000ULL)},
+    };
+    const auto compare_record_byte = [
+        &install_tagged_byte_lookup,
+        &record_byte_code,
+        &require_same_architectural_state](Word48 record_byte,
+                                           std::uint16_t modifier = 0) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            install_tagged_byte_lookup(*machine);
+            for (const auto &[address, word] : record_byte_code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(0) = modifier;
+            machine->reg(003) = 03000;
+            machine->reg(007) = 07123;
+            machine->reg(015) = 04567;
+            machine->reg(017) = 04000;
+            machine->memory(03001) = record_byte;
+            machine->memory(016772) = Word48(2);
+            machine->start(016742);
+        }
+
+        for (unsigned steps = 0;
+             (semantic->program_counter() != 04567
+              || semantic->right_half()) && steps != 16;
+             ++steps) {
+            require(semantic->step() == poplan::ExecutionStatus::running,
+                    "16742 semantic path keeps running");
+        }
+        interpreted->disable_translated_routine(016742);
+        interpreted->disable_translated_routine(016744);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != 04567
+              || interpreted->right_half()) && steps != 32;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "16742 instruction path keeps running");
+        }
+        require(semantic->program_counter() == 04567
+                    && !semantic->right_half()
+                    && interpreted->program_counter() == 04567
+                    && !interpreted->right_half(),
+                "16742 paths return through the saved r7 link");
+        require_same_architectural_state(
+            *semantic, *interpreted, "16742 record byte");
+        return semantic;
+    };
+
+    const auto tagged_record_byte = compare_record_byte(
+        Word48(06400000000000012ULL), 7);
+    require(tagged_record_byte->accumulator() == Word48(016)
+                && tagged_record_byte->remainder() == Word48(014)
+                && tagged_record_byte->reg(007) == 04567
+                && tagged_record_byte->reg(015) == 016744,
+            "16742 converts and adjusts a tagged record byte");
+    const auto untagged_record_byte =
+        compare_record_byte(Word48(012));
+    require(untagged_record_byte->accumulator() == Word48(017)
+                && untagged_record_byte->remainder() == Word48(015),
+            "16742 retains 16421's untagged-byte fallback");
+
+    const std::pair<std::uint16_t, Word48> address_wrapper_code[] = {
+        {011464, Word48(00043000100430015ULL)},
+        {011465, Word48(07400000006411464ULL)},
+        {011466, Word48(07637777572400000ULL)},
+        {011467, Word48(07341147472500001ULL)},
+        {011470, Word48(00220000067105430ULL)},
+        {011471, Word48(07510777500360050ULL)},
+        {011472, Word48(07512777504130310ULL)},
+        {011473, Word48(07000000002200000ULL)},
+        {011474, Word48(00042001604120036ULL)},
+        {011475, Word48(07500777574100000ULL)},
+        {011476, Word48(00041001500410001ULL)},
+        {011477, Word48(06700000002200000ULL)},
+    };
+    const auto prepare_address_wrapper = [&address_wrapper_code](
+        Machine &machine) {
+        for (const auto &[address, word] : address_wrapper_code) {
+            machine.memory(address) = word;
+        }
+        machine.remainder() = Word48(07654);
+        machine.alu_mode() = 025;
+        machine.reg(001) = 05007;
+        machine.reg(002) = 065517;
+        machine.reg(003) = 065523;
+        machine.reg(015) = 05163;
+        machine.reg(016) = 07123;
+        machine.reg(017) = 04000;
+        machine.memory(011522) =
+            Word48(07040000000000000ULL);
+        machine.memory(011774) = Word48(1);
+    };
+
+    auto zero_address_semantic = std::make_unique<Machine>();
+    auto zero_address_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {zero_address_semantic.get(),
+                             zero_address_interpreted.get()}) {
+        prepare_address_wrapper(*machine);
+        machine->accumulator() = Word48();
+        machine->start(011464);
+    }
+    require(zero_address_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "11464 zero-address semantic path keeps running");
+    zero_address_interpreted->disable_translated_routine(011464);
+    zero_address_interpreted->disable_translated_routine(011471);
+    for (unsigned steps = 0;
+         (zero_address_interpreted->program_counter() != 05163
+          || zero_address_interpreted->right_half()) && steps != 32;
+         ++steps) {
+        require(zero_address_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "11464 zero-address instruction path keeps running");
+    }
+    require_same_architectural_state(
+        *zero_address_semantic, *zero_address_interpreted,
+        "11464 zero address");
+    require(zero_address_semantic->accumulator()
+                == Word48(07040000000000000ULL)
+                && zero_address_semantic->remainder() == Word48()
+                && zero_address_semantic->alu_mode() == 005
+                && zero_address_semantic->reg(001) == 05007
+                && zero_address_semantic->reg(015) == 05163
+                && zero_address_semantic->reg(016) == 0
+                && zero_address_semantic->reg(017) == 04000,
+            "11464 zero address skips allocation and restores its frame");
+
+    auto address_transfer_semantic = std::make_unique<Machine>();
+    auto address_transfer_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {address_transfer_semantic.get(),
+                             address_transfer_interpreted.get()}) {
+        prepare_address_wrapper(*machine);
+        machine->accumulator() = Word48(1);
+        machine->start(011464);
+    }
+    require(address_transfer_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "11464 allocation transfer keeps running");
+    address_transfer_interpreted->disable_translated_routine(011464);
+    address_transfer_interpreted->disable_translated_routine(011471);
+    for (unsigned steps = 0;
+         (address_transfer_interpreted->program_counter() != 05430
+          || address_transfer_interpreted->right_half()) && steps != 24;
+         ++steps) {
+        require(address_transfer_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "11464 allocation instruction path keeps running");
+    }
+    require_same_architectural_state(
+        *address_transfer_semantic, *address_transfer_interpreted,
+        "11464 allocation transfer");
+    require(address_transfer_semantic->accumulator() == Word48(05163)
+                && address_transfer_semantic->remainder() == Word48(07654)
+                && address_transfer_semantic->alu_mode() == 005
+                && address_transfer_semantic->reg(001) == 011464
+                && address_transfer_semantic->reg(015) == 011471
+                && address_transfer_semantic->reg(016) == 2
+                && address_transfer_semantic->reg(017) == 04003,
+            "11464 builds the observed allocator frame and continuation");
+
+    auto address_resume_semantic = std::make_unique<Machine>();
+    auto address_resume_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {address_resume_semantic.get(),
+                             address_resume_interpreted.get()}) {
+        prepare_address_wrapper(*machine);
+        machine->accumulator() =
+            Word48(06500000000000000ULL);
+        machine->reg(001) = 011464;
+        machine->reg(015) = 05433;
+        machine->reg(016) = 03000;
+        machine->reg(017) = 04003;
+        machine->memory(04000) = Word48(1);
+        machine->memory(04001) = Word48(05007);
+        machine->memory(04002) = Word48(05163);
+        machine->start(011471);
+    }
+    require(address_resume_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "11471 semantic continuation keeps running");
+    address_resume_interpreted->disable_translated_routine(011471);
+    for (unsigned steps = 0;
+         (address_resume_interpreted->program_counter() != 05163
+          || address_resume_interpreted->right_half()) && steps != 24;
+         ++steps) {
+        require(address_resume_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "11471 instruction continuation keeps running");
+    }
+    require_same_architectural_state(
+        *address_resume_semantic, *address_resume_interpreted,
+        "11471 continuation");
+    require(address_resume_semantic->accumulator()
+                == Word48(07040000000003000ULL)
+                && address_resume_semantic->remainder() == Word48(03000)
+                && address_resume_semantic->alu_mode() == 005
+                && address_resume_semantic->reg(001) == 05007
+                && address_resume_semantic->reg(015) == 05163
+                && address_resume_semantic->reg(016) == 03000
+                && address_resume_semantic->reg(017) == 04000
+                && address_resume_semantic->memory(03000)
+                    == Word48(00000000100000002ULL),
+            "11471 stores the transformed word and restores its frame");
+
+    const std::pair<std::uint16_t, Word48> compiler_frame_code[] = {
+        {07673, Word48(00042001500370006ULL)},
+        {07674, Word48(00043000100430002ULL)},
+        {07675, Word48(00043000526407514ULL)},
+        {07676, Word48(02403024374000000ULL)},
+        {07677, Word48(07010000024000243ULL)},
+        {07700, Word48(00036010124130325ULL)},
+        {07701, Word48(02660016724100243ULL)},
+        {07702, Word48(06640774203012674ULL)},
+        {07703, Word48(02410024367103330ULL)},
+        {07704, Word48(02660023224100326ULL)},
+        {07705, Word48(00220000067103275ULL)},
+        {07706, Word48(07240000167107652ULL)},
+        {07707, Word48(02410024367110353ULL)},
+        {07710, Word48(00036007126700200ULL)},
+        {07711, Word48(02410024367103330ULL)},
+        {07712, Word48(02670021272407757ULL)},
+        {07713, Word48(06640774227000157ULL)},
+        {07714, Word48(02410024367117021ULL)},
+        {07715, Word48(02403024367117013ULL)},
+        {07716, Word48(02400024372407757ULL)},
+        {07717, Word48(00220000067107673ULL)},
+        {07720, Word48(07410000024000243ULL)},
+        {07721, Word48(00220000067110353ULL)},
+        {07722, Word48(00036007126600175ULL)},
+        {07723, Word48(02410032267103275ULL)},
+        {07724, Word48(07240000167107652ULL)},
+        {07725, Word48(02700020002200000ULL)},
+        {07726, Word48(02410032767103275ULL)},
+        {07727, Word48(07240000127000225ULL)},
+        {07730, Word48(02410024300400016ULL)},
+        {07731, Word48(02411031724120330ULL)},
+        {07732, Word48(02670024570100000ULL)},
+        {07733, Word48(00640000012477773ULL)},
+        {07734, Word48(02400024424110331ULL)},
+        {07735, Word48(02660022306500001ULL)},
+        {07736, Word48(02412032067103275ULL)},
+        {07737, Word48(02410024400360110ULL)},
+        {07740, Word48(01370773404440016ULL)},
+        {07741, Word48(00220000067107652ULL)},
+        {07742, Word48(07410000024010243ULL)},
+        {07743, Word48(00041000500410002ULL)},
+        {07744, Word48(00041000100400015ULL)},
+        {07745, Word48(06700000002200000ULL)},
+        {07746, Word48(02410024324110317ULL)},
+        {07747, Word48(02412033226700214ULL)},
+        {07750, Word48(07240775367107673ULL)},
+        {07751, Word48(07240775467107673ULL)},
+        {07752, Word48(02700022602200000ULL)},
+    };
+    const auto prepare_compiler_frame = [&compiler_frame_code](
+        Machine &machine) {
+        for (const auto &[address, word] : compiler_frame_code) {
+            machine.memory(address) = word;
+        }
+        machine.accumulator() = Word48(0123456701234567ULL);
+        machine.remainder() = Word48(07654);
+        machine.alu_mode() = 025;
+        machine.reg(001) = 0141;
+        machine.reg(002) = 07777;
+        machine.reg(005) = 04536;
+        machine.reg(015) = 05670;
+        machine.reg(016) = 03000;
+        machine.reg(017) = 04000;
+        machine.memory(07757) = Word48(0765432107654321ULL);
+    };
+
+    const auto compare_compiler_frame_entry = [
+        &prepare_compiler_frame,
+        &require_same_architectural_state](Word48 input,
+                                           Word48 branch_constant,
+                                           std::uint16_t boundary,
+                                           const std::string &label) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            prepare_compiler_frame(*machine);
+            machine->memory(03000) = input;
+            machine->memory(010041) = branch_constant;
+            machine->start(07673);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic path keeps running");
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != boundary
+              || interpreted->right_half()) && steps != 48;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require(interpreted->program_counter() == boundary
+                    && !interpreted->right_half(),
+                label + " instruction path reaches its boundary");
+        require_same_architectural_state(*semantic, *interpreted, label);
+        return semantic;
+    };
+
+    const auto compiler_frame_transfer = compare_compiler_frame_entry(
+        Word48(), Word48(), 012674, "07673 transfer");
+    require(compiler_frame_transfer->reg(005) == 07514
+                && compiler_frame_transfer->reg(015) == 07742
+                && compiler_frame_transfer->reg(017) == 04005
+                && compiler_frame_transfer->accumulator() == Word48()
+                && compiler_frame_transfer->remainder() == Word48()
+                && compiler_frame_transfer->alu_mode() == 006,
+            "07673 preserves its frame around the 12674 boundary");
+
+    const auto compiler_frame_check = compare_compiler_frame_entry(
+        Word48(04000000000000000ULL),
+        Word48(02000000000000000ULL), 03330,
+        "07673 checked branch");
+    require(compiler_frame_check->reg(015) == 07704
+                && compiler_frame_check->reg(017) == 04005
+                && compiler_frame_check->accumulator()
+                    == Word48(04000000000000000ULL)
+                && compiler_frame_check->remainder()
+                    == Word48(04000000000000000ULL)
+                && compiler_frame_check->alu_mode() == 006,
+            "07673 enters 03330 with the original selected word");
+
+    auto compiler_loop_semantic = std::make_unique<Machine>();
+    auto compiler_loop_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {compiler_loop_semantic.get(),
+                             compiler_loop_interpreted.get()}) {
+        prepare_compiler_frame(*machine);
+        machine->accumulator() = Word48();
+        machine->alu_mode() = 006;
+        machine->reg(005) = 07514;
+        machine->reg(015) = 07704;
+        machine->reg(017) = 04005;
+        machine->memory(04000) = Word48(05670);
+        machine->memory(04001) = Word48(0141);
+        machine->memory(04002) = Word48(07777);
+        machine->memory(04003) = Word48(04536);
+        machine->memory(04004) = Word48(0765432107654321ULL);
+        machine->memory(07757) = Word48(03000);
+        machine->memory(010033) = Word48(Word48::mask);
+        machine->memory(010046) = Word48(1);
+        machine->memory(010044) = Word48(03000);
+        machine->memory(010045) = Word48();
+        machine->memory(03000) = Word48(0777);
+        machine->start(07704);
+    }
+    require(compiler_loop_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "07704 semantic loop keeps running");
+    compiler_loop_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (compiler_loop_interpreted->program_counter() != 07652
+          || compiler_loop_interpreted->right_half()) && steps != 160;
+         ++steps) {
+        require(compiler_loop_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "07704 instruction loop keeps running");
+    }
+    require_same_architectural_state(
+        *compiler_loop_semantic, *compiler_loop_interpreted,
+        "07704 bit loop");
+    require(compiler_loop_semantic->reg(001) == 0
+                && compiler_loop_semantic->reg(002) == 0
+                && compiler_loop_semantic->reg(015) == 07742
+                && compiler_loop_semantic->reg(016) == 0
+                && compiler_loop_semantic->reg(017) == 04005,
+            "07704 completes six bit-loop passes at the 07652 boundary");
+
+    auto compiler_cleanup_semantic = std::make_unique<Machine>();
+    auto compiler_cleanup_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {compiler_cleanup_semantic.get(),
+                             compiler_cleanup_interpreted.get()}) {
+        prepare_compiler_frame(*machine);
+        machine->accumulator() = Word48(01234);
+        machine->alu_mode() = 025;
+        machine->reg(001) = 0;
+        machine->reg(002) = 0;
+        machine->reg(005) = 07514;
+        machine->reg(015) = 07742;
+        machine->reg(017) = 04005;
+        machine->memory(04000) = Word48(05670);
+        machine->memory(04001) = Word48(0141);
+        machine->memory(04002) = Word48(07777);
+        machine->memory(04003) = Word48(04536);
+        machine->memory(04004) = Word48(0765432107654321ULL);
+        machine->start(07742);
+    }
+    require(compiler_cleanup_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "07742 semantic cleanup keeps running");
+    compiler_cleanup_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (compiler_cleanup_interpreted->program_counter() != 05670
+          || compiler_cleanup_interpreted->right_half()) && steps != 24;
+         ++steps) {
+        require(compiler_cleanup_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "07742 instruction cleanup keeps running");
+    }
+    require_same_architectural_state(
+        *compiler_cleanup_semantic, *compiler_cleanup_interpreted,
+        "07742 cleanup");
+    require(compiler_cleanup_semantic->accumulator() == Word48(05670)
+                && compiler_cleanup_semantic->remainder() == Word48(07654)
+                && compiler_cleanup_semantic->alu_mode() == 005
+                && compiler_cleanup_semantic->reg(001) == 0141
+                && compiler_cleanup_semantic->reg(002) == 07777
+                && compiler_cleanup_semantic->reg(005) == 04536
+                && compiler_cleanup_semantic->reg(015) == 05670
+                && compiler_cleanup_semantic->reg(017) == 04000
+                && compiler_cleanup_semantic->memory(07757)
+                    == Word48(0765432107654321ULL),
+            "07742 restores the five-word compiler frame");
+
+    const std::pair<std::uint16_t, Word48> addressed_update_code[] = {
+        {03716, Word48(00040001673403723ULL)},
+        {03717, Word48(07010000000400014ULL)},
+        {03720, Word48(06340372260100000ULL)},
+        {03721, Word48(07513777760000000ULL)},
+        {03722, Word48(07010000112700160ULL)},
+        {03723, Word48(07657777767000000ULL)},
+    };
+    const auto compare_addressed_update = [
+        &addressed_update_code,
+        &require_same_architectural_state](Word48 input,
+                                           Word48 first_word,
+                                           Word48 second_word,
+                                           std::uint16_t r2,
+                                           std::uint16_t boundary,
+                                           const std::string &label) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : addressed_update_code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = input;
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(002) = r2;
+            machine->reg(014) = 07123;
+            machine->reg(015) = 05670;
+            machine->reg(016) = 07654;
+            machine->reg(017) = 04001;
+            machine->memory(03000) = first_word;
+            machine->memory(03001) = second_word;
+            machine->memory(03100) = Word48(5);
+            machine->memory(04000) = Word48(2);
+            machine->start(03716);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic path keeps running");
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != boundary
+              || interpreted->right_half()) && steps != 24;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require(interpreted->program_counter() == boundary
+                    && !interpreted->right_half(),
+                label + " instruction path reaches its boundary");
+        require_same_architectural_state(*semantic, *interpreted, label);
+        return semantic;
+    };
+
+    const auto zero_addressed_update = compare_addressed_update(
+        Word48(), Word48(), Word48(), 03536, 05670,
+        "03716 zero address");
+    require(zero_addressed_update->reg(016) == 0
+                && zero_addressed_update->reg(017) == 04000
+                && zero_addressed_update->remainder() == Word48(07654)
+                && zero_addressed_update->alu_mode() == 025,
+            "03716 zero address returns without touching ALU state");
+
+    const auto stored_addressed_update = compare_addressed_update(
+        Word48(03000), Word48(03100), Word48(), 03536, 05670,
+        "03716 stored update");
+    require(stored_addressed_update->memory(03100) == Word48(7)
+                && stored_addressed_update->reg(014) == 03100
+                && stored_addressed_update->reg(016) == 03000
+                && stored_addressed_update->reg(017) == 04000
+                && stored_addressed_update->remainder() == Word48()
+                && stored_addressed_update->alu_mode() == 005,
+            "03716 cyclically updates the selected word and returns");
+
+    const auto transferred_addressed_update = compare_addressed_update(
+        Word48(03000), Word48(), Word48(1), 05620, 06000,
+        "03716 computed transfer");
+    require(transferred_addressed_update->reg(014) == 0
+                && transferred_addressed_update->reg(017) == 04001
+                && transferred_addressed_update->accumulator() == Word48(1)
+                && transferred_addressed_update->remainder() == Word48(1)
+                && transferred_addressed_update->alu_mode() == 005,
+            "03716 preserves the stack on its computed transfer");
+
+    const std::pair<std::uint16_t, Word48> table_write_wrapper_code[] = {
+        {04074, Word48(00043001502204464ULL)},
+        {04075, Word48(00003000067117340ULL)},
+        {04076, Word48(00220446300100000ULL)},
+        {04077, Word48(00220000067117340ULL)},
+        {04100, Word48(03410117367117340ULL)},
+        {04101, Word48(03410116767117340ULL)},
+        {04102, Word48(01010010767117340ULL)},
+        {04103, Word48(00010000002204463ULL)},
+        {04104, Word48(00000000034001173ULL)},
+        {04105, Word48(03400116710100627ULL)},
+        {04106, Word48(01000010710100647ULL)},
+        {04107, Word48(00220446400010000ULL)},
+        {04110, Word48(00041001567000000ULL)},
+    };
+    const auto prepare_table_write_wrapper = [&table_write_wrapper_code](
+        Machine &machine) {
+        for (const auto &[address, word] : table_write_wrapper_code) {
+            machine.memory(address) = word;
+        }
+        machine.accumulator() = Word48(0123);
+        machine.remainder() = Word48(07654);
+        machine.alu_mode() = 025;
+        machine.reg(002) = 03536;
+        machine.reg(007) = 01000;
+        machine.reg(015) = 05670;
+        machine.reg(017) = 04000;
+        machine.memory(04464) = Word48(03000);
+    };
+
+    auto table_write_entry_semantic = std::make_unique<Machine>();
+    auto table_write_entry_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {table_write_entry_semantic.get(),
+                             table_write_entry_interpreted.get()}) {
+        prepare_table_write_wrapper(*machine);
+        machine->start(04074);
+    }
+    require(table_write_entry_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "04074 semantic entry keeps running");
+    table_write_entry_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (table_write_entry_interpreted->program_counter() != 017340
+          || table_write_entry_interpreted->right_half()) && steps != 16;
+         ++steps) {
+        require(table_write_entry_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "04074 instruction entry keeps running");
+    }
+    require_same_architectural_state(
+        *table_write_entry_semantic, *table_write_entry_interpreted,
+        "04074 entry");
+    require(table_write_entry_semantic->accumulator() == Word48(03000)
+                && table_write_entry_semantic->reg(015) == 04076
+                && table_write_entry_semantic->reg(017) == 04002
+                && table_write_entry_semantic->memory(04000)
+                    == Word48(0123)
+                && table_write_entry_semantic->memory(04001)
+                    == Word48(05670),
+            "04074 builds its two-word table-write frame");
+
+    struct TableWriteContinuationCase {
+        std::uint16_t entry;
+        std::uint16_t link;
+        Word48 value;
+    };
+    const TableWriteContinuationCase table_write_continuations[] = {
+        {04076, 04100, Word48(0701)},
+        {04100, 04101, Word48(0702)},
+        {04101, 04102, Word48(0703)},
+        {04102, 04103, Word48(0704)},
+    };
+    for (const auto &test : table_write_continuations) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            prepare_table_write_wrapper(*machine);
+            machine->reg(015) = test.entry;
+            machine->reg(017) = 04002;
+            machine->memory(04000) = Word48(0123);
+            machine->memory(04001) = Word48(05670);
+            machine->memory(04463) = Word48(0701);
+            machine->memory(02173) = Word48(0702);
+            machine->memory(02167) = Word48(0703);
+            machine->memory(03645) = Word48(0704);
+            machine->start(test.entry);
+        }
+        const std::string label =
+            std::to_string(test.entry) + " table-write continuation";
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic path keeps running");
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != 017340
+              || interpreted->right_half()) && steps != 12;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require_same_architectural_state(
+            *semantic, *interpreted, label);
+        require(semantic->accumulator() == test.value
+                    && semantic->reg(015) == test.link,
+                label + " forwards the expected table-write value");
+    }
+
+    auto table_write_cleanup_semantic = std::make_unique<Machine>();
+    auto table_write_cleanup_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {table_write_cleanup_semantic.get(),
+                             table_write_cleanup_interpreted.get()}) {
+        prepare_table_write_wrapper(*machine);
+        machine->accumulator() = Word48(07123);
+        machine->reg(015) = 04103;
+        machine->reg(017) = 04002;
+        machine->memory(0) = Word48(0666);
+        machine->memory(04000) = Word48(0123);
+        machine->memory(04001) = Word48(05670);
+        machine->memory(04365) = Word48(0777);
+        machine->memory(04405) = Word48(03000);
+        machine->start(04103);
+    }
+    require(table_write_cleanup_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "04103 semantic cleanup keeps running");
+    table_write_cleanup_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (table_write_cleanup_interpreted->program_counter() != 05670
+          || table_write_cleanup_interpreted->right_half()) && steps != 24;
+         ++steps) {
+        require(table_write_cleanup_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "04103 instruction cleanup keeps running");
+    }
+    require_same_architectural_state(
+        *table_write_cleanup_semantic, *table_write_cleanup_interpreted,
+        "04103 cleanup");
+    require(table_write_cleanup_semantic->accumulator() == Word48(0123)
+                && table_write_cleanup_semantic->remainder() == Word48(07654)
+                && table_write_cleanup_semantic->alu_mode() == 005
+                && table_write_cleanup_semantic->reg(015) == 05670
+                && table_write_cleanup_semantic->reg(017) == 04000
+                && table_write_cleanup_semantic->memory(04463)
+                    == Word48(0666)
+                && table_write_cleanup_semantic->memory(04464)
+                    == Word48(03000)
+                && table_write_cleanup_semantic->memory(03645)
+                    == Word48(0777),
+            "04103 stores results and restores the table-write frame");
+
+    const std::pair<std::uint16_t, Word48> alternate_hash_code[] = {
+        {01122, Word48(00043000100430005ULL)},
+        {01123, Word48(00043000300430004ULL)},
+        {01124, Word48(00043001500430007ULL)},
+        {01125, Word48(00640112075037771ULL)},
+        {01126, Word48(00036010100400003ULL)},
+        {01127, Word48(04445000354440007ULL)},
+        {01130, Word48(02640000075107771ULL)},
+        {01131, Word48(00411005406600013ULL)},
+        {01132, Word48(02640000102200000ULL)},
+        {01133, Word48(01410000027501135ULL)},
+        {01134, Word48(00036013002200000ULL)},
+        {01135, Word48(07044000400400016ULL)},
+        {01136, Word48(07350114450440016ULL)},
+        {01137, Word48(00220000067105430ULL)},
+        {01167, Word48(04640614352400002ULL)},
+        {01170, Word48(05640000003001122ULL)},
+    };
+    auto alternate_hash_semantic = std::make_unique<Machine>();
+    auto alternate_hash_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {alternate_hash_semantic.get(),
+                             alternate_hash_interpreted.get()}) {
+        for (const auto &[address, word] : alternate_hash_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48();
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(001) = 07001;
+        machine->reg(003) = 07003;
+        machine->reg(004) = 07004;
+        machine->reg(005) = 07005;
+        machine->reg(007) = 07007;
+        machine->reg(015) = 05670;
+        machine->reg(016) = 03000;
+        machine->reg(017) = 04000;
+        machine->start(01167);
+    }
+    require(alternate_hash_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "01167 semantic alternate hash entry keeps running");
+    alternate_hash_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (alternate_hash_interpreted->program_counter() != 05430
+          || alternate_hash_interpreted->right_half()) && steps != 48;
+         ++steps) {
+        require(alternate_hash_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "01167 instruction alternate hash entry keeps running");
+    }
+    require_same_architectural_state(
+        *alternate_hash_semantic, *alternate_hash_interpreted,
+        "01167 alternate shared-hash entry");
+
+    const std::pair<std::uint16_t, Word48> compiler_chain_code[] = {
+        {04675, Word48(00042000200430015ULL)},
+        {04676, Word48(00043001512404536ULL)},
+        {04677, Word48(01410000210120235ULL)},
+        {04700, Word48(01270014466404677ULL)},
+        {04701, Word48(00300446702200000ULL)},
+        {04702, Word48(01410000210120245ULL)},
+        {04703, Word48(01270015302203504ULL)},
+        {04704, Word48(00010000012700152ULL)},
+        {04705, Word48(01010024502200000ULL)},
+        {04706, Word48(01003024167104447ULL)},
+        {04707, Word48(06640467703004467ULL)},
+        {04710, Word48(01010024613000150ULL)},
+        {04711, Word48(01410000214120032ULL)},
+        {04712, Word48(01260017214100002ULL)},
+        {04713, Word48(01412003312600217ULL)},
+        {04714, Word48(00220000067117253ULL)},
+        {04715, Word48(07340471766404677ULL)},
+        {04716, Word48(01300000002200000ULL)},
+        {04717, Word48(00041001500410015ULL)},
+        {04720, Word48(00040000267000000ULL)},
+        {04721, Word48(01010006267104740ULL)},
+        {04722, Word48(07010000012700170ULL)},
+        {04723, Word48(01410000670000000ULL)},
+        {04724, Word48(00042001667104507ULL)},
+        {04725, Word48(06640454403004467ULL)},
+        {04726, Word48(07241510010100062ULL)},
+        {04727, Word48(06710301402200000ULL)},
+        {04730, Word48(00220000067104467ULL)},
+        {04731, Word48(01270020114100004ULL)},
+        {04732, Word48(01012023112600201ULL)},
+        {04733, Word48(01410000067104740ULL)},
+        {04734, Word48(00042001610030247ULL)},
+        {04735, Word48(00220000067104447ULL)},
+        {04736, Word48(06640467703004467ULL)},
+        {04737, Word48(07240414003003014ULL)},
+        {04740, Word48(00043001534031167ULL)},
+        {04741, Word48(01260021002200000ULL)},
+        {04742, Word48(00040001460100000ULL)},
+        {04743, Word48(00040001670100001ULL)},
+        {04744, Word48(07512777612600215ULL)},
+        {04745, Word48(06010000112700204ULL)},
+        {04746, Word48(00010000075037775ULL)},
+        {04747, Word48(00220000067105215ULL)},
+        {04750, Word48(03403116767105215ULL)},
+        {04751, Word48(03400116700400016ULL)},
+        {04752, Word48(07010000000400016ULL)},
+        {04753, Word48(07410000000410015ULL)},
+        {04754, Word48(06700000002200000ULL)},
+        {04755, Word48(01003025067104447ULL)},
+        {04756, Word48(06640467703004467ULL)},
+    };
+    const auto prepare_compiler_chain = [&compiler_chain_code](
+        Machine &machine) {
+        for (const auto &[address, word] : compiler_chain_code) {
+            machine.memory(address) = word;
+        }
+        machine.accumulator() = Word48(07123);
+        machine.remainder() = Word48(07654);
+        machine.alu_mode() = 025;
+        machine.reg(002) = 01234;
+        machine.reg(003) = 03000;
+        machine.reg(007) = 01000;
+        machine.reg(015) = 05670;
+        machine.reg(016) = 03100;
+        machine.reg(017) = 04000;
+    };
+    const auto compare_compiler_chain = [
+        &prepare_compiler_chain,
+        &require_same_architectural_state](std::uint16_t entry,
+                                           std::uint16_t boundary,
+                                           const std::string &label,
+                                           const auto &configure) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            prepare_compiler_chain(*machine);
+            configure(*machine);
+            machine->start(entry);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic path keeps running");
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != boundary
+              || interpreted->right_half()) && steps != 64;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require(interpreted->program_counter() == boundary
+                    && !interpreted->right_half(),
+                label + " instruction path reaches its boundary");
+        require_same_architectural_state(*semantic, *interpreted, label);
+        return semantic;
+    };
+
+    const auto compiler_chain_equal = compare_compiler_chain(
+        04675, 04467, "04675 first-marker call",
+        [](Machine &machine) {
+            machine.memory(03002) = Word48(02253);
+            machine.memory(04773) = Word48(02253);
+        });
+    require(compiler_chain_equal->reg(002) == 04536
+                && compiler_chain_equal->reg(015) == 04677
+                && compiler_chain_equal->reg(017) == 04002
+                && compiler_chain_equal->memory(04000) == Word48(01234)
+                && compiler_chain_equal->memory(04001) == Word48(05670),
+            "04675 preserves its two-word compiler-chain frame");
+
+    const auto compiler_chain_scan = compare_compiler_chain(
+        04675, 017253, "04675 shared scan call",
+        [](Machine &machine) {
+            machine.memory(03002) = Word48(02253);
+            machine.memory(04773) = Word48(1);
+            machine.memory(05003) = Word48(2);
+            machine.memory(03032) = Word48(3);
+            machine.memory(03033) = Word48(4);
+        });
+    require(compiler_chain_scan->reg(015) == 04715
+                && compiler_chain_scan->accumulator() == Word48(02257),
+            "04675 retains the shared 17253 scan boundary");
+
+    const auto compiler_chain_cleanup = compare_compiler_chain(
+        04715, 05670, "04715 compiler-chain cleanup",
+        [](Machine &machine) {
+            machine.accumulator() = Word48();
+            machine.reg(002) = 04536;
+            machine.reg(015) = 04715;
+            machine.reg(016) = 0;
+            machine.reg(017) = 04002;
+            machine.memory(04000) = Word48(01234);
+            machine.memory(04001) = Word48(05670);
+        });
+    require(compiler_chain_cleanup->reg(002) == 01234
+                && compiler_chain_cleanup->reg(015) == 05670
+                && compiler_chain_cleanup->reg(017) == 04000,
+            "04715 restores the compiler-chain frame");
+
+    const auto compiler_chain_helper_entry = compare_compiler_chain(
+        04721, 04740, "04721 chain-helper entry",
+        [](Machine &machine) {
+            machine.reg(002) = 04536;
+            machine.reg(015) = 04561;
+            machine.memory(04620) = Word48(06440000000065453ULL);
+        });
+    require(compiler_chain_helper_entry->accumulator()
+                    == Word48(06440000000065453ULL)
+                && compiler_chain_helper_entry->reg(015) == 04722,
+            "04721 forwards the selected word to the 04740 boundary");
+
+    const auto compiler_chain_select = compare_compiler_chain(
+        04722, 04507, "04722 selected record call",
+        [](Machine &machine) {
+            machine.reg(002) = 04536;
+            machine.reg(003) = 03000;
+            machine.reg(015) = 04722;
+            machine.reg(016) = 03100;
+            machine.memory(03100) = Word48();
+            machine.memory(03006) = Word48(022);
+        });
+    require(compiler_chain_select->memory(03100) == Word48(022)
+                && compiler_chain_select->accumulator() == Word48(03100)
+                && compiler_chain_select->reg(015) == 04725,
+            "04722 installs the selected record before 04507");
+
+    const auto compiler_chain_finish = compare_compiler_chain(
+        04751, 04722, "04751 chain-helper return",
+        [](Machine &machine) {
+            machine.accumulator() = Word48(03200);
+            machine.reg(007) = 01000;
+            machine.reg(015) = 04751;
+            machine.reg(017) = 04002;
+            machine.memory(03200) = Word48(03300);
+            machine.memory(04000) = Word48(065453);
+            machine.memory(04001) = Word48(04722);
+        });
+    require(compiler_chain_finish->memory(02167) == Word48(03200)
+                && compiler_chain_finish->reg(015) == 04722
+                && compiler_chain_finish->reg(016) == 03300
+                && compiler_chain_finish->reg(017) == 04000
+                && compiler_chain_finish->accumulator() == Word48(065453),
+            "04751 stores without popping before its stacked return");
+
+    const std::pair<std::uint16_t, Word48> chain_helper_code[] = {
+        {04740, Word48(00043001534031167ULL)},
+        {04741, Word48(01260021002200000ULL)},
+        {04742, Word48(00040001460100000ULL)},
+        {04743, Word48(00040001670100001ULL)},
+        {04744, Word48(07512777612600215ULL)},
+        {04745, Word48(06010000112700204ULL)},
+        {04746, Word48(00010000075037775ULL)},
+        {04747, Word48(00220000067105215ULL)},
+        {04750, Word48(03403116767105215ULL)},
+        {04751, Word48(03400116700400016ULL)},
+        {04752, Word48(07010000000400016ULL)},
+        {04753, Word48(07410000000410015ULL)},
+        {04754, Word48(06700000002200000ULL)},
+    };
+    auto chain_helper_semantic = std::make_unique<Machine>();
+    auto chain_helper_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {chain_helper_semantic.get(),
+                             chain_helper_interpreted.get()}) {
+        for (const auto &[address, word] : chain_helper_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 04536;
+        machine->reg(007) = 01000;
+        machine->reg(015) = 05670;
+        machine->reg(017) = 04000;
+        machine->memory(02167) = Word48();
+        machine->start(04740);
+    }
+    require(chain_helper_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "04740 semantic zero-chain path keeps running");
+    chain_helper_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (chain_helper_interpreted->program_counter() != 05215
+          || chain_helper_interpreted->right_half()) && steps != 24;
+         ++steps) {
+        require(chain_helper_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "04740 instruction zero-chain path keeps running");
+    }
+    require_same_architectural_state(
+        *chain_helper_semantic, *chain_helper_interpreted,
+        "04740 zero-chain allocation entry");
+
+    auto chain_match_semantic = std::make_unique<Machine>();
+    auto chain_match_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {chain_match_semantic.get(),
+                             chain_match_interpreted.get()}) {
+        for (const auto &[address, word] : chain_helper_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 04536;
+        machine->reg(007) = 01000;
+        machine->reg(015) = 05670;
+        machine->reg(017) = 04000;
+        machine->memory(02167) = Word48(03000);
+        machine->memory(03000) = Word48(03100);
+        machine->memory(03101) = Word48(0123);
+        machine->start(04740);
+    }
+    require(chain_match_semantic->step()
+                == poplan::ExecutionStatus::running,
+            "04740 semantic matching-chain path keeps running");
+    chain_match_interpreted->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (chain_match_interpreted->program_counter() != 05670
+          || chain_match_interpreted->right_half()) && steps != 32;
+         ++steps) {
+        require(chain_match_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                    "04740 instruction matching-chain path keeps running");
+    }
+    require_same_architectural_state(
+        *chain_match_semantic, *chain_match_interpreted,
+        "04740 matching-chain dynamic return");
+
+    const std::pair<std::uint16_t, Word48> table_search_code[] = {
+        {016254, Word48(04241625440000036ULL)},
+        {016255, Word48(00037000340100030ULL)},
+        {016256, Word48(04000003470100000ULL)},
+        {016257, Word48(04000003502200000ULL)},
+        {016260, Word48(04010003440040031ULL)},
+        {016261, Word48(04012003542600021ULL)},
+        {016262, Word48(04010003440040035ULL)},
+        {016263, Word48(00036010174000000ULL)},
+        {016264, Word48(04012003270170001ULL)},
+        {016265, Word48(00031010000400014ULL)},
+        {016266, Word48(07220000362500000ULL)},
+        {016267, Word48(06010000070110002ULL)},
+        {016270, Word48(04012003340130036ULL)},
+        {016271, Word48(04260001774100000ULL)},
+        {016272, Word48(04000003443000004ULL)},
+        {016273, Word48(07410000040000035ULL)},
+        {016274, Word48(06044001343000004ULL)},
+        {016275, Word48(04010003570120000ULL)},
+        {016276, Word48(04260002554100000ULL)},
+        {016277, Word48(07011000240120036ULL)},
+        {016300, Word48(04260002743000026ULL)},
+        {016301, Word48(06044001372300001ULL)},
+        {016302, Word48(05650000040100031ULL)},
+        {016303, Word48(05444001667000000ULL)},
+        {016304, Word48(00037777777777777ULL)},
+        {016305, Word48(1)},
+        {016306, Word48(04000000000000000ULL)},
+        {016307, Word48(07777777777777777ULL)},
+    };
+    auto semantic_table_search = std::make_unique<Machine>();
+    auto interpreted_table_search = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_table_search.get(),
+                             interpreted_table_search.get()}) {
+        for (const auto &[address, word] : table_search_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(01717);
+        machine->remainder() = Word48();
+        machine->alu_mode() = 007;
+        machine->reg(001) = 017624;
+        machine->reg(002) = 065517;
+        machine->reg(003) = 065523;
+        machine->reg(006) = 070000;
+        machine->reg(007) = 01200;
+        machine->reg(011) = 05447;
+        machine->reg(012) = 4;
+        machine->reg(013) = 077766;
+        machine->reg(014) = 032553;
+        machine->reg(015) = 017700;
+        machine->reg(016) = 025575;
+        machine->reg(017) = 066027;
+        machine->memory(025575) = Word48(020);
+        machine->memory(025576) = Word48(2);
+        machine->memory(025577) = Word48(077777);
+        machine->memory(025600) =
+            Word48(02021010000001403ULL);
+        machine->memory(025616) =
+            Word48(02021010000001437ULL);
+        machine->memory(025626) =
+            Word48(02111212000001677ULL);
+        machine->memory(025632) =
+            Word48(02011010000002063ULL);
+        machine->memory(025630) =
+            Word48(02111010000001747ULL);
+        machine->memory(066027) =
+            Word48(0140000000000000ULL);
+        machine->memory(066030) = Word48(017633);
+        machine->memory(066031) = Word48(017764);
+        machine->start(016254);
+    }
+
+    require(semantic_table_search->step()
+                == poplan::ExecutionStatus::running,
+            "16254 semantic path keeps running");
+    interpreted_table_search->disable_translated_routine(016254);
+    for (unsigned steps = 0;
+         (interpreted_table_search->program_counter() != 017700
+          || interpreted_table_search->right_half()) && steps != 160;
+         ++steps) {
+        require(interpreted_table_search->step()
+                    == poplan::ExecutionStatus::running,
+                "16254 instruction path keeps running");
+    }
+    require(interpreted_table_search->program_counter() == 017700
+                && !interpreted_table_search->right_half(),
+            "16254 instruction path returns through r15");
+    require_same_architectural_state(
+        *semantic_table_search, *interpreted_table_search, "16254");
+    require(semantic_table_search->accumulator() == Word48(1)
+                && semantic_table_search->remainder() == Word48(050)
+                && semantic_table_search->alu_mode() == 007
+                && semantic_table_search->reg(013) == 025630
+                && semantic_table_search->reg(014) == 025630
+                && semantic_table_search->reg(016) == 025630
+                && semantic_table_search->reg(017) == 066027,
+            "16254 reproduces the observed table-search result and frame");
+
+    const std::pair<std::uint16_t, Word48> compiler_repeat_code[] = {
+        {004665, Word48(00042000200430015ULL)},
+        {004666, Word48(00043001512404536ULL)},
+        {004667, Word48(07240354467103536ULL)},
+        {004670, Word48(01410000210120244ULL)},
+        {004671, Word48(01270013566404667ULL)},
+        {004672, Word48(00300446702200000ULL)},
+        {004673, Word48(00041001500410015ULL)},
+        {004674, Word48(00040000267000000ULL)},
+    };
+    const auto compare_compiler_repeat = [
+        &compiler_repeat_code,
+        &require_same_architectural_state](
+            std::uint16_t entry, bool equal_fields,
+            std::uint16_t modifier = 0) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : compiler_repeat_code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(0) = modifier;
+            machine->reg(001) = 02261;
+            machine->reg(002) = 04536;
+            machine->reg(003) = 03000;
+            machine->reg(015) = entry == 04665 ? 04605 : 04670;
+            machine->reg(016) = 05200;
+            machine->reg(017) = entry == 04673 ? 04003 : 04001;
+            machine->memory(03002) = Word48(055);
+            machine->memory(05002) =
+                equal_fields ? Word48(055) : Word48(066);
+            machine->memory(04000) = Word48(0777);
+            machine->memory(04001) = Word48(04536);
+            machine->memory(04002) = Word48(04605);
+            machine->start(entry);
+        }
+
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                "04665 semantic path keeps running");
+        const std::uint16_t continuation = semantic->program_counter();
+        for (const std::uint16_t address :
+             {004665, 004667, 004670, 004673}) {
+            interpreted->disable_translated_routine(address);
+        }
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 32;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "04665 instruction path keeps running");
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "04665 instruction path reaches its semantic boundary");
+        if (semantic->accumulator() != interpreted->accumulator()
+            || semantic->remainder() != interpreted->remainder()
+            || semantic->alu_mode() != interpreted->alu_mode()) {
+            std::cerr << "04665 entry/equal/modifier ACC semantic/raw: "
+                      << std::oct << entry << '/' << equal_fields << '/'
+                      << modifier << ' ' << semantic->accumulator().raw()
+                      << '/' << interpreted->accumulator().raw()
+                      << " RMR " << semantic->remainder().raw() << '/'
+                      << interpreted->remainder().raw() << " mode "
+                      << static_cast<unsigned>(semantic->alu_mode()) << '/'
+                      << static_cast<unsigned>(interpreted->alu_mode())
+                      << '\n';
+        }
+        require_same_architectural_state(
+            *semantic, *interpreted, "04665 compiler repeat");
+        return continuation;
+    };
+
+    require(compare_compiler_repeat(04665, false) == 03536,
+            "04665 saves its caller and enters the 03536 frame builder");
+    require(compare_compiler_repeat(04665, false, 1) == 03536,
+            "04665 retains short-instruction modifier semantics");
+    require(compare_compiler_repeat(04667, false) == 03536,
+            "04667 preserves its independent repeat entry");
+    require(compare_compiler_repeat(04670, false) == 04673,
+            "04670 selects restoration for unequal record fields");
+    require(compare_compiler_repeat(04670, true) == 04467,
+            "04670 repeats through 04467 for equal record fields");
+    require(compare_compiler_repeat(04673, false) == 04605,
+            "04673 restores the compiler base and caller");
+    require(compare_compiler_repeat(04673, false, 1) == 04605,
+            "04673 retains its first short-instruction modifier");
+
+    auto allocator_entry_semantic = std::make_unique<Machine>();
+    auto allocator_entry_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {allocator_entry_semantic.get(),
+                             allocator_entry_interpreted.get()}) {
+        machine->memory(017762) = Word48(0043001574000000ULL);
+        machine->memory(017763) = Word48(07240000267105430ULL);
+        machine->accumulator() = Word48(01400000000000123ULL);
+        machine->remainder() = Word48(077);
+        machine->alu_mode() = 031;
+        machine->reg(0) = 012;
+        machine->reg(015) = 017633;
+        machine->reg(017) = 04000;
+        machine->start(017762);
+    }
+    allocator_entry_semantic->step();
+    allocator_entry_interpreted->disable_translated_routine(017762);
+    while (allocator_entry_interpreted->program_counter() != 05430
+           || allocator_entry_interpreted->right_half()) {
+        require(allocator_entry_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "17762 instruction entry keeps running");
+    }
+    require_same_architectural_state(
+        *allocator_entry_semantic, *allocator_entry_interpreted, "17762");
+    require(allocator_entry_semantic->program_counter() == 05430
+                && allocator_entry_semantic->reg(016) == 2
+                && allocator_entry_semantic->reg(015) == 017764
+                && allocator_entry_semantic->reg(017) == 04002,
+            "17762 builds its two-word allocator frame");
+
+    auto allocator_resume_semantic = std::make_unique<Machine>();
+    auto allocator_resume_interpreted = std::make_unique<Machine>();
+    const std::pair<std::uint16_t, Word48> allocator_resume_code[] = {
+        {017764, Word48(0037000375107776ULL)},
+        {017765, Word48(07001000000410015ULL)},
+        {017766, Word48(0042001604120205ULL)},
+        {017767, Word48(01000000100400002ULL)},
+        {017770, Word48(0042000304120205ULL)},
+        {017771, Word48(07000000104100235ULL)},
+        {017772, Word48(0413016404000235ULL)},
+        {017773, Word48(06700000002200000ULL)},
+    };
+    for (Machine *machine : {allocator_resume_semantic.get(),
+                             allocator_resume_interpreted.get()}) {
+        for (const auto &[address, word] : allocator_resume_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(06500000000000000ULL);
+        machine->remainder() = Word48(076);
+        machine->alu_mode() = 025;
+        machine->reg(0) = 0;
+        machine->reg(001) = 01000;
+        machine->reg(002) = 02000;
+        machine->reg(003) = 03000;
+        machine->reg(015) = 05433;
+        machine->reg(016) = 05000;
+        machine->reg(017) = 04002;
+        machine->memory(04000) = Word48(01400000000000123ULL);
+        machine->memory(04001) = Word48(017633);
+        machine->memory(01205) = Word48(07200000000000000ULL);
+        machine->memory(01235) = Word48(1);
+        machine->memory(01164) = Word48(1);
+        machine->start(017764);
+    }
+    allocator_resume_semantic->step();
+    allocator_resume_interpreted->disable_translated_routine(017764);
+    while (allocator_resume_interpreted->program_counter() != 017633
+           || allocator_resume_interpreted->right_half()) {
+        require(allocator_resume_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "17764 instruction continuation keeps running");
+    }
+    require_same_architectural_state(
+        *allocator_resume_semantic, *allocator_resume_interpreted, "17764");
+    require(allocator_resume_semantic->reg(017) == 04000
+                && allocator_resume_semantic->memory(05000)
+                    == Word48(01400000000000123ULL)
+                && allocator_resume_semantic->memory(01235) == Word48(2),
+            "17764 installs the allocated object and balances its frame");
+
+    const std::pair<std::uint16_t, Word48> compiler_select_code[] = {
+        {03736, Word48(0043001500430002ULL)},
+        {03737, Word48(0043000400430004ULL)},
+        {03740, Word48(01240353667117417ULL)},
+        {03741, Word48(07350374367104467ULL)},
+        {03742, Word48(07240000013000213ULL)},
+        {03743, Word48(01010010510120630ULL)},
+        {03744, Word48(01270022310100643ULL)},
+        {03745, Word48(01012010312700216ULL)},
+        {03746, Word48(02240000002200000ULL)},
+        {03747, Word48(0220000067104214ULL)},
+        {03750, Word48(07240000002200000ULL)},
+        {03751, Word48(0041000400410004ULL)},
+        {03752, Word48(0041000200410015ULL)},
+        {03753, Word48(06700000002200000ULL)},
+        {03754, Word48(01010010310120644ULL)},
+        {03755, Word48(01270022122400001ULL)},
+        {03756, Word48(01300021102200000ULL)},
+        {03757, Word48(01010010310120645ULL)},
+        {03760, Word48(01260022402200000ULL)},
+        {03761, Word48(07240000113000213ULL)},
+    };
+    const auto install_compiler_select_code = [
+        &compiler_select_code](Machine &machine) {
+        for (const auto &[address, word] : compiler_select_code) {
+            machine.memory(address) = word;
+        }
+    };
+
+    auto compiler_select_entry_semantic = std::make_unique<Machine>();
+    auto compiler_select_entry_interpreted = std::make_unique<Machine>();
+    for (Machine *machine : {compiler_select_entry_semantic.get(),
+                             compiler_select_entry_interpreted.get()}) {
+        install_compiler_select_code(*machine);
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(076);
+        machine->alu_mode() = 025;
+        machine->reg(001) = 01111;
+        machine->reg(002) = 02222;
+        machine->reg(004) = 04444;
+        machine->reg(015) = 03550;
+        machine->reg(017) = 04000;
+        machine->start(03736);
+    }
+    compiler_select_entry_semantic->step();
+    compiler_select_entry_interpreted->disable_translated_routine(03736);
+    while (compiler_select_entry_interpreted->program_counter() != 017417
+           || compiler_select_entry_interpreted->right_half()) {
+        require(compiler_select_entry_interpreted->step()
+                    == poplan::ExecutionStatus::running,
+                "03736 instruction entry keeps running");
+    }
+    require_same_architectural_state(
+        *compiler_select_entry_semantic,
+        *compiler_select_entry_interpreted, "03736");
+    require(compiler_select_entry_semantic->reg(002) == 03536
+                && compiler_select_entry_semantic->reg(015) == 03741
+                && compiler_select_entry_semantic->reg(017) == 04004,
+            "03736 builds its four-word saved-register frame");
+
+    const auto compare_compiler_select_continuation = [
+        &install_compiler_select_code,
+        &require_same_architectural_state](
+            std::uint16_t entry, std::uint16_t status,
+            Word48 first_left, Word48 first_right,
+            Word48 second_left, Word48 second_right,
+            Word48 third_right) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            install_compiler_select_code(*machine);
+            machine->accumulator() = Word48(0777);
+            machine->remainder() = Word48(076);
+            machine->alu_mode() = 025;
+            machine->reg(002) = 03536;
+            machine->reg(004) = 01234;
+            machine->reg(015) = entry;
+            machine->reg(016) = status;
+            machine->reg(017) = 04004;
+            machine->memory(04000) = Word48(0123456701234567ULL);
+            machine->memory(04001) = Word48(03550);
+            machine->memory(04002) = Word48(02222);
+            machine->memory(04003) = Word48(04444);
+            machine->memory(03643) = first_left;
+            machine->memory(04366) = first_right;
+            machine->memory(04401) = second_left;
+            machine->memory(03641) = second_right;
+            machine->memory(04402) = Word48(012);
+            machine->memory(04403) = third_right;
+            machine->start(entry);
+        }
+
+        semantic->step();
+        const std::uint16_t continuation = semantic->program_counter();
+        for (const std::uint16_t address : {
+                 03741, 03742, 03743, 03750, 03751,
+                 03754, 03757, 03761}) {
+            interpreted->disable_translated_routine(address);
+        }
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 64;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "03736 continuation instruction path keeps running");
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "03736 continuation reaches its semantic boundary");
+        require_same_architectural_state(
+            *semantic, *interpreted, "03736 continuation");
+        return continuation;
+    };
+
+    require(compare_compiler_select_continuation(
+                03741, 0, Word48(), Word48(), Word48(), Word48(), Word48())
+                == 04467,
+            "03741 retains the compiler-wrapper call boundary");
+    require(compare_compiler_select_continuation(
+                03742, 0, Word48(), Word48(), Word48(), Word48(), Word48())
+                == 03550,
+            "03742 restores the caller after the compiler wrapper");
+    require(compare_compiler_select_continuation(
+                03741, 1, Word48(1), Word48(2),
+                Word48(), Word48(), Word48()) == 03550,
+            "03743 restores directly after its first unequal comparison");
+    require(compare_compiler_select_continuation(
+                03741, 1, Word48(5), Word48(5),
+                Word48(7), Word48(7), Word48()) == 04214,
+            "03743 retains the 04214 call boundary for equal values");
+    require(compare_compiler_select_continuation(
+                03741, 1, Word48(5), Word48(5),
+                Word48(7), Word48(010), Word48(011)) == 03550,
+            "03754/03757 restore after their unequal comparisons");
+    require(compare_compiler_select_continuation(
+                03741, 1, Word48(5), Word48(5),
+                Word48(7), Word48(010), Word48(010)) == 03762,
+            "03757 retains its generated-code continuation on equality");
+    require(compare_compiler_select_continuation(
+                03750, 0, Word48(), Word48(), Word48(), Word48(), Word48())
+                == 03550,
+            "03750 restores the caller after 04214");
+
+    const std::pair<std::uint16_t, Word48> compiler_classify_code[] = {
+        {017417, Word48(00042000200430015ULL)},
+        {017420, Word48(01241741714030000ULL)},
+        {017421, Word48(00036010110130044ULL)},
+        {017422, Word48(01260001102200000ULL)},
+        {017423, Word48(01410000067106134ULL)},
+        {017424, Word48(01003004567104447ULL)},
+        {017425, Word48(07240000002200000ULL)},
+        {017426, Word48(07410000000410015ULL)},
+        {017427, Word48(00040000267000000ULL)},
+        {017430, Word48(01410000210120046ULL)},
+        {017431, Word48(01270002367106526ULL)},
+        {017432, Word48(07400000010110047ULL)},
+        {017433, Word48(01012005012600016ULL)},
+        {017434, Word48(07240440067103014ULL)},
+        {017435, Word48(06710446702200000ULL)},
+        {017436, Word48(07257532173417440ULL)},
+        {017437, Word48(07240461067103014ULL)},
+        {017440, Word48(07410000014000000ULL)},
+        {017441, Word48(01300000402200000ULL)},
+        {017442, Word48(01410000210120051ULL)},
+        {017443, Word48(01270003566417450ULL)},
+        {017444, Word48(00042001500430004ULL)},
+        {017445, Word48(00043000700430005ULL)},
+        {017446, Word48(01403000074000000ULL)},
+        {017447, Word48(03400105703015322ULL)},
+        {017450, Word48(01444001667103303ULL)},
+        {017451, Word48(01410000067117571ULL)},
+        {017452, Word48(01003005267104447ULL)},
+        {017453, Word48(07240000013000007ULL)},
+        {017454, Word48(01410000000360151ULL)},
+        {017455, Word48(00040001462577627ULL)},
+        {017456, Word48(06341746162577777ULL)},
+        {017457, Word48(06341742362577777ULL)},
+        {017460, Word48(06341742313000032ULL)},
+        {017461, Word48(07240000113000007ULL)},
+        {017462, Word48(06440000000002410ULL)},
+        {017463, Word48(00560000000000000ULL)},
+        {017464, Word48(00010000000000000ULL)},
+        {017465, Word48(00000000000002457ULL)},
+        {017466, Word48(07740000000000000ULL)},
+        {017467, Word48(06440000000000000ULL)},
+        {017470, Word48(00000000000002257ULL)},
+        {017471, Word48(00100000000000000ULL)},
+    };
+    const auto compare_compiler_classify = [
+        &compiler_classify_code,
+        &require_same_architectural_state](
+            std::uint16_t entry, Word48 object, Word48 field,
+            Word48 accumulator, std::uint16_t status,
+            std::uint16_t stack) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : compiler_classify_code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = accumulator;
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(001) = 01111;
+            machine->reg(002) = entry == 017417 ? 03536 : 017417;
+            machine->reg(003) = 03000;
+            machine->reg(004) = 04444;
+            machine->reg(005) = 05555;
+            machine->reg(007) = 07000;
+            machine->reg(014) = 01414;
+            machine->reg(015) = 03550;
+            machine->reg(016) = status;
+            machine->reg(017) = stack;
+            machine->memory(03000) = object;
+            machine->memory(03002) = field;
+            for (std::uint16_t address = 04000;
+                 address != 04012; ++address) {
+                machine->memory(address) = Word48(address - 04000 + 05000);
+            }
+            machine->start(entry);
+        }
+
+        semantic->step();
+        const std::uint16_t continuation = semantic->program_counter();
+        for (const std::uint16_t address : {
+                 017417, 017423, 017424, 017425, 017426,
+                 017430, 017432, 017435, 017436, 017440,
+                 017442, 017451, 017452, 017453, 017454,
+                 017461}) {
+            interpreted->disable_translated_routine(address);
+        }
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 64;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "17417 instruction path keeps running");
+        }
+        if (interpreted->program_counter() != continuation
+            || interpreted->right_half()) {
+            std::cerr << "17417 entry/target/current: " << std::oct
+                      << entry << '/' << continuation << '/'
+                      << interpreted->program_counter() << '\n';
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "17417 instruction path reaches its semantic boundary");
+        if (semantic->accumulator() != interpreted->accumulator()
+            || semantic->remainder() != interpreted->remainder()
+            || semantic->alu_mode() != interpreted->alu_mode()) {
+            std::cerr << "17417 ALU mismatch at entry " << std::oct << entry
+                      << ": semantic acc/rmr/rau="
+                      << semantic->accumulator().raw() << '/'
+                      << semantic->remainder().raw() << '/'
+                      << static_cast<unsigned>(semantic->alu_mode())
+                      << " interpreted="
+                      << interpreted->accumulator().raw() << '/'
+                      << interpreted->remainder().raw() << '/'
+                      << static_cast<unsigned>(interpreted->alu_mode())
+                      << '\n';
+        }
+        require_same_architectural_state(
+            *semantic, *interpreted, "17417 compiler classification");
+        return continuation;
+    };
+
+    require(compare_compiler_classify(
+                017417, Word48(06400000000000100ULL), Word48(),
+                Word48(1), 0, 04000) == 06134,
+            "17417 retains the 06134 object-processing boundary");
+    require(compare_compiler_classify(
+                017417, Word48(06440000000000000ULL), Word48(02457),
+                Word48(), 0, 04000) == 06526,
+            "17417 retains the 06526 equal-field boundary");
+    require(compare_compiler_classify(
+                017417, Word48(06440000000000000ULL), Word48(02257),
+                Word48(), 0, 04000) == 015322,
+            "17417 builds the generated frame for 15322");
+    require(compare_compiler_classify(
+                017424, Word48(06400000000000100ULL), Word48(),
+                Word48(0123), 0, 04002) == 04447,
+            "17424 retains the allocation boundary");
+    require(compare_compiler_classify(
+                017425, Word48(), Word48(), Word48(0777),
+                012, 04003) == 05002,
+            "17425 restores the saved frame and caller");
+    require(compare_compiler_classify(
+                017432, Word48(), Word48(),
+                Word48(06440000000000000ULL), 0, 04002) == 04467,
+            "17432 retains its equal-mask compiler boundary");
+    require(compare_compiler_classify(
+                017432, Word48(), Word48(),
+                Word48(07200000000000000ULL), 0, 04002) == 03014,
+            "17432 retains its diagnostic boundary");
+    require(compare_compiler_classify(
+                017435, Word48(), Word48(), Word48(),
+                0, 04002) == 04467,
+            "17435 retains the compiler-wrapper boundary");
+    require(compare_compiler_classify(
+                017436, Word48(06400000000000100ULL), Word48(),
+                Word48(), 02457, 04002) == 06134,
+            "17436 resumes object processing after a zero status adjustment");
+    require(compare_compiler_classify(
+                017436, Word48(), Word48(), Word48(),
+                1, 04002) == 03014,
+            "17436 retains its second diagnostic boundary");
+    require(compare_compiler_classify(
+                017440, Word48(), Word48(), Word48(),
+                0, 04002) == 06134,
+            "17440 installs the diagnostic result and resumes at 06134");
+    require(compare_compiler_classify(
+                017442, Word48(), Word48(02257), Word48(),
+                0, 04002) == 015322,
+            "17442 retains the generated transfer boundary");
+    require(compare_compiler_classify(
+                017454, Word48(std::uint64_t{0152} << 41), Word48(),
+                Word48(), 0, 04002) == 06134,
+            "17454 routes the traced adjacent classes through 06134");
+    require(compare_compiler_classify(
+                017454, Word48(std::uint64_t{0153} << 41), Word48(),
+                Word48(), 0, 04002) == 06134,
+            "17454 routes the second adjacent class through 06134");
+    require(compare_compiler_classify(
+                017454, Word48(std::uint64_t{0151} << 41), Word48(),
+                Word48(), 0, 04002) == 05001,
+            "17454 restores the caller for its direct-return class");
+    require(compare_compiler_classify(
+                017454, Word48(std::uint64_t{0162} << 41), Word48(),
+                Word48(), 0, 04002) == 017571,
+            "17454 retains the 17571 classification boundary");
+    require(compare_compiler_classify(
+                017452, Word48(), Word48(), Word48(0123),
+                0, 04002) == 04447,
+            "17452 retains its allocation boundary");
+    require(compare_compiler_classify(
+                017453, Word48(), Word48(), Word48(),
+                077, 04003) == 05002,
+            "17453 clears the status and restores the saved frame");
+
+    const std::pair<std::uint16_t, Word48> record_chain_code[] = {
+        {017774, Word48(01741775614100000ULL)},
+        {017775, Word48(00411016604120204ULL)},
+        {017776, Word48(00660015614440002ULL)},
+        {017777, Word48(01410000100400003ULL)},
+        {020000, Word48(00410023504130164ULL)},
+        {020001, Word48(00400023567000000ULL)},
+        {020002, Word48(00410023516300000ULL)},
+        {020003, Word48(00000000014440002ULL)},
+        {020004, Word48(01410000100400003ULL)},
+        {020005, Word48(01410000004110166ULL)},
+        {020006, Word48(00412020406600156ULL)},
+        {020007, Word48(06700000002200000ULL)},
+    };
+    const auto compare_record_chain = [
+        &record_chain_code,
+        &require_same_architectural_state](
+            std::uint16_t entry, unsigned chain_length) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : record_chain_code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(001) = 017624;
+            machine->reg(002) = 02222;
+            machine->reg(003) = chain_length == 0 ? 0 : 03000;
+            machine->reg(015) = 04567;
+            machine->reg(017) = 04000;
+            machine->memory(020010) = Word48(1);
+            machine->memory(020012) = Word48(Word48::mask);
+            machine->memory(020030) = Word48(055);
+            machine->memory(020061) = Word48(035);
+            machine->memory(03000) =
+                chain_length >= 2 ? Word48(055) : Word48(1);
+            machine->memory(03001) = Word48(03100);
+            machine->memory(03100) =
+                chain_length >= 3 ? Word48(055) : Word48(1);
+            machine->memory(03101) = Word48(03200);
+            machine->memory(03200) = Word48(1);
+            machine->start(entry);
+        }
+
+        semantic->step();
+        const std::uint16_t continuation = semantic->program_counter();
+        interpreted->disable_translated_routine(017774);
+        interpreted->disable_translated_routine(020002);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != continuation
+              || interpreted->right_half()) && steps != 128;
+             ++steps) {
+            require(interpreted->step() == poplan::ExecutionStatus::running,
+                    "17774 instruction path keeps running");
+        }
+        if (interpreted->program_counter() != continuation
+            || interpreted->right_half()) {
+            std::cerr << "17774 entry/length/target/current: " << std::oct
+                      << entry << '/' << chain_length << '/'
+                      << continuation << '/'
+                      << interpreted->program_counter() << '\n';
+        }
+        require(interpreted->program_counter() == continuation
+                    && !interpreted->right_half(),
+                "17774 instruction path reaches its semantic boundary");
+        for (std::size_t address = 0;
+             address != Machine::core_words; ++address) {
+            if (semantic->memory(static_cast<std::uint16_t>(address))
+                != interpreted->memory(
+                    static_cast<std::uint16_t>(address))) {
+                std::cerr << "17774 memory mismatch entry/length/address: "
+                          << std::oct << entry << '/' << chain_length << '/'
+                          << address << " semantic/interpreted="
+                          << semantic->memory(
+                                 static_cast<std::uint16_t>(address)).raw()
+                          << '/'
+                          << interpreted->memory(
+                                 static_cast<std::uint16_t>(address)).raw()
+                          << '\n';
+                break;
+            }
+        }
+        require_same_architectural_state(
+            *semantic, *interpreted, "17774 record chain");
+        return continuation;
+    };
+
+    require(compare_record_chain(017774, 0) == 017756,
+            "17774 preserves the empty-chain restoration boundary");
+    require(compare_record_chain(017774, 1) == 04567,
+            "17774 updates and returns for an ordinary record");
+    require(compare_record_chain(017774, 2) == 04567,
+            "17774 follows one matched record through 20002");
+    require(compare_record_chain(017774, 3) == 04567,
+            "17774 follows multiple matched records through 20002");
+    require(compare_record_chain(020002, 2) == 04567,
+            "20002 retains its independent chain-continuation entry");
 
     // The first traced 16421 call maps tagged byte 012 to code 014. It uses
     // table word 16440, r12=1, and the r13-controlled 12-bit left shift.
