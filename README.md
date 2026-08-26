@@ -103,8 +103,8 @@ dispatch; `POPLAN_INTERPRET_ONLY=1` disables semantic dispatch for differential
 trace comparisons. `POPLAN_DISABLE_TRANSLATED_ROUTINES=03235,03261` disables
 selected octal entries when isolating a semantic mismatch.
 
-The saved quine trace currently has semantic dispatch for 65 of its 98 direct
-`vjm` targets; the remaining 33 addresses are listed in
+The saved quine trace currently has semantic dispatch for 67 of its 98 direct
+`vjm` targets; the remaining 31 addresses are listed in
 `subroutines-from-trace.md`.
 
 Extracode `053` with address `010` returns local time since midnight in
