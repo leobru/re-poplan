@@ -34,6 +34,7 @@ The address-preserving machine layer now translates:
 - `03235..03260` environment binding and restoration;
 - `03261..03264` function entry;
 - `03275`, `03277`, `03301`, and `03303` POP value-stack operations;
+- `03330..03336` traced two-stage value classification;
 - `03413..03423` traced numeric-update arithmetic;
 - `03516..03520` addressed-word replacement;
 - `03536..03541` computed-continuation frame construction;
@@ -92,6 +93,8 @@ The address-preserving machine layer now translates:
 - `17337..17342` descriptor-selecting wrappers for those shared table bodies;
 - `17417..17461` object/compiler classification, nested call continuations,
   generated transfer, and saved-frame restoration;
+- `17624..17761` generated descriptor scan, record update loop, nested
+  allocation continuations, and four-word frame restoration;
 - `17762..17773` two-word object allocation, tagged-link installation, and
   shared counter update;
 - `17774..20007` record-chain classification, counter stamping, link

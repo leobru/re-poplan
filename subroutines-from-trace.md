@@ -39,6 +39,7 @@ the quine trace is `11673`.
 | `03277` | `POP_ACC` | Pop accumulator from the POP data stack. | Loads `(r6)`, increments `r6`, returns through `r15`. |
 | `03301` | — | Load and push an indirect POP value. | Loads `(r16)`, decrements `r6`, stores the value at `(r6)`, and returns through `r15`. |
 | `03303` | `STORE_STACK_TOP` | Store the top POP stack item through `r16`. | Uses the hardware stack to preserve the accumulator while moving `(r6)` to `(r16)` and incrementing `r6`. |
+| `03330` | — | Two-stage value classifier. | Saves the input, first compares its masked tag with `03455`, then compares the complete saved word with the value selected through `02047`; either match returns `03456`, while a miss returns word zero. A complete fixed-seed game exercised 216 entries. |
 | `03413` | `NUMERIC_UPDATE` | Numeric arithmetic helper in the generated quine update loop. | Called 279 times from `11707`; preserves the original `ntr 6/7`, divide, multiply, reverse-subtract, and RMR path. |
 | `03506` | — | Address-derived replacement entry. | Shifts the incoming address, returns immediately for zero, and otherwise retains the original `NTR 3` subtraction and branch through `03516`; the alternate branch replaces the words selected through `r13` and `r16`. A complete fixed-seed game exercised 123 entries, including 94 direct calls. |
 | `03516` | — | Replace one addressed word while preserving its old value through another address. | Loads `(r13)` into `(r16)`, replaces `(r13)` with `r16`, and returns through `r15`; the partial tic-tac-toe trace calls it 5,572 times. |
@@ -107,6 +108,7 @@ the quine trace is `11673`.
 | `17337`, `17341` | — | Descriptor-selecting wrappers for the shared table-read body at `17254`. | Select descriptors `17353` and `17355`; ordinary calls decrement the stored index and return the selected table word, while the exhausted path retains the original allocation and diagnostic continuations. |
 | `17340`, `17342` | — | Descriptor-selecting wrappers for the shared table-write body at `17275`. | Select descriptors `17353` and `17355`; ordinary calls store the accumulator and advance the descriptor, while the full path allocates and links another table block. |
 | `17417` | — | Object/compiler classification wrapper. | Saves `r2` and the caller in a two-word hardware-stack frame, selects constants at `17462..17471`, and classifies the object at `r3`. Local continuations preserve calls to `06134`, `04447`, `06526`, `03014`, `04467`, and `17571`, the generated transfer to `15322`, and final frame restoration. A complete fixed-seed game exercised 616 entries, including 260 transfers to `06134`, nine to `06526`, and 21 to `17571`. |
+| `17624` | — | Generated descriptor and record scan wrapper. | Saves a four-word frame, decodes fields through the tables based at `20010`, preserves the `03506`, `16254`, `17762`, and `17774` boundaries, updates the selected record and counters, and restores through `17756`. A complete fixed-seed game exercised 19 initial entries and all traced continuations. |
 | `17472` | — | Generated classification and update entry. | Saves `r1` and the caller, scans the chain selected through `17557`, retains calls through `16313`, `03301`, `02767`, `17342`, and `17602`, updates the selected word with scratch values `17566/17567`, and restores the original frame through `17543`. A complete fixed-seed game exercised 107 entries, including 88 direct calls. |
 | `17571` | — | Three-word generated wrapper around `17602`. | Saves the input, caller, and word `17601`, passes the original input to `17602` with `r16=17577`, then continuation `17575` returns the generated result while releasing the complete frame. A complete fixed-seed game exercised 19 direct entries plus one transfer from `17417`. |
 | `17602` | — | Generated pair-allocation wrapper. | Saves the input, `r1`, and caller around `05213`; continuation `17606` cyclically updates the selected pair, follows the original `WTC` generated store, and restores the three-word frame. A complete fixed-seed game exercised 90 entries and continuations. |
@@ -159,7 +161,7 @@ the quine trace is `11673`.
 
 ## Dynamic Inventory
 
-The quine has 98 direct `vjm` targets. Eighty-seven now have executable semantic
+The quine has 98 direct `vjm` targets. Eighty-nine now have executable semantic
 dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 `03736`, `04074`, `04322`, `04426`, `04665`, `04675`, `05213`, `17417`,
 `17472`, `17602`, `17614`, `17762`, `17774`, and the generated template entries
@@ -167,31 +169,28 @@ dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 `16742`, together with wrappers `03506`, `03702`, `04161`, and `04507`, and
 the latest `04536`, `05007`, `05405`, `05410`, and `16605` entries, followed by
 the generated cycle at `13007`, `13017`, `13047`, `13111`, `13130`, and `13217`,
-the tied leaders `17571`, `25427`, and `25556`, and finally the numeric-format
-pair `25641`/`25660`,
+the tied leaders `17571`, `25427`, and `25556`, the numeric-format pair
+`25641`/`25660`, and the classifier/scan pair `03330` and `17624`,
 from instruction fallback.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 
 A complete fixed-seed host tic-tac-toe session after this sequence executed
-1,460,505 machine steps: 568,580 semantic routine dispatches and 891,925
+1,359,180 machine steps: 571,565 semantic routine dispatches and 787,615
 individual BESM instructions. The combined trace also contained 363 input-status
 marker lines, which are excluded from these execution counts. This sequence
-semantically dispatches all 12 calls of `25660`, all four calls of `25641`, and
-all four calls of the game-specific scan at `16151`. The remaining interpreted
+semantically dispatches all 12 calls of `25660`, all four calls of `25641`, all
+four calls of the game-specific scan at `16151`, all 216 entries at `03330`,
+and all 19 entries at `17624`. The remaining interpreted
 direct-call inventory in that session is `07533`, `20475`, `20674`, `21107`,
 and `25223`, each reached once.
-Translated `05007` also transfers to fallback entry `17624` 19 times; those
-transfers no longer pass through an individually interpreted `VJM`.
 Semantic `17417` enters translated `06134` 260 times; those transfers remain
 outside the instruction-only direct-call counter. These counts rank future work; they do
 not by themselves establish routine boundaries or semantic names.
 
-The 11 direct quine targets still using instruction fallback are:
+The nine direct quine targets still using instruction fallback are:
 
-`01004`, `02764`, `03330`,
-`05230`, `16005`,
-`17624`,
+`01004`, `02764`, `05230`, `16005`,
 `20144`, `20263`, `20456`, `20660`, and `21107`.
 
 "Leaf" in generated output means no nested `vjm` was observed while a traced

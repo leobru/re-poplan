@@ -1588,6 +1588,24 @@ int main()
     const auto require_same_architectural_state = [](
         const Machine &semantic, const Machine &interpreted,
         const std::string &label) {
+        if (semantic.program_counter() != interpreted.program_counter()
+            || semantic.right_half() != interpreted.right_half()
+            || semantic.accumulator() != interpreted.accumulator()
+            || semantic.remainder() != interpreted.remainder()
+            || semantic.alu_mode() != interpreted.alu_mode()) {
+            std::cerr << label << " semantic/raw control: pc "
+                      << std::oct << semantic.program_counter() << '/'
+                      << interpreted.program_counter() << " half "
+                      << semantic.right_half() << '/'
+                      << interpreted.right_half() << " acc "
+                      << semantic.accumulator().raw() << '/'
+                      << interpreted.accumulator().raw() << " rmr "
+                      << semantic.remainder().raw() << '/'
+                      << interpreted.remainder().raw() << " rau "
+                      << static_cast<unsigned>(semantic.alu_mode()) << '/'
+                      << static_cast<unsigned>(interpreted.alu_mode())
+                      << '\n';
+        }
         require(semantic.program_counter() == interpreted.program_counter()
                     && semantic.right_half() == interpreted.right_half()
                     && semantic.accumulator() == interpreted.accumulator()
@@ -1623,6 +1641,196 @@ int main()
                     label + " preserves complete BESM memory state");
         }
     };
+
+    const std::pair<std::uint16_t, Word48> classifier_03330_code[] = {
+        {03330, Word48(0xba06c8b00061ULL)},
+        {03331, Word48(0xb09064b0a065ULL)},
+        {03332, Word48(0xbb0016b08061ULL)},
+        {03333, Word48(0x09042700a000ULL)},
+        {03334, Word48(0xbb0016008000ULL)},
+        {03335, Word48(0xdc0000090000ULL)},
+        {03336, Word48(0xb08066dc0000ULL)},
+    };
+    const auto compare_classifier_03330 = [
+        &classifier_03330_code,
+        &require_same_architectural_state](Word48 input,
+                                           Word48 secondary,
+                                           const std::string &label) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : classifier_03330_code) {
+                machine->memory(address) = word;
+            }
+            machine->memory(02047) = secondary;
+            machine->memory(03454) = Word48(0xfe0000000000ULL);
+            machine->memory(03455) = Word48(0xe80000000000ULL);
+            machine->memory(03456) = Word48(1);
+            machine->accumulator() = input;
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(013) = 01234;
+            machine->reg(015) = 07000;
+            machine->start(03330);
+        }
+        semantic->step();
+        interpreted->disable_translated_routine(03330);
+        interpreted->disable_translated_routine(03336);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != 07000
+              || interpreted->right_half()) && steps != 16;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require(interpreted->program_counter() == 07000
+                    && !interpreted->right_half(),
+                label + " reaches its saved caller");
+        require_same_architectural_state(*semantic, *interpreted, label);
+    };
+
+    compare_classifier_03330(
+        Word48(0xe80000000000ULL), Word48(012345),
+        "03330 masked classifier match");
+    compare_classifier_03330(
+        Word48(012345), Word48(012345),
+        "03330 secondary classifier match");
+    compare_classifier_03330(
+        Word48(0765432107654321ULL), Word48(012345),
+        "03330 classifier miss");
+
+    const std::pair<std::uint16_t, Word48> descriptor_scan_code[] = {
+        {017624, Word48(0x02200d023001ULL)},
+        {017625, Word48(0x023002023003ULL)},
+        {017626, Word48(0xf000001a1f94ULL)},
+        {017627, Word48(0x01f003108074ULL)},
+        {017630, Word48(0x10009d2a0932ULL)},
+        {017631, Word48(0x208001020003ULL)},
+        {017632, Word48(0x108075dc9ff2ULL)},
+        {017633, Word48(0x02200210009eULL)},
+        {017634, Word48(0x00800010009cULL)},
+        {017635, Word48(0x10009b090000ULL)},
+        {017636, Word48(0x308000109076ULL)},
+        {017637, Word48(0x10a0771b8019ULL)},
+        {017655, Word48(0x3e1fcf308000ULL)},
+        {017717, Word48(0x10807410009fULL)},
+        {017720, Word48(0x0080001000a2ULL)},
+        {017721, Word48(0x1000a01000a1ULL)},
+        {017722, Word48(0x1080a21b0044ULL)},
+        {017730, Word48(0x10809f1b804cULL)},
+        {017740, Word48(0x10809c10509bULL)},
+        {017741, Word48(0x00a0001b0050ULL)},
+        {017744, Word48(0x1080a01b0053ULL)},
+        {017747, Word48(0x10809c01e028ULL)},
+        {017750, Word48(0x19809eea0000ULL)},
+        {017751, Word48(0xe0a000e00000ULL)},
+        {017752, Word48(0x090000dc9ffcULL)},
+        {017756, Word48(0x10809d0907a5ULL)},
+        {017757, Word48(0x001000021003ULL)},
+        {017760, Word48(0x021002021001ULL)},
+        {017761, Word48(0x02000ddc0000ULL)},
+    };
+    const auto load_descriptor_scan_code = [&descriptor_scan_code](
+                                               Machine &machine) {
+        for (const auto &[address, word] : descriptor_scan_code) {
+            machine.memory(address) = word;
+        }
+        machine.memory(020010) = Word48(0x000000000001ULL);
+        machine.memory(020011) = Word48(0x060000000000ULL);
+        machine.memory(020012) = Word48(0xff8000000000ULL);
+        machine.memory(020013) = Word48(0x008000000000ULL);
+    };
+    const auto run_interpreted_to = [](Machine &machine,
+                                       std::uint16_t target,
+                                       unsigned limit,
+                                       const std::string &label) {
+        machine.set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (machine.program_counter() != target
+              || machine.right_half()) && steps != limit;
+             ++steps) {
+            require(machine.step() == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require(machine.program_counter() == target
+                    && !machine.right_half(),
+                label + " reaches its semantic boundary");
+    };
+
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            load_descriptor_scan_code(*machine);
+            machine->memory(04463) = Word48(04321);
+            machine->accumulator() = Word48(0765432107654321ULL);
+            machine->remainder() = Word48(0123456701234567ULL);
+            machine->alu_mode() = 067;
+            machine->reg(001) = 01234;
+            machine->reg(002) = 02345;
+            machine->reg(003) = 03456;
+            machine->reg(015) = 07000;
+            machine->reg(017) = 05000;
+            machine->start(017624);
+        }
+        semantic->step();
+        run_interpreted_to(
+            *interpreted, 017762, 32, "17624 descriptor-scan entry");
+        require_same_architectural_state(
+            *semantic, *interpreted, "17624 descriptor-scan entry");
+    }
+
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            load_descriptor_scan_code(*machine);
+            machine->memory(04462) = Word48(0123456701234567ULL);
+            machine->accumulator() = Word48(0765432107654321ULL);
+            machine->remainder() = Word48(012345);
+            machine->alu_mode() = 053;
+            machine->reg(001) = 017624;
+            machine->reg(002) = 04462;
+            machine->reg(003) = 0;
+            machine->reg(015) = 07111;
+            machine->reg(017) = 05200;
+            machine->start(017633);
+        }
+        semantic->step();
+        run_interpreted_to(
+            *interpreted, 017774, 48, "17633 empty descriptor path");
+        require_same_architectural_state(
+            *semantic, *interpreted, "17633 empty descriptor path");
+    }
+
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            load_descriptor_scan_code(*machine);
+            machine->memory(020061) = Word48(0765432107654321ULL);
+            machine->memory(03645) = Word48(0123456701234567ULL);
+            machine->memory(05000) = Word48(07000);
+            machine->memory(05001) = Word48(01234);
+            machine->memory(05002) = Word48(02345);
+            machine->memory(05003) = Word48(03456);
+            machine->accumulator() = Word48(01111);
+            machine->remainder() = Word48(02222);
+            machine->alu_mode() = 063;
+            machine->reg(001) = 017624;
+            machine->reg(002) = 04462;
+            machine->reg(003) = 05555;
+            machine->reg(015) = 017756;
+            machine->reg(017) = 05004;
+            machine->start(017756);
+        }
+        semantic->step();
+        run_interpreted_to(
+            *interpreted, 07000, 16, "17756 descriptor-scan return");
+        require_same_architectural_state(
+            *semantic, *interpreted, "17756 descriptor-scan return");
+    }
 
     const std::pair<std::uint16_t, Word48> generated_dispatch_code[] = {
         {013121, Word48(0x02200df00000ULL)},
