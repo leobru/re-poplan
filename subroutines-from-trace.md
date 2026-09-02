@@ -26,6 +26,7 @@ the quine trace is `11673`.
 | Address | Symbol | Description | Evidence |
 |---:|---|---|---|
 | `01000` | `ENTRY` | Runtime entry trampoline. | Executes `uj 01001`, then calls `05230`. |
+| `01004` | — | Startup/evaluator initialization entry. | Establishes the `r2=01001`, `r3=03637` frame, clears the observed `r7`-relative state words, and preserves calls through `05405`, `04467`, `04536`, `05410`, `04447`, `05007`, and `02750`. |
 | `01107` | — | Hash and collision-chain lookup entry. | Builds a hash in `01172`, selects a bucket through the table based at `01200`, follows its links, and allocates a record through `05430` only when the value is absent. The first tic-tac-toe call resolves bucket `01354` through `01534` to matching record `01624`. |
 | `01167` | — | Alternate shared hash-table entry. | Sets `r11=06143`, `r12=2`, and `r13=0`, then tail-enters the translated `01122` body without changing the accumulator or ALU state. A fixed-seed game exercised 260 entries. |
 | `02750` | `EVAL_DISPATCH` | POP value dispatch/evaluator trampoline. | Decodes high tag bits, stores temporaries at `03272/03273`, and dispatches through the decoded value or runtime tables. |
@@ -67,7 +68,7 @@ the quine trace is `11673`.
 | `05211` | — | Load word one through an object address. | Copies the accumulator address to `r16`, loads `1(r16)`, and returns through `r15`; the quine calls it directly 91 times. |
 | `05213` | — | First tagged two-word allocation entry. | Preserves the input with tag word `05226`, shares the four-word allocation frame at `05217` with `05215`, and retains the `05430`/`05221` boundaries. A complete fixed-seed game exercised 90 calls. |
 | `05215` | — | Allocate and initialize a tagged two-word pair. | Builds the four-word caller frame, allocates through `05430`, stores the two source values, tags the allocated address with `05227`, and returns through the stacked link. |
-| `05230` | `COLD_START` | Main initialization/cold-start routine. | Saves initial registers at `05400..05404`, establishes runtime areas and stack state, initializes I/O, prints the greeting, and enters the evaluator. |
+| `05230` | `COLD_START` | Main initialization/cold-start routine. | Saves initial registers at `05400..05404`, establishes runtime areas and stack state, initializes I/O, prints the greeting, and enters the evaluator. The translation retains dependencies `20263`, `20660`, `20144`, `16005`, `16145`, `16054`, `20673`, and `20456`, then restores the saved registers through `05341`. |
 | `05405` | — | Optional dispatch entry. | Loads word `05407` and either returns through `r15` when it is zero or transfers to `02750`; a complete fixed-seed game exercised 48 direct entries. |
 | `05410` | — | Shared-table frame wrapper. | Saves `r1`, the caller, and two `r7`-relative words, scans the chain at `r7+1167`, and preserves the `05215`, `17624`, and diagnostic boundaries before restoring its frame. A complete fixed-seed game exercised 66 direct entries. |
 | `05430` | — | Allocation wrapper and recovery bracket. | Returns zero-size requests directly, saves nonzero requests for `05447`, retries through `05523`, and returns through the stacked caller link at `05436`. |
@@ -77,6 +78,7 @@ the quine trace is `11673`.
 | `06623`, `06631`, `06637`, `06645` | — | Four generated comparison templates. | Select `r16` values `14040`, `14030`, `14050`, and `14060`, call the shared `06650` body through `r14`, pop two hardware-stack values, alternate `A-X` with `X-A`, and select `06657` or `06660` with the original additive sign test. A complete fixed-seed game exercised `06623` 884 times and `06631` 1,118 times. |
 | `06650` | — | Two-stage generated comparison entry. | Preserves the original `r14` continuation, RMR flags, and diagnostic continuations `06654` and `06657`; the completed tic-tac-toe session called it 1,929 times before translation. |
 | `07475` | `CUCHIN_ARG` | Argument-taking entry within the dictionary `CUCHIN` routine. | Pops a tagged character; `0136` selects code `0012`, while ordinary tagged characters are forwarded unchanged to `21255`. |
+| `07533` | — | Output-descriptor cleanup and caller restoration. | Saves its input and caller around `21443`, retains the ignored `Э64` side effect, copies `07543` to `07600`, restores descriptor `07574` at `07545`, and balances the two-word frame. |
 | `07673` | — | Compiler frame and classification entry. | Saves the caller and `r1`, `r2`, and `r5` in a five-word frame. The fixed-seed game exercised 294 entries: 78 transferred through `12674`, while 216 called `03330`, entered the six-pass `07730..07741` bit loop, and restored through `07742`. Calls to evaluator and stack helpers remain independent boundaries. |
 | `11464` | — | Address-based allocation wrapper. | Saves the input, `r1`, and caller in a three-word hardware-stack frame. Zero addresses skip allocation; nonzero addresses call `05430`, then continuation `11471` shifts and combines the input, stores through `r16`, and restores the frame. A fixed-seed game exercised 301 entries, including 206 allocator calls. |
 | `11536` | — | Tagged-frame precheck before `11541`. | Masks frame word `r17-2` against `11777`, compares it with `11522`, and either passes frame word `r17-1` to `11541` or selects diagnostic boundary `11547`. |
@@ -94,6 +96,7 @@ the quine trace is `11673`.
 | `13216` | — | Generated indirect-transfer template. | Loads the transfer modifier from `r1+0500` with `WTC` and jumps to that address without changing the accumulator, RMR, ALU mode, registers, or memory. A complete fixed-seed game exercised 312 entries, including 156 direct calls. |
 | `13217` | — | Generated sequence expansion entry. | Initializes `r1+0450` on the empty path; otherwise advances it and reproduces the `r16=-41` `XTS` loop that copies `r1+0451..0523` onto the hardware stack before returning through `r15`. A complete fixed-seed game exercised 78 direct entries. |
 | `15765` | `SPECIAL_FUNCTION_DISPATCH` | Evaluator branch for `664` function descriptors. | Preserves evaluator registers, pushes the counted values reached through environment word `+4`, restores the saved context, and redispatches the descriptor at environment word `+3`. Static `NEWARR` at `6641223600000000` expands two values from `12244..12245` before dispatching `NEWANY`. |
+| `16005` | — | Descriptor-chain scan and record allocation entry. | Follows the chain rooted at `21124`, applies the masks at `16223..16226`, returns a matching address through the original computed transfer, or allocates and initializes a record through `05430` and `21107`. |
 | `16151` | — | Table compaction and descriptor-scan entry. | Saves the input at `16252`; the common path selects and compacts words based on count `16237`, while the zero-count path follows descriptors from `21123`. Continuations through `16222` preserve the traced zero result, and the less common rewrite paths retain calls to `20575` and `21075`. A complete fixed-seed game exercised four direct entries. |
 | `16254` | — | Arithmetic table-search leaf. | Preserves the `NTR 3`, multiply, RMR/YTA-derived offset, and hardware-stack narrowing loop through `16303`. A fixed-seed game exercised 362 entries; both outcomes of all four internal decisions appeared in its instruction trace. |
 | `16313` | `CHAR_SEQUENCE` | Packed-character sequence loop. | Builds a tagged cursor for the sequence at `r16`, calls `21431`, tags each extracted character, and dispatches it through the descriptor at `01567`. During this diagnostic, `03075` copies the `CHARIN` entry at `01517` into the `CUCHOU` value slot at `01567`. |
@@ -127,15 +130,18 @@ the quine trace is `11673`.
 | `20257` | `INPUT_CONTINUE_FINISH` | Post-`Э71 0177` completion entry. | Stores `1` at `20362` and returns through `r15`. |
 | `20263` | `IO_INIT` | Console and I/O-state initialization. | Probes `*71`, initializes state at `20362..20377`, and initializes message descriptors at `25415..25417`. |
 | `20456` | `FORMAT_STARTUP` | Numeric/time/message formatting during startup. | Calls `*53 10` and repeatedly invokes `25641`/`25660`. |
+| `20475` | — | Exit/session time formatting and final message setup. | Saves the caller and `r1`, reads current and elapsed 1/50-second times through `Э53`/`Э63` semantics, retains three `25641` formatting boundaries, and restores the frame before tail-entering `20674`. |
 | `20660` | `MEMORY_BOUND` | Memory-size or upper-bound initialization helper. | Uses constant `0016760000033064` and stores a computed bound through `r16`. |
 | `20673` | `RETURN` | Trivial return/no-op routine. | Immediately executes `uj (15)`. |
-| `20674` | `MESSAGE_OUTPUT` | Common interactive message-output routine. | Uses `*71 14(10)`, `*71 20(10)`, and `*71 14(10)` around a descriptor selected through `r16`. |
+| `20674` | `MESSAGE_OUTPUT` | Common interactive message-output routine. | Uses `*71 14(10)`, `*71 20(10)`, and `*71 14(10)` around a descriptor selected through `r16`; the translated available, status, and ignored-`Э64` paths have full-state and emitted-byte differential coverage. |
+| `21107` | — | Descriptor-mask and record-word update. | Masks the mutable word at `21124`, updates the words selected through `r16+1` and the saved address field, and balances both temporary `r17` stack operands. |
 | `21251` | `CHAR_EXTRACT` | Character/byte extraction wrapper. | Calls `25370`, postprocesses through a table at `21301`, and returns a low byte. |
 | `21255` | `CHAR_INPUT` | Character conversion/input subentry. | Saves its parameter and the environment-binding return, then enters conversion at `21275`. |
 | `21260` | `CHAR_FORWARD` | Converted-character forwarding entry. | Calls `25346` with link `21261`. |
 | `21261` | `CHAR_RETURN` | Character-conversion return entry. | Pops the saved caller link from `r17` and returns through `r15`. |
 | `21264` | `CHAR_CONVERT` | Shared table-driven character converter. | Uses BESM multiplication and RMR state to select a word and byte from the table based at `r16`. |
 | `21274` | `CHAR_DECODE` | Input-side table selector. | Selects table base `21301` and enters `21264`. |
+| `25223` | — | Stack-driven retry and unwind entry. | Preserves its caller and repeatedly invokes `16151` while the BESM ALU condition succeeds; the unwind path either re-enters `16145` with link `25226` or performs the original stack-selected computed return. |
 | `21275` | `CHAR_ENCODE` | Output-side table selector. | Selects table base `21354` and enters `21264`. |
 | `21431` | `BUFFER_CHAR` | Packed text-buffer cursor advance and character fetch. | Updates the descriptor passed in `r16`; with `25413`, reads packed text from `20400`. |
 | `21443` | `DESCRIPTOR_ADVANCE` | Packed descriptor advance helper. | Inserts one byte and advances or wraps the descriptor for callers at `16470` and `25347`. |
@@ -162,7 +168,7 @@ the quine trace is `11673`.
 
 ## Dynamic Inventory
 
-The quine has 98 direct `vjm` targets. Ninety now have executable semantic
+The quine has 98 direct `vjm` targets. All 98 now have executable semantic
 dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 `03736`, `04074`, `04322`, `04426`, `04665`, `04675`, `05213`, `17417`,
 `17472`, `17602`, `17614`, `17762`, `17774`, and the generated template entries
@@ -171,29 +177,33 @@ dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 the latest `04536`, `05007`, `05405`, `05410`, and `16605` entries, followed by
 the generated cycle at `13007`, `13017`, `13047`, `13111`, `13130`, and `13217`,
 the tied leaders `17571`, `25427`, and `25556`, the numeric-format pair
-`25641`/`25660`, the classifier/scan pair `03330` and `17624`, and finally
-descriptor trampoline `02764`,
+`25641`/`25660`, the classifier/scan pair `03330` and `17624`, descriptor
+trampoline `02764`, the complete local cold-start body at `05230`, and finally
+`01004`, `16005`, `20144`, `20263`, `20456`, `20660`, and `21107`,
 from instruction fallback.
+A subsequent game-only pass also converts `20475`, `20674`, `07533`, and
+`25223` in descending executable-body length.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 
 A complete fixed-seed host tic-tac-toe session after this sequence executed
-1,359,070 machine steps: 571,587 semantic routine dispatches and 787,483
-individual BESM instructions. The combined trace also contained 363 input-status
+1,357,979 machine steps: 571,932 semantic routine dispatches and 786,047
+individual BESM instructions. The combined trace also contained 364 input-status
 marker lines, which are excluded from these execution counts. This sequence
 semantically dispatches all 12 calls of `25660`, all four calls of `25641`, all
 four calls of the game-specific scan at `16151`, all 216 entries at `03330`,
-all 19 entries at `17624`, and all 22 entries at `02764`. The remaining interpreted
-direct-call inventory in that session is `07533`, `20475`, `20674`, `21107`,
-and `25223`, each reached once.
+all 19 entries at `17624`, all 22 entries at `02764`, and the `05230` cold-start
+entry plus its nine reached continuations. The former interpreted direct-call
+leaders `07533`, `20475`, `20674`, `21107`, and `25223` now all dispatch
+semantically; no direct-call target in this fixed game session remains on the
+instruction fallback.
 Semantic `17417` enters translated `06134` 260 times; those transfers remain
 outside the instruction-only direct-call counter. These counts rank future work; they do
 not by themselves establish routine boundaries or semantic names.
 
-The eight direct quine targets still using instruction fallback are:
-
-`01004`, `05230`, `16005`,
-`20144`, `20263`, `20456`, `20660`, and `21107`.
+No direct quine `vjm` target still uses instruction fallback. Instruction
+emulation remains active for code between the extracted routine boundaries
+and for targets found only in other workloads.
 
 "Leaf" in generated output means no nested `vjm` was observed while a traced
 invocation was active. It is not proof that the routine is leaf for every

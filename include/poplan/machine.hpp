@@ -126,6 +126,7 @@ public:
     std::uint16_t p05213();
     std::uint16_t p05215();
     std::uint16_t p05221();
+    std::uint16_t p05230();
     std::uint16_t p05405();
     std::uint16_t p05410();
 
@@ -146,6 +147,7 @@ public:
     std::uint16_t p02764();
     std::uint16_t p02767();
     std::uint16_t p02770();
+    std::uint16_t p01004();
     std::uint16_t p01107();
     std::uint16_t p01167();
 
@@ -174,6 +176,7 @@ public:
     std::uint16_t p13130();
     std::uint16_t p13216();
     std::uint16_t p13217();
+    std::uint16_t p16005();
     std::uint16_t p16151();
     std::uint16_t p16254();
     std::uint16_t p16341();
@@ -212,6 +215,7 @@ public:
     std::uint16_t p17762();
     std::uint16_t p17774();
     std::uint16_t p20077();
+    std::uint16_t p20144();
     std::uint16_t p21464();
 
     // Literal translations of the ordinary-function call cluster.
@@ -241,6 +245,7 @@ public:
 
     // Primitive-runtime entries reached by the first diagnostic-format call.
     std::uint16_t p07475_cuchin();
+    std::uint16_t p07533();
     std::uint16_t p11536();
     std::uint16_t p11541_match_tagged_value();
     std::uint16_t p11673_begin_generated_update();
@@ -269,7 +274,13 @@ public:
     std::uint16_t p20253_resume_input_continue_status();
     std::uint16_t p20256_transfer_console();
     std::uint16_t p20257_finish_input_continue();
+    std::uint16_t p20263();
+    std::uint16_t p20456();
+    std::uint16_t p20475();
+    std::uint16_t p20660();
     std::uint16_t p20673_return();
+    std::uint16_t p20674();
+    std::uint16_t p21107();
     std::uint16_t p21255_begin_character_input();
     std::uint16_t p21251_extract_character();
     std::uint16_t p21253_resume_character_extract();
@@ -281,6 +292,7 @@ public:
     std::uint16_t p21431_buffer_char();
     std::uint16_t p21443_advance_descriptor();
     std::uint16_t p25346_begin_character_output();
+    std::uint16_t p25223();
     std::uint16_t p25350_continue_character_output();
     std::uint16_t p25361_resume_character_output();
     std::uint16_t p25364_return_character_output();
@@ -318,6 +330,7 @@ private:
     static Word48 unpack_bits(Word48 value, Word48 mask);
     void shift_accumulator(int count);
     void select_alu_group(std::uint8_t group);
+    bool accumulator_condition() const;
     void normalize_and_round(std::int64_t mantissa, int exponent,
                              std::uint64_t low, bool round);
     void multiply(Word48 value);
@@ -337,6 +350,13 @@ private:
     void stx(std::uint16_t address);
     std::uint16_t p06727_finish_arithmetic();
     std::uint16_t p01122_shared();
+    std::uint16_t p01011();
+    std::uint16_t p01012();
+    std::uint16_t p01016();
+    std::uint16_t p01023();
+    std::uint16_t p01024();
+    std::uint16_t p01025();
+    std::uint16_t p01026();
     std::uint16_t p01140();
     std::uint16_t p01151();
     std::uint16_t p01154_finish();
@@ -344,6 +364,23 @@ private:
     std::uint16_t p03532();
     std::uint16_t p03534();
     std::uint16_t p03336();
+    std::uint16_t p05240();
+    std::uint16_t p05250();
+    std::uint16_t p05252();
+    std::uint16_t p05254();
+    std::uint16_t p05255();
+    std::uint16_t p05261();
+    std::uint16_t p05266();
+    std::uint16_t p05273();
+    std::uint16_t p05314();
+    std::uint16_t p05316();
+    std::uint16_t p05326();
+    std::uint16_t p05334();
+    std::uint16_t p05335();
+    std::uint16_t p05336();
+    std::uint16_t p05337();
+    std::uint16_t p05341();
+    std::uint16_t p07536();
     std::uint16_t p13010();
     std::uint16_t p13013();
     std::uint16_t p13014();
@@ -371,6 +408,19 @@ private:
     std::uint16_t p16215();
     std::uint16_t p16216();
     std::uint16_t p16222();
+    std::uint16_t p16022();
+    std::uint16_t p16026();
+    std::uint16_t p20150();
+    std::uint16_t p20152();
+    std::uint16_t p20155();
+    std::uint16_t p20161();
+    std::uint16_t p20462();
+    std::uint16_t p20501();
+    std::uint16_t p20506();
+    std::uint16_t p20511();
+    std::uint16_t p20514();
+    std::uint16_t p25225();
+    std::uint16_t p25226();
     std::uint16_t p17575();
     std::uint16_t p17632();
     std::uint16_t p17633();

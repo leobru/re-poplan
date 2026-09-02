@@ -22,6 +22,8 @@ introduced only after that baseline is observable in a focused C++ test.
 
 The address-preserving machine layer now translates:
 
+- `01004..01027` startup/evaluator initialization and its retained call
+  boundaries;
 - `01107..01166` traced hash construction, collision-chain lookup, allocation
   continuations, and register restoration for entry `01107`;
 - `01167..01170` alternate register setup for the shared `01122` body;
@@ -56,6 +58,8 @@ The address-preserving machine layer now translates:
   record update, nested allocation, and saved-frame continuations;
 - `05207` and `05211` indirect object-word loads;
 - `05215..05225` tagged two-word allocation and initialization;
+- `05230..05346` cold-start frame, initialization loops, dependency
+  continuations, and saved-register restoration;
 - `05430..05447` allocation wrapper, common-list allocator, and return
   continuations;
 - `06343..06561` trace-confirmed compiler/evaluator entry cluster and its
@@ -66,6 +70,7 @@ The address-preserving machine layer now translates:
 - `06712..06754` arithmetic normalization and add, subtract, multiply, and
   divide entry paths;
 - `07475..07504` traced `CUCHIN` argument paths;
+- `07533..07541` output-descriptor cleanup and caller-frame restoration;
 - `07673..07745` compiler frame, classification branches, recursive helper
   continuations, six-pass bit loop, and five-word restoration;
 - `11464..11477` address-based allocation wrapper, `05430` continuation,
@@ -77,6 +82,8 @@ The address-preserving machine layer now translates:
   `r14` linkage;
 - `15765..16003` special-function argument expansion and evaluator
   redispatch;
+- `16005..16027` descriptor-chain scan, allocation, record initialization,
+  and computed return;
 - `16254..16303` trace-confirmed arithmetic table search, including its
   multiply/RMR offset path and two-value narrowing loop;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
@@ -103,10 +110,19 @@ The address-preserving machine layer now translates:
 - `20077..20106` generated return selection and restoration;
 - `20110..20123` activation argument transfer;
 - `20124..20140` activation construction;
+- `20144..20162` supervisor setup, extracode-register setup, and diagnostic
+  continuation;
 - `20170..20223` traced primary-input readiness and transfer continuations;
 - `20245..20260` continuation-state selection, `Э71` readiness/output
   transfers, and post-extracode status/completion entries;
+- `20263..20320` console capability probing, descriptor construction, and I/O
+  state initialization;
+- `20456..20474` startup time formatting and greeting selection;
+- `20475..20516` exit/session time formatting and final message selection;
+- `20660..20665` memory-bound arithmetic and indirect store;
 - `20673` trivial register return;
+- `20674..20706` console message output and status handling;
+- `21107..21117` descriptor-mask and record-word update;
 - `21255..21257` character-input wrapper entry;
 - `21251..21254` character extraction and conversion return;
 - `21260..21275` table-driven character forwarding, return, decode, and
@@ -114,6 +130,7 @@ The address-preserving machine layer now translates:
 - `21431..21440` packed-text character extraction and cursor advance;
 - `21443..21454` packed-byte insertion and descriptor advance;
 - `21464..21522` trace-confirmed evaluator classification and return paths;
+- `25223..25230` stack-driven retry and unwind loop around `16151`/`16145`;
 - `25346..25365` converted-character output, counting, continuation resume,
   and return entries;
 - `25356` and `25370..25405` end-character and packed token-source paths.
