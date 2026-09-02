@@ -4206,6 +4206,19 @@ std::uint16_t Machine::p02750_dispatch()
     return accumulator_.raw() == 0 ? 03261 : 03206;
 }
 
+std::uint16_t Machine::p02764()
+{
+    registers_[010] = 02745;
+    its(016);
+    const Word48 saved_register = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw() ^ memory_[address_add(registers_[010], 045)].raw());
+    remainder_ = saved_register;
+    select_alu_group(rau_logical);
+    stx(03272);
+    return 03261;
+}
+
 std::uint16_t Machine::p02767()
 {
     // 02767 is the common indirect evaluator wrapper.

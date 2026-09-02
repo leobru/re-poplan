@@ -29,6 +29,7 @@ the quine trace is `11673`.
 | `01107` | — | Hash and collision-chain lookup entry. | Builds a hash in `01172`, selects a bucket through the table based at `01200`, follows its links, and allocates a record through `05430` only when the value is absent. The first tic-tac-toe call resolves bucket `01354` through `01534` to matching record `01624`. |
 | `01167` | — | Alternate shared hash-table entry. | Sets `r11=06143`, `r12=2`, and `r13=0`, then tail-enters the translated `01122` body without changing the accumulator or ALU state. A fixed-seed game exercised 260 entries. |
 | `02750` | `EVAL_DISPATCH` | POP value dispatch/evaluator trampoline. | Decodes high tag bits, stores temporaries at `03272/03273`, and dispatches through the decoded value or runtime tables. |
+| `02764` | — | Descriptor-construction trampoline. | Preserves ACC on the hardware stack, XORs `r16` with `03012` into `03272`, restores ACC, and tail-enters `03261`. A complete fixed-seed game exercised 22 entries. |
 | `03014` | `ERROR_DISPATCH` | Diagnostic context and POP-argument packager. | The `1+*2;` trace saves code `04020`, pushes source object `7200000000016750` and tagged code `6400000000004020`, then dispatches descriptor `6600000000003051`. |
 | `03051` | `ERROR_UNPACK` | Diagnostic argument unpacker. | Pops the tagged code and source object, restores `r16=04020`, and transfers to `03057`. |
 | `03057` | `ERROR_FORMAT` | Diagnostic formatting and reporting entry. | Saves the object and register context before invoking the runtime message and number-formatting machinery. |
@@ -161,7 +162,7 @@ the quine trace is `11673`.
 
 ## Dynamic Inventory
 
-The quine has 98 direct `vjm` targets. Eighty-nine now have executable semantic
+The quine has 98 direct `vjm` targets. Ninety now have executable semantic
 dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 `03736`, `04074`, `04322`, `04426`, `04665`, `04675`, `05213`, `17417`,
 `17472`, `17602`, `17614`, `17762`, `17774`, and the generated template entries
@@ -170,27 +171,28 @@ dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 the latest `04536`, `05007`, `05405`, `05410`, and `16605` entries, followed by
 the generated cycle at `13007`, `13017`, `13047`, `13111`, `13130`, and `13217`,
 the tied leaders `17571`, `25427`, and `25556`, the numeric-format pair
-`25641`/`25660`, and the classifier/scan pair `03330` and `17624`,
+`25641`/`25660`, the classifier/scan pair `03330` and `17624`, and finally
+descriptor trampoline `02764`,
 from instruction fallback.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 
 A complete fixed-seed host tic-tac-toe session after this sequence executed
-1,359,180 machine steps: 571,565 semantic routine dispatches and 787,615
+1,359,070 machine steps: 571,587 semantic routine dispatches and 787,483
 individual BESM instructions. The combined trace also contained 363 input-status
 marker lines, which are excluded from these execution counts. This sequence
 semantically dispatches all 12 calls of `25660`, all four calls of `25641`, all
 four calls of the game-specific scan at `16151`, all 216 entries at `03330`,
-and all 19 entries at `17624`. The remaining interpreted
+all 19 entries at `17624`, and all 22 entries at `02764`. The remaining interpreted
 direct-call inventory in that session is `07533`, `20475`, `20674`, `21107`,
 and `25223`, each reached once.
 Semantic `17417` enters translated `06134` 260 times; those transfers remain
 outside the instruction-only direct-call counter. These counts rank future work; they do
 not by themselves establish routine boundaries or semantic names.
 
-The nine direct quine targets still using instruction fallback are:
+The eight direct quine targets still using instruction fallback are:
 
-`01004`, `02764`, `05230`, `16005`,
+`01004`, `05230`, `16005`,
 `20144`, `20263`, `20456`, `20660`, and `21107`.
 
 "Leaf" in generated output means no nested `vjm` was observed while a traced

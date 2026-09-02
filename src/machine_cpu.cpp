@@ -553,6 +553,7 @@ bool Machine::dispatch_translated_routine()
     case 01151: continuation = p01151(); break;
     case 01167: continuation = p01167(); break;
     case 02750: continuation = p02750_dispatch(); break;
+    case 02764: continuation = p02764(); break;
     case 02767: continuation = p02767(); break;
     case 02770: continuation = p02770(); break;
     case 03014: continuation = p03014_dispatch_error(); break;

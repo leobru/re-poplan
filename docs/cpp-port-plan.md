@@ -26,6 +26,7 @@ The address-preserving machine layer now translates:
   continuations, and register restoration for entry `01107`;
 - `01167..01170` alternate register setup for the shared `01122` body;
 - `02750..02763` function validation and dispatch;
+- `02764..02766` descriptor construction and function-entry transfer;
 - `02767..03005` indirect evaluator selection and validation;
 - `03014..03071` normal diagnostic packaging, unpacking, and first formatter
   call;

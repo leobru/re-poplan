@@ -143,6 +143,7 @@ public:
     // Decode performed by the first part of EVAL_DISPATCH at 02750.
     FunctionDescriptor p02750_decode_function() const;
     std::uint16_t p02750_dispatch();
+    std::uint16_t p02764();
     std::uint16_t p02767();
     std::uint16_t p02770();
     std::uint16_t p01107();

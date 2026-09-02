@@ -1642,6 +1642,45 @@ int main()
         }
     };
 
+    {
+        const std::pair<std::uint16_t, Word48> descriptor_entry_code[] = {
+            {02764, Word48(0x8a05e502300eULL)},
+            {02765, Word48(0x80a0250906baULL)},
+            {02766, Word48(0x0010000c06b1ULL)},
+        };
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : descriptor_entry_code) {
+                machine->memory(address) = word;
+            }
+            machine->memory(03012) = Word48(0xd80000000000ULL);
+            machine->accumulator() = Word48(0765432107654321ULL);
+            machine->remainder() = Word48(0123456701234567ULL);
+            machine->alu_mode() = 053;
+            machine->reg(010) = 01234;
+            machine->reg(015) = 07000;
+            machine->reg(016) = 04567;
+            machine->reg(017) = 05000;
+            machine->start(02764);
+        }
+        semantic->step();
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != 03261
+              || interpreted->right_half()) && steps != 8;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    "02764 raw descriptor path keeps running");
+        }
+        require(interpreted->program_counter() == 03261
+                    && !interpreted->right_half(),
+                "02764 raw descriptor path reaches ENTER_FUNCTION");
+        require_same_architectural_state(
+            *semantic, *interpreted, "02764 descriptor entry");
+    }
+
     const std::pair<std::uint16_t, Word48> classifier_03330_code[] = {
         {03330, Word48(0xba06c8b00061ULL)},
         {03331, Word48(0xb09064b0a065ULL)},
