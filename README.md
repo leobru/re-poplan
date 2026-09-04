@@ -62,19 +62,24 @@ Build and test the address-preserving C++ evaluator/activation translation:
 make cpp-test
 ```
 
-Run the C++ Э71 I/O shell:
+Run the extracted POPLAN image on the C++ execution layer:
 
 ```sh
 make cpp-run
 ```
 
-The shell prints `:` through the translated Э71 output control word, reads
-ASCII POP-2 text from standard input through the translated Э71 input control
-word, and echoes the transferred GOST bytes through Э71 output. Type `^` to
-exit. This no-argument mode is a focused console-path demonstration.
+No-argument `poplan` locates `poplan.bin` next to the C++ build directory or
+at `build/poplan.bin`, boots the historical interpreter, and evaluates POP-2
+from standard input. For example:
 
-Run the extracted POPLAN image on the C++ BESM execution layer and emulated
-Э71 console:
+```sh
+echo '2+2=>' | build/cpp/poplan
+```
+
+prints `** 4`. The focused Э71 loopback demonstration remains available as
+`build/cpp/poplan --io-demo`.
+
+An explicit image path is also supported:
 
 ```sh
 make image cpp
@@ -107,6 +112,9 @@ All 98 direct `vjm` targets in the saved quine trace now have semantic
 dispatch. Other dynamically reached entries still use instruction fallback
 until their routine boundaries are extracted.
 
+Extracode `050` implements the BESM-6 floating-point square root (`000`), sine
+(`001`), cosine (`002`), arctangent (`003`), arcsine (`004`), natural logarithm
+(`005`), and exponential (`006`) operations and clears the remainder register.
 Extracode `053` with address `010` returns local time since midnight in
 1/50-second jiffies, including the current 20 ms fraction.
 Extracode `063` with address `004` returns elapsed image-execution time in the

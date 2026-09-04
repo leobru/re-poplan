@@ -18,7 +18,7 @@ ZONE_INPUTS := $(wildcard zone*.pop2)
 ZONE_COVERAGES := $(patsubst %.pop2,$(BUILD_DIR)/%.cov,$(ZONE_INPUTS))
 COVERAGE_CORPUS := $(BUILD_DIR)/coverage-corpus.md
 
-.PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test cpp-run cpp-quine cpp-zone1224 test clean
+.PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test cpp-run cpp-trivial cpp-quine cpp-zone1224 test clean
 
 all: listing calls dictionary
 
@@ -38,11 +38,21 @@ cpp:
 	cmake -S . -B $(CPP_BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
 	cmake --build $(CPP_BUILD_DIR)
 
-cpp-test: cpp
+cpp-test: cpp image
 	ctest --test-dir $(CPP_BUILD_DIR) --output-on-failure
+	echo '2+2=>' | $(CPP_BUILD_DIR)/poplan > $(BUILD_DIR)/cpp-trivial.out
+	./tools/normalize-output.py $(BUILD_DIR)/cpp-trivial.out \
+		> $(BUILD_DIR)/cpp-trivial.normalized
+	diff -u tests/expected/trivial.out $(BUILD_DIR)/cpp-trivial.normalized
 
-cpp-run: cpp
+cpp-run: cpp image
 	$(CPP_BUILD_DIR)/poplan
+
+cpp-trivial: cpp image
+	echo '2+2=>' | $(CPP_BUILD_DIR)/poplan > $(BUILD_DIR)/cpp-trivial.out
+	./tools/normalize-output.py $(BUILD_DIR)/cpp-trivial.out \
+		> $(BUILD_DIR)/cpp-trivial.normalized
+	diff -u tests/expected/trivial.out $(BUILD_DIR)/cpp-trivial.normalized
 
 cpp-quine: cpp image
 	$(CPP_BUILD_DIR)/poplan --image $(IMAGE) < quine.pop2 \

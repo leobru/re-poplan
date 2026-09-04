@@ -66,6 +66,47 @@ int main()
     require(e75_store.step() == poplan::ExecutionStatus::halted,
             "the synthetic E75 program reaches STOP");
 
+    struct E50Case {
+        std::uint16_t address;
+        Word48 operand;
+        Word48 expected;
+    };
+    const E50Case elementary_function_cases[] = {
+        {0, Word48(), Word48()},
+        {0, Word48(04050000000000000ULL), Word48(04050000000000000ULL)},
+        {0, Word48(04110000000000000ULL), Word48(04053240474631771ULL)},
+        {0, Word48(04150000000000000ULL), Word48(04110000000000000ULL)},
+        {1, Word48(04050000000000000ULL), Word48(04015355251074110ULL)},
+        {1, Word48(04020000000000000ULL), Word48(04022422526703670ULL)},
+        {2, Word48(04050000000000000ULL), Word48(04010512120076650ULL)},
+        {3, Word48(04050000000000000ULL), Word48(04014441766521041ULL)},
+        {4, Word48(04010000000000000ULL), Word48(04010301244340553ULL)},
+        {4, Word48(04030000000000000ULL), Word48(04027476533437225ULL)},
+        {5, Word48(04154000000000000ULL), Word48(04056253027750521ULL)},
+        {5, Word48(04010000000000000ULL), Word48(04024721572004057ULL)},
+        {6, Word48(04050000000000000ULL), Word48(04112677025054242ULL)},
+        {6, Word48(04020000000000000ULL), Word48(03753613254330547ULL)},
+    };
+    for (const auto &[address, operand, expected]
+         : elementary_function_cases) {
+        const std::uint32_t e50_left = (050U << 12) | address;
+        auto machine = std::make_unique<Machine>();
+        machine->memory(01000) = Word48(
+            (static_cast<std::uint64_t>(e50_left) << 24) | stop_right);
+        machine->accumulator() = operand;
+        machine->remainder() = Word48(0765432107654321ULL);
+        machine->alu_mode() = 020;
+        machine->start(01000);
+        require(machine->step() == poplan::ExecutionStatus::running,
+                "E50 elementary function continues with the right half");
+        require(machine->accumulator() == expected,
+                "E50 computes the traced BESM-6 elementary function");
+        require(machine->remainder() == Word48()
+                    && machine->reg(016) == address
+                    && machine->alu_mode() == 004,
+                "E50 clears RMR and exposes its effective address");
+    }
+
     auto e53_time = std::make_unique<Machine>();
     constexpr std::uint32_t e53_left = (053U << 12) | 010U;
     e53_time->memory(01000) = Word48(
@@ -1796,6 +1837,402 @@ int main()
                     && !machine.right_half(),
                 label + " reaches its semantic boundary");
     };
+
+    const std::pair<std::uint16_t, Word48> hot_runtime_code[] = {
+        {03314, Word48(0xda069d0c06bdULL)},
+        {03374, Word48(0xdc86bf090000ULL)},
+        {03375, Word48(0xf00000dc86bfULL)},
+        {03376, Word48(0xda06cc090000ULL)},
+        {03377, Word48(0xf0a000ba06c8ULL)},
+        {03400, Word48(0xbb803a090487ULL)},
+        {03401, Word48(0x008000dc0000ULL)},
+        {03402, Word48(0xb08063dc0000ULL)},
+        {05045, Word48(0x208001020002ULL)},
+        {05046, Word48(0x2e0a63208000ULL)},
+        {05047, Word48(0x01e067020009ULL)},
+        {05050, Word48(0x92400a9a8a3fULL)},
+        {05051, Word48(0xac0a2a090000ULL)},
+        {07472, Word48(0x090000dca2a9ULL)},
+        {07473, Word48(0x8a0f3a80a00dULL)},
+        {07474, Word48(0xda069d0c06bdULL)},
+        {016406, Word48(0x3080004e1d0aULL)},
+        {016407, Word48(0x14993a51e000ULL)},
+        {016410, Word48(0xf4aff9f40ff9ULL)},
+        {016411, Word48(0x5a80084a8001ULL)},
+        {016412, Word48(0x308001dc9d11ULL)},
+        {016413, Word48(0x2e1d0d14a93bULL)},
+        {016414, Word48(0x1b785d090000ULL)},
+        {016415, Word48(0x14a93c1bf85eULL)},
+        {016416, Word48(0xda1d061c7894ULL)},
+        {016417, Word48(0xf48ff9dc8247ULL)},
+        {016420, Word48(0xda1cfe0c06bdULL)},
+        {016467, Word48(0x02300d303000ULL)},
+        {016470, Word48(0xea1d6ddca323ULL)},
+        {016471, Word48(0x14894214b8bdULL)},
+        {016472, Word48(0x1418bd02100dULL)},
+        {016473, Word48(0x1488bc14a8d3ULL)},
+        {016474, Word48(0xdb80001408bdULL)},
+        {016475, Word48(0x1488bb1408bcULL)},
+        {016476, Word48(0xdc0000090000ULL)},
+        {011524, Word48(0xdc86bf090000ULL)},
+        {011525, Word48(0xf00000dc86bfULL)},
+        {011526, Word48(0xf00000dc935eULL)},
+        {011527, Word48(0xf08000dc9340ULL)},
+        {011530, Word48(0xda069d0c06bdULL)},
+        {016376, Word48(0xf08000021003ULL)},
+        {016377, Word48(0x021007021002ULL)},
+        {016400, Word48(0x021005021004ULL)},
+        {016401, Word48(0x0210010c069dULL)},
+        {020667, Word48(0xdc9ce1090000ULL)},
+    };
+    const auto compare_hot_runtime_block = [
+        &hot_runtime_code, &run_interpreted_to,
+        &require_same_architectural_state](
+            std::uint16_t entry, std::uint16_t target,
+            const auto &initialize, const std::string &label) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : hot_runtime_code) {
+                machine->memory(address) = word;
+            }
+            initialize(*machine);
+            machine->start(entry);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic path keeps running");
+        run_interpreted_to(*interpreted, target, 32, label);
+        require_same_architectural_state(*semantic, *interpreted, label);
+    };
+
+    compare_hot_runtime_block(
+        03314, 03275,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 07000;
+        },
+        "03314 binding return");
+    compare_hot_runtime_block(
+        03374, 03277,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06600000000003374ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 03235;
+            machine.reg(017) = 05000;
+        },
+        "03374 two-value entry");
+    compare_hot_runtime_block(
+        03375, 03277,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000123ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 03375;
+            machine.reg(017) = 05000;
+        },
+        "03375 first-value continuation");
+    compare_hot_runtime_block(
+        03376, 03314,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000123ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(05000) = Word48(06400000000000123ULL);
+            machine.memory(02207) = Word48(06400000000000001ULL);
+            machine.memory(03453) = Word48(06400000000000002ULL);
+            machine.reg(013) = 01234;
+            machine.reg(015) = 03376;
+            machine.reg(017) = 05001;
+        },
+        "03376 equal-value path");
+    compare_hot_runtime_block(
+        03376, 03314,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000123ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(05000) = Word48(06400000000000456ULL);
+            machine.memory(02207) = Word48(06400000000000001ULL);
+            machine.memory(03453) = Word48(06400000000000002ULL);
+            machine.reg(013) = 01234;
+            machine.reg(015) = 03376;
+            machine.reg(017) = 05001;
+        },
+        "03376 unequal-value path");
+
+    compare_hot_runtime_block(
+        05045, 05143,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(04463) = Word48();
+            machine.reg(002) = 04462;
+            machine.reg(011) = 01111;
+            machine.reg(012) = 01212;
+            machine.reg(015) = 07000;
+        },
+        "05045 zero generated-continuation address");
+    compare_hot_runtime_block(
+        05045, 05057,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(04463) = Word48(04000);
+            machine.memory(04000) =
+                Word48(std::uint64_t{5} << 39);
+            machine.reg(002) = 04462;
+            machine.reg(011) = 01111;
+            machine.reg(012) = 01212;
+            machine.reg(015) = 07000;
+        },
+        "05045 selected generated continuation");
+
+    compare_hot_runtime_block(
+        07472, 021251,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 07000;
+        },
+        "07472 character-extractor entry");
+    compare_hot_runtime_block(
+        07473, 03275,
+        [](Machine &machine) {
+            machine.memory(07507) = Word48(06400000000000000ULL);
+            machine.accumulator() = Word48(06400000000000052ULL);
+            machine.remainder() = Word48(07654);
+            machine.alu_mode() = 021;
+            machine.reg(010) = 01234;
+            machine.reg(015) = 07000;
+        },
+        "07473 character-extractor continuation");
+
+    compare_hot_runtime_block(
+        016406, 016421,
+        [](Machine &machine) {
+            machine.memory(04000) = Word48(0123456701234567ULL);
+            machine.memory(04001) = Word48(06400000000000106ULL);
+            machine.memory(016753) = Word48(07777777777777777ULL);
+            machine.memory(05001) = Word48(0707070707070707ULL);
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0111111111111111ULL);
+            machine.alu_mode() = 023;
+            machine.reg(001) = 022261;
+            machine.reg(003) = 04000;
+            machine.reg(004) = 1;
+            machine.reg(005) = 0100;
+            machine.reg(015) = 07000;
+            machine.reg(017) = 05010;
+        },
+        "16406 record-word entry");
+    compare_hot_runtime_block(
+        016413, 016416,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(01234567);
+            machine.remainder() = Word48(07654);
+            machine.alu_mode() = 021;
+            machine.memory(016754) = Word48(01234567);
+            machine.reg(001) = 022261;
+            machine.reg(002) = 1;
+            machine.reg(015) = 07000;
+        },
+        "16413 zero first comparison");
+    compare_hot_runtime_block(
+        016413, 016505,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(01);
+            machine.remainder() = Word48(07654);
+            machine.alu_mode() = 021;
+            machine.memory(016754) = Word48(03);
+            machine.memory(016755) = Word48(02);
+            machine.reg(001) = 022261;
+            machine.reg(002) = 1;
+            machine.reg(015) = 07000;
+        },
+        "16413 matching second comparison");
+    compare_hot_runtime_block(
+        016415, 016417,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(01);
+            machine.remainder() = Word48(07654);
+            machine.alu_mode() = 021;
+            machine.memory(016755) = Word48();
+            machine.reg(001) = 022261;
+            machine.reg(015) = 07000;
+        },
+        "16415 nonzero second comparison");
+    compare_hot_runtime_block(
+        016416, 016505,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 022261;
+            machine.reg(015) = 07000;
+        },
+        "16416 loop continuation");
+
+    compare_hot_runtime_block(
+        016467, 021443,
+        [](Machine &machine) {
+            machine.memory(04000) = Word48(07200000000012345ULL);
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(003) = 04000;
+            machine.reg(015) = 07000;
+            machine.reg(016) = 04567;
+            machine.reg(017) = 05000;
+        },
+        "16467 descriptor-advance entry");
+    compare_hot_runtime_block(
+        016471, 07000,
+        [](Machine &machine) {
+            machine.memory(016763) = Word48(0123);
+            machine.memory(016556) = Word48(0456);
+            machine.memory(016555) = Word48(01);
+            machine.memory(016604) = Word48(02);
+            machine.memory(05000) = Word48(0765432107654321ULL);
+            machine.memory(05001) = Word48(07000);
+            machine.accumulator() = Word48(01111);
+            machine.remainder() = Word48(02222);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 022261;
+            machine.reg(015) = 016471;
+            machine.reg(017) = 05002;
+        },
+        "16471 nonzero return");
+    compare_hot_runtime_block(
+        016471, 07000,
+        [](Machine &machine) {
+            machine.memory(016763) = Word48(0123);
+            machine.memory(016556) = Word48(0456);
+            machine.memory(016554) = Word48(0777);
+            machine.memory(016555) = Word48(012);
+            machine.memory(016604) = Word48(012);
+            machine.memory(05000) = Word48(0765432107654321ULL);
+            machine.memory(05001) = Word48(07000);
+            machine.accumulator() = Word48(01111);
+            machine.remainder() = Word48(02222);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 022261;
+            machine.reg(015) = 016471;
+            machine.reg(017) = 05002;
+        },
+        "16471 zero update and return");
+
+    compare_hot_runtime_block(
+        016376, 03235,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(07777777777777777ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(05000) = Word48(0765432107654321ULL);
+            machine.memory(05001) = Word48(01001);
+            machine.memory(05002) = Word48(04004);
+            machine.memory(05003) = Word48(05005);
+            machine.memory(05004) = Word48(02002);
+            machine.memory(05005) = Word48(07007);
+            machine.memory(05006) = Word48(03003);
+            machine.reg(001) = 01111;
+            machine.reg(002) = 02222;
+            machine.reg(003) = 03333;
+            machine.reg(004) = 04444;
+            machine.reg(005) = 05555;
+            machine.reg(007) = 07777;
+            machine.reg(015) = 016376;
+            machine.reg(017) = 05007;
+        },
+        "16376 saved-register restoration");
+    compare_hot_runtime_block(
+        016417, 01107,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(05001) = Word48(02125110124642400ULL);
+            machine.reg(015) = 016413;
+            machine.reg(017) = 05010;
+        },
+        "16417 hash-call continuation");
+    compare_hot_runtime_block(
+        016420, 03275,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06440000000001624ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 016420;
+            machine.reg(017) = 05010;
+        },
+        "16420 value-forward continuation");
+    compare_hot_runtime_block(
+        020667, 016341,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0660000000020667ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 03235;
+            machine.reg(017) = 05000;
+        },
+        "20667 generated character entry");
+
+    compare_hot_runtime_block(
+        011524, 03277,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(07040000000000000ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 03235;
+            machine.reg(017) = 05000;
+        },
+        "11524 generated entry");
+    compare_hot_runtime_block(
+        011525, 03277,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(07040000000012345ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 011525;
+            machine.reg(017) = 05000;
+        },
+        "11525 first-value continuation");
+    compare_hot_runtime_block(
+        011526, 011536,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000001ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 011526;
+            machine.reg(017) = 05001;
+        },
+        "11526 second-value continuation");
+    compare_hot_runtime_block(
+        011527, 011500,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000077ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(05001) = Word48(06400000000000001ULL);
+            machine.reg(015) = 011527;
+            machine.reg(017) = 05002;
+        },
+        "11527 indexed-load continuation");
+    compare_hot_runtime_block(
+        011530, 03275,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000001ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 011530;
+            machine.reg(017) = 05001;
+        },
+        "11530 binding return");
 
     const std::pair<std::uint16_t, Word48> entry_01004_code[] = {
         {01004, Word48(0x02200df00000ULL)},

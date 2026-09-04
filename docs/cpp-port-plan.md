@@ -37,6 +37,7 @@ The address-preserving machine layer now translates:
 - `03235..03260` environment binding and restoration;
 - `03261..03264` function entry;
 - `03275`, `03277`, `03301`, and `03303` POP value-stack operations;
+- `03314` shared binding return and `03374..03402` two-value selection;
 - `03330..03336` traced two-stage value classification;
 - `03413..03423` traced numeric-update arithmetic;
 - `03516..03520` addressed-word replacement;
@@ -56,6 +57,7 @@ The address-preserving machine layer now translates:
   `04467` re-entry, and saved-state restoration;
 - `04675..04756` second compiler-chain wrapper, marker branches, shared scan,
   record update, nested allocation, and saved-frame continuations;
+- `05045..05051` generated-continuation selection shared with `05040`;
 - `05207` and `05211` indirect object-word loads;
 - `05215..05225` tagged two-word allocation and initialization;
 - `05230..05346` cold-start frame, initialization loops, dependency
@@ -69,6 +71,7 @@ The address-preserving machine layer now translates:
 - `06650..06661` shared generated comparison and diagnostic continuations;
 - `06712..06754` arithmetic normalization and add, subtract, multiply, and
   divide entry paths;
+- `07472..07474` shared character-extractor call and binding continuation;
 - `07475..07504` traced `CUCHIN` argument paths;
 - `07533..07541` output-descriptor cleanup and caller-frame restoration;
 - `07673..07745` compiler frame, classification branches, recursive helper
@@ -76,6 +79,7 @@ The address-preserving machine layer now translates:
 - `11464..11477` address-based allocation wrapper, `05430` continuation,
   transformed-word store, and three-word frame restoration;
 - `11500..11502` frame-relative indexed load;
+- `11524..11530` generated two-value validation and indexed-load bracket;
 - `11536..11545` tagged-value precheck, frame-field match, and diagnostic
   exits;
 - `11673..11745` generated quine update/binding cluster, including its unique
@@ -88,8 +92,12 @@ The address-preserving machine layer now translates:
   multiply/RMR offset path and two-value narrowing loop;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
 - `16341..16350` trace-confirmed compiler dispatch frame and restoration;
+- `16376..16401` six-register frame restoration and environment bind;
+- `16406..16416` record-word mask, comparison, and computed continuations;
+- `16417..16420` hash call and POP-value forwarding continuations;
 - `16421..16434` tagged-low-byte validation and packed-table lookup;
 - `16457..16462` three-word record shift and continuation selection;
+- `16467..16476` descriptor-advance bracket and record-field update;
 - `16477..16504` record-word presence check, evaluator call, and result store;
 - `16505..16510` record-shift call wrapper and caller restoration;
 - `16742..16744` record-byte lookup wrapper, result adjustment, and indirect
@@ -108,6 +116,7 @@ The address-preserving machine layer now translates:
 - `17774..20007` record-chain classification, counter stamping, link
   traversal, and ordinary counter update;
 - `20077..20106` generated return selection and restoration;
+- `20667` generated entry into the `16341` compiler frame;
 - `20110..20123` activation argument transfer;
 - `20124..20140` activation construction;
 - `20144..20162` supervisor setup, extracode-register setup, and diagnostic

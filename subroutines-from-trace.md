@@ -41,7 +41,9 @@ the quine trace is `11673`.
 | `03277` | `POP_ACC` | Pop accumulator from the POP data stack. | Loads `(r6)`, increments `r6`, returns through `r15`. |
 | `03301` | — | Load and push an indirect POP value. | Loads `(r16)`, decrements `r6`, stores the value at `(r6)`, and returns through `r15`. |
 | `03303` | `STORE_STACK_TOP` | Store the top POP stack item through `r16`. | Uses the hardware stack to preserve the accumulator while moving `(r6)` to `(r16)` and incrementing `r6`. |
+| `03314` | — | Shared binding return. | Installs `03235` as the link and tail-enters `03275`; the fixed-seed game reached it 3,340 times. |
 | `03330` | — | Two-stage value classifier. | Saves the input, first compares its masked tag with `03455`, then compares the complete saved word with the value selected through `02047`; either match returns `03456`, while a miss returns word zero. A complete fixed-seed game exercised 216 entries. |
+| `03374` | — | Generated two-value selection bracket. | Pops two values, preserves the first on `r17`, compares them at `03376`, and selects word `02207` or `03453` before returning through `03314`. The fixed-seed game exercised 3,322 complete brackets. |
 | `03413` | `NUMERIC_UPDATE` | Numeric arithmetic helper in the generated quine update loop. | Called 279 times from `11707`; preserves the original `ntr 6/7`, divide, multiply, reverse-subtract, and RMR path. |
 | `03506` | — | Address-derived replacement entry. | Shifts the incoming address, returns immediately for zero, and otherwise retains the original `NTR 3` subtraction and branch through `03516`; the alternate branch replaces the words selected through `r13` and `r16`. A complete fixed-seed game exercised 123 entries, including 94 direct calls. |
 | `03516` | — | Replace one addressed word while preserving its old value through another address. | Loads `(r13)` into `(r16)`, replaces `(r13)` with `r16`, and returns through `r15`; the partial tic-tac-toe trace calls it 5,572 times. |
@@ -63,6 +65,7 @@ the quine trace is `11673`.
 | `04675` | — | Compiler-chain wrapper. | Saves `r2` and the caller, compares the selected record field with the table at `04536`, and preserves calls through `04447`, `04467`, `04507`, `05215`, and `17253` before restoring through `04717`. A fixed-seed game exercised 258 initial entries. |
 | `04740` | — | Two-word chain helper. | Traverses the chain selected through `r7+1167`; a missing chain allocates two linked words through `05215`, while a match returns through the stacked `04722` or `04734` continuation. A fixed-seed game exercised 104 entries, including 46 entries through `04721`. |
 | `05007` | — | Generated construction wrapper. | Saves its four-word frame, preserves the optional `17623`/`17624` boundaries and two `05160` copies, and retains the original literal `UTC` scratch selections before `03531`, `17614`, and `05430`. A complete fixed-seed game exercised 66 direct entries. |
+| `05045` | — | Generated-continuation selector shared with the suffix of `05040`. | Loads the address from `r2+1`, extracts the selector from the addressed word, and transfers through `r12+05052`; zero retains the `05143` exit. The fixed-seed game reached it independently 2,510 times. |
 | `05160` | — | Four-word frame and address-chain copy wrapper. | Saves the input, caller, `r2`, and `r3`, calls `11464` for word `r16+2`, then follows the selected address chain and copies its values through consecutive `r3` words before restoring the frame. A complete fixed-seed game exercised 132 entries and continuations. |
 | `05207` | — | Load word zero through an object address. | Copies the accumulator address to `r16`, loads `(r16)`, and returns through `r15`; the quine calls it directly 46 times. |
 | `05211` | — | Load word one through an object address. | Copies the accumulator address to `r16`, loads `1(r16)`, and returns through `r15`; the quine calls it directly 91 times. |
@@ -77,10 +80,12 @@ the quine trace is `11673`.
 | `06424` | — | Generated masked address-chain scan. | Advances `r16`, tests words against constants selected through base `06444`, and follows embedded addresses while they match. A mismatch returns through `r15`; a zero link preserves the `05430` allocation boundary and resumes at `06435`. The fixed-seed game exercised 2,824 entries, including 141 direct calls. |
 | `06623`, `06631`, `06637`, `06645` | — | Four generated comparison templates. | Select `r16` values `14040`, `14030`, `14050`, and `14060`, call the shared `06650` body through `r14`, pop two hardware-stack values, alternate `A-X` with `X-A`, and select `06657` or `06660` with the original additive sign test. A complete fixed-seed game exercised `06623` 884 times and `06631` 1,118 times. |
 | `06650` | — | Two-stage generated comparison entry. | Preserves the original `r14` continuation, RMR flags, and diagnostic continuations `06654` and `06657`; the completed tic-tac-toe session called it 1,929 times before translation. |
+| `07472` | — | Shared character-extraction wrapper. | Calls `21251`, XORs the result with word `07507`, and forwards it through the `03275`/`03235` binding bracket. |
 | `07475` | `CUCHIN_ARG` | Argument-taking entry within the dictionary `CUCHIN` routine. | Pops a tagged character; `0136` selects code `0012`, while ordinary tagged characters are forwarded unchanged to `21255`. |
 | `07533` | — | Output-descriptor cleanup and caller restoration. | Saves its input and caller around `21443`, retains the ignored `Э64` side effect, copies `07543` to `07600`, restores descriptor `07574` at `07545`, and balances the two-word frame. |
 | `07673` | — | Compiler frame and classification entry. | Saves the caller and `r1`, `r2`, and `r5` in a five-word frame. The fixed-seed game exercised 294 entries: 78 transferred through `12674`, while 216 called `03330`, entered the six-pass `07730..07741` bit loop, and restored through `07742`. Calls to evaluator and stack helpers remain independent boundaries. |
 | `11464` | — | Address-based allocation wrapper. | Saves the input, `r1`, and caller in a three-word hardware-stack frame. Zero addresses skip allocation; nonzero addresses call `05430`, then continuation `11471` shifts and combines the input, stores through `r16`, and restores the frame. A fixed-seed game exercised 301 entries, including 206 allocator calls. |
+| `11524` | — | Generated two-value validation and indexed-load bracket. | Pops and saves two values, preserves the `11536` precheck and `11500` indexed-load boundaries, then returns the result through the `03275`/`03235` bracket. The fixed-seed game exercised 3,815 complete brackets. |
 | `11536` | — | Tagged-frame precheck before `11541`. | Masks frame word `r17-2` against `11777`, compares it with `11522`, and either passes frame word `r17-1` to `11541` or selects diagnostic boundary `11547`. |
 | `11541` | `TAGGED_VALUE_MATCH` | High-frequency leaf check in the generated quine loop. | Requires a nonzero `640` value, extracts and retags the high 24-bit field of the object addressed by frame word `r17-2`, and compares it with frame word `r17-1`. A negative comparison selects diagnostic `10100`; traced nonnegative results return through `r15`. |
 | `11673` | — | Shared generated-value update body. | Uses the unique `r14` link, two POP values, `11541`, and `03413`, then computes continuation `11720` or `11727` from its saved frame. |
@@ -100,8 +105,12 @@ the quine trace is `11673`.
 | `16151` | — | Table compaction and descriptor-scan entry. | Saves the input at `16252`; the common path selects and compacts words based on count `16237`, while the zero-count path follows descriptors from `21123`. Continuations through `16222` preserve the traced zero result, and the less common rewrite paths retain calls to `20575` and `21075`. A complete fixed-seed game exercised four direct entries. |
 | `16254` | — | Arithmetic table-search leaf. | Preserves the `NTR 3`, multiply, RMR/YTA-derived offset, and hardware-stack narrowing loop through `16303`. A fixed-seed game exercised 362 entries; both outcomes of all four internal decisions appeared in its instruction trace. |
 | `16313` | `CHAR_SEQUENCE` | Packed-character sequence loop. | Builds a tagged cursor for the sequence at `r16`, calls `21431`, tags each extracted character, and dispatches it through the descriptor at `01567`. During this diagnostic, `03075` copies the `CHARIN` entry at `01517` into the `CUCHOU` value slot at `01567`. |
+| `16376` | — | Compiler-frame restoration. | Restores `r3`, `r7`, `r2`, `r5`, `r4`, and `r1` from the seven-word `r17` frame established by `16341`, then enters `03235`. The fixed-seed game reached it 2,972 times. |
+| `16406` | — | Record-word mask and comparison block. | Optionally masks and shifts the word at `r3`, folds it into the saved `r17-7` word, calls `16421`, and selects one of three `r1`-relative continuations. |
+| `16417` | — | Hash and POP-forward continuation pair. | Loads the saved `r17-7` word for `01107`; continuation `16420` installs `16376` as the link and enters `03275`. The fixed-seed game exercised both entries 2,692 times. |
 | `16421` | `TAGGED_BYTE_LOOKUP` | Packed lookup for tagged low bytes. | Rejects values outside the `640`-tagged low-byte form with code `015`; valid bytes select a packed word through bits 3..6 and an eight-bit field through bits 0..2. Traced mappings include `012` to `014`, `106` to `001`, and `040` to `000`. |
 | `16457` | `RECORD_SHIFT` | Three-word record advance used by the compiler/runtime path at `16346` and `16506`. | If word `r3+1` is nonzero, moves `+1` to the head, `+2` to `+1`, clears `+2`, and selects continuation `r1+74206`; otherwise it leaves the record unchanged and selects `r1+74202`. |
+| `16467` | — | Descriptor-advance and record-field update bracket. | Saves the accumulator and caller around `21443`; its `16471` continuation performs the cyclic update, restores `r15`, and conditionally replaces words `r1+74274..74275`. |
 | `16477` | — | Record-word presence and fill entry. | Returns word `r3+1` when populated; otherwise preserves the caller, evaluates the descriptor at `r3-2`, pops the result, and stores it at `r3+1`. |
 | `16505` | `RECORD_SHIFT_WRAPPER` | Saved-state wrapper around `16457`. | Saves the incoming accumulator and caller link on `r17`, calls `16457`, and restores both at `16507` before selecting continuation `r1+74216`. The quine trace calls this entry 96 times. |
 | `16605` | — | Masked record-shift wrapper. | Saves its caller in `r7`, calls `16505`, then masks word `r3` with `r1+74510` and returns through `r7`. A complete fixed-seed game exercised 65 direct entries and completions. |
@@ -132,6 +141,7 @@ the quine trace is `11673`.
 | `20456` | `FORMAT_STARTUP` | Numeric/time/message formatting during startup. | Calls `*53 10` and repeatedly invokes `25641`/`25660`. |
 | `20475` | — | Exit/session time formatting and final message setup. | Saves the caller and `r1`, reads current and elapsed 1/50-second times through `Э53`/`Э63` semantics, retains three `25641` formatting boundaries, and restores the frame before tail-entering `20674`. |
 | `20660` | `MEMORY_BOUND` | Memory-size or upper-bound initialization helper. | Uses constant `0016760000033064` and stores a computed bound through `r16`. |
+| `20667` | — | Generated compiler-frame entry. | Calls `16341` with link `20670`; the fixed-seed game exercised 2,972 entries. |
 | `20673` | `RETURN` | Trivial return/no-op routine. | Immediately executes `uj (15)`. |
 | `20674` | `MESSAGE_OUTPUT` | Common interactive message-output routine. | Uses `*71 14(10)`, `*71 20(10)`, and `*71 14(10)` around a descriptor selected through `r16`; the translated available, status, and ignored-`Э64` paths have full-state and emitted-byte differential coverage. |
 | `21107` | — | Descriptor-mask and record-word update. | Masks the mutable word at `21124`, updates the words selected through `r16+1` and the saved address field, and balances both temporary `r17` stack operands. |
@@ -183,17 +193,35 @@ trampoline `02764`, the complete local cold-start body at `05230`, and finally
 from instruction fallback.
 A subsequent game-only pass also converts `20475`, `20674`, `07533`, and
 `25223` in descending executable-body length.
+The next fixed-game hot-block pass converts the `07472`/`07473`,
+`16406`/`16412`/`16413`/`16415`/`16416`, and `16467`/`16471` entries and
+continuations. Their internal instruction words no longer execute through the
+fallback; calls and external returns still appear at their preserved addresses.
+The following pass converts shared return `03314`, the two-value bracket at
+`03374` with continuations `03375`/`03376`, and the generated bracket at
+`11524` with continuations `11525`/`11526`/`11527`/`11530`.
+The next raw-leader pass converts generated selector `05045`, frame restoration
+`16376`, hash/forward continuations `16417`/`16420`, and generated entry
+`20667`.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 
 A complete fixed-seed host tic-tac-toe session after this sequence executed
-1,357,979 machine steps: 571,932 semantic routine dispatches and 786,047
+1,084,185 machine steps: 668,671 semantic routine dispatches and 415,514
 individual BESM instructions. The combined trace also contained 364 input-status
 marker lines, which are excluded from these execution counts. This sequence
 semantically dispatches all 12 calls of `25660`, all four calls of `25641`, all
 four calls of the game-specific scan at `16151`, all 216 entries at `03330`,
 all 19 entries at `17624`, all 22 entries at `02764`, and the `05230` cold-start
-entry plus its nine reached continuations. The former interpreted direct-call
+entry plus its nine reached continuations. It also dispatches all 9,196 calls
+at each of `07472` and `07473`, 5,318 calls at each of `16406` and `16413`,
+3,096 calls at `16416`, and 9,198 calls at each of `16467` and `16471`.
+The new brackets add 3,340 dispatches at `03314`, 3,322 at each of
+`03374`/`03375`/`03376`, and 3,815 at each of
+`11524`/`11525`/`11526`/`11527`/`11530`.
+The raw-leader pass adds 2,510 dispatches at `05045`, 2,972 each at `16376`
+and `20667`, and 2,692 each at `16417` and `16420`.
+The former interpreted direct-call
 leaders `07533`, `20475`, `20674`, `21107`, and `25223` now all dispatch
 semantically; no direct-call target in this fixed game session remains on the
 instruction fallback.
