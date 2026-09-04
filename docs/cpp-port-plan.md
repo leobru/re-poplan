@@ -42,6 +42,7 @@ The address-preserving machine layer now translates:
 - `03413..03423` traced numeric-update arithmetic;
 - `03516..03520` addressed-word replacement;
 - `03536..03541` computed-continuation frame construction;
+- `03631..03635` continuation-word update and five-word frame restoration;
 - `03716..03723` addressed cyclic update, computed transfer, and ordinary
   return;
 - `03724..03735` table read, transform, allocation re-entry, and table write;
@@ -58,6 +59,8 @@ The address-preserving machine layer now translates:
 - `04675..04756` second compiler-chain wrapper, marker branches, shared scan,
   record update, nested allocation, and saved-frame continuations;
 - `05045..05051` generated-continuation selection shared with `05040`;
+- executable selector words `05052..05076`, generated-word assembly at
+  `05124..05137`, and the empty-word cleanup bracket `05143..05157`;
 - `05207` and `05211` indirect object-word loads;
 - `05215..05225` tagged two-word allocation and initialization;
 - `05230..05346` cold-start frame, initialization loops, dependency
@@ -76,6 +79,7 @@ The address-preserving machine layer now translates:
 - `07533..07541` output-descriptor cleanup and caller-frame restoration;
 - `07673..07745` compiler frame, classification branches, recursive helper
   continuations, six-pass bit loop, and five-word restoration;
+- `10232..10234` hardware-stack comparison and descriptor selection;
 - `11464..11477` address-based allocation wrapper, `05430` continuation,
   transformed-word store, and three-word frame restoration;
 - `11500..11502` frame-relative indexed load;
@@ -84,6 +88,8 @@ The address-preserving machine layer now translates:
   exits;
 - `11673..11745` generated quine update/binding cluster, including its unique
   `r14` linkage;
+- `11755..11757` runtime-installed binding and rebinding templates;
+- `13207..13215` generated multiply/add/subtract and masked return leaf;
 - `15765..16003` special-function argument expansion and evaluator
   redispatch;
 - `16005..16027` descriptor-chain scan, allocation, record initialization,
@@ -92,14 +98,19 @@ The address-preserving machine layer now translates:
   multiply/RMR offset path and two-value narrowing loop;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
 - `16341..16350` trace-confirmed compiler dispatch frame and restoration;
+- executable lookup-result selectors `16351..16370`, their shared
+  continuations, and record setup through `16405`;
 - `16376..16401` six-register frame restoration and environment bind;
 - `16406..16416` record-word mask, comparison, and computed continuations;
 - `16417..16420` hash call and POP-value forwarding continuations;
 - `16421..16434` tagged-low-byte validation and packed-table lookup;
 - `16457..16462` three-word record shift and continuation selection;
+- `16511..16512` shifted record-word save and relocated continuation;
+- `16463..16466` evaluator/store bridge and saved-state restoration;
 - `16467..16476` descriptor-advance bracket and record-field update;
 - `16477..16504` record-word presence check, evaluator call, and result store;
 - `16505..16510` record-shift call wrapper and caller restoration;
+- `16531..16552` record comparison, evaluator continuations, and `r7` loop;
 - `16742..16744` record-byte lookup wrapper, result adjustment, and indirect
   `r7` return;
 - `17013..17052` trace-confirmed evaluator wrapper paths;

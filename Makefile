@@ -43,7 +43,7 @@ cpp-test: cpp image
 	echo '2+2=>' | $(CPP_BUILD_DIR)/poplan > $(BUILD_DIR)/cpp-trivial.out
 	./tools/normalize-output.py $(BUILD_DIR)/cpp-trivial.out \
 		> $(BUILD_DIR)/cpp-trivial.normalized
-	diff -u tests/expected/trivial.out $(BUILD_DIR)/cpp-trivial.normalized
+	printf '%s\n' '** 4' | diff -u - $(BUILD_DIR)/cpp-trivial.normalized
 
 cpp-run: cpp image
 	$(CPP_BUILD_DIR)/poplan
@@ -52,7 +52,7 @@ cpp-trivial: cpp image
 	echo '2+2=>' | $(CPP_BUILD_DIR)/poplan > $(BUILD_DIR)/cpp-trivial.out
 	./tools/normalize-output.py $(BUILD_DIR)/cpp-trivial.out \
 		> $(BUILD_DIR)/cpp-trivial.normalized
-	diff -u tests/expected/trivial.out $(BUILD_DIR)/cpp-trivial.normalized
+	printf '%s\n' '** 4' | diff -u - $(BUILD_DIR)/cpp-trivial.normalized
 
 cpp-quine: cpp image
 	$(CPP_BUILD_DIR)/poplan --image $(IMAGE) < quine.pop2 \
