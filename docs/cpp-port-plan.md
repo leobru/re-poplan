@@ -39,9 +39,12 @@ The address-preserving machine layer now translates:
 - `03275`, `03277`, `03301`, and `03303` POP value-stack operations;
 - `03314` shared binding return and `03374..03402` two-value selection;
 - `03330..03336` traced two-stage value classification;
+- `03337..03342` generated two-value POP/allocate/push bracket;
 - `03413..03423` traced numeric-update arithmetic;
 - `03516..03520` addressed-word replacement;
 - `03536..03541` computed-continuation frame construction;
+- `03544..03630` trace-confirmed computed compiler paths and their preserved
+  dependency boundaries;
 - `03631..03635` continuation-word update and five-word frame restoration;
 - `03716..03723` addressed cyclic update, computed transfer, and ordinary
   return;
@@ -49,6 +52,8 @@ The address-preserving machine layer now translates:
 - `03736..03761` compiler selection, nested classification, and saved-frame
   restoration continuations;
 - `04074..04110` repeated shared-table writes and two-word frame cleanup;
+- `04214..04311` generated compiler frame, selection paths, record updates,
+  and frame restoration;
 - `04322..04355` classification, record update, and nested dispatch
   continuations;
 - `04426..04434` two-marker record-field selection and replacement;
@@ -79,6 +84,9 @@ The address-preserving machine layer now translates:
 - `07533..07541` output-descriptor cleanup and caller-frame restoration;
 - `07673..07745` compiler frame, classification branches, recursive helper
   continuations, six-pass bit loop, and five-word restoration;
+- `07773` native packed-string output for dictionary primitive `PRSTRI`,
+  retaining `21275` table conversion and falling back to instruction
+  interpretation whenever the character callback at `01567` is rebound;
 - `10232..10234` hardware-stack comparison and descriptor selection;
 - `11464..11477` address-based allocation wrapper, `05430` continuation,
   transformed-word store, and three-word frame restoration;
@@ -89,6 +97,8 @@ The address-preserving machine layer now translates:
 - `11673..11745` generated quine update/binding cluster, including its unique
   `r14` linkage;
 - `11755..11757` runtime-installed binding and rebinding templates;
+- `12674` native fixed-point text formation for dictionary primitive
+  `PRREAL`, retaining the packed-output and `07742` restoration boundaries;
 - `13207..13215` generated multiply/add/subtract and masked return leaf;
 - `15765..16003` special-function argument expansion and evaluator
   redispatch;
@@ -111,6 +121,8 @@ The address-preserving machine layer now translates:
 - `16477..16504` record-word presence check, evaluator call, and result store;
 - `16505..16510` record-shift call wrapper and caller restoration;
 - `16531..16552` record comparison, evaluator continuations, and `r7` loop;
+- `16643..16664` trace-confirmed generated record paths and loop
+  continuations;
 - `16742..16744` record-byte lookup wrapper, result adjustment, and indirect
   `r7` return;
 - `17013..17052` trace-confirmed evaluator wrapper paths;
@@ -143,6 +155,8 @@ The address-preserving machine layer now translates:
 - `20673` trivial register return;
 - `20674..20706` console message output and status handling;
 - `21107..21117` descriptor-mask and record-word update;
+- `21141..21174` generated two-arm allocation/update loop and frame
+  restoration;
 - `21255..21257` character-input wrapper entry;
 - `21251..21254` character extraction and conversion return;
 - `21260..21275` table-driven character forwarding, return, decode, and
@@ -153,7 +167,9 @@ The address-preserving machine layer now translates:
 - `25223..25230` stack-driven retry and unwind loop around `16151`/`16145`;
 - `25346..25365` converted-character output, counting, continuation resume,
   and return entries;
-- `25356` and `25370..25405` end-character and packed token-source paths.
+- `25356` and `25370..25405` end-character and packed token-source paths;
+- `25421..25426` descriptor advance wrapper around the preserved `06424`
+  boundary.
 
 The C++ tests compare the one-argument `20124` transition at generated entry
 `65576` with the BESM trace, exercise a three-argument activation round trip,
@@ -186,6 +202,10 @@ testing with `POPLAN_INTERPRET_ONLY=1`; the long-term target is to make the
 fallback unnecessary by expanding the translated-entry set.
 `zone1224.pop2` now completes identically in hybrid and instruction-only
 modes; that run also exercises captured-slot paths through translated `03206`.
+The latest profile executes 228,463 semantic routine steps and 112,044 raw
+instructions. Regions `03337..03342`, `03544..03630`, `04214..04311`,
+`16643..16664`, `21141..21174`, and `25421..25426` contribute no remaining raw
+instructions in that session.
 
 ## Port Order
 

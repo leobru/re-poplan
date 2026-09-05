@@ -866,6 +866,179 @@ int main()
         target.memory(025417) = target.memory(025410);
     };
 
+    const auto install_input_continue = [](Machine &target) {
+        target.memory(020322) =
+            Word48(02000000000000000ULL);
+        target.memory(020323) =
+            Word48(04000000000000000ULL);
+        target.memory(020326) = Word48(1);
+        target.memory(020333) = Word48(2);
+        target.memory(020365) =
+            Word48(00004000000040000ULL);
+        target.memory(020375) = Word48();
+        target.memory(020377) = Word48(012);
+        target.memory(020336) =
+            Word48(0100000077777777ULL);
+        target.memory(020367) =
+            Word48(04020025041120265ULL);
+    };
+
+    struct PrrealCase {
+        Word48 value;
+        std::string text;
+    };
+    const PrrealCase prreal_cases[] = {
+        {Word48(06400000000000004ULL), " 4"},
+        {Word48(06437777777777775ULL), "-3"},
+        {Word48(04112000000000000ULL), " 2.5000000"},
+        {Word48(), " .00000000"},
+        {Word48(04020000000000000ULL), "-1.0000000"},
+        {Word48(03654631463146315ULL), " .10000000"},
+        {Word48(04214260771514443ULL), " 12.345679"},
+    };
+    const auto expected_gost = [](char character) -> std::uint8_t {
+        if (character >= '0' && character <= '9') {
+            return static_cast<std::uint8_t>(character - '0');
+        }
+        switch (character) {
+        case ' ': return 0017;
+        case '-': return 0013;
+        case '.': return 0016;
+        default: return 0377;
+        }
+    };
+    for (const PrrealCase &test : prreal_cases) {
+        auto machine = std::make_unique<Machine>();
+        install_character_output(*machine);
+        machine->accumulator() = test.value;
+        machine->remainder() = Word48(0765432107654321ULL);
+        machine->alu_mode() = 006;
+        machine->reg(010) = 03206;
+        machine->reg(013) = 050;
+        machine->reg(015) = 07742;
+        machine->reg(016) = 066012;
+        machine->reg(017) = 05000;
+        machine->start(012674);
+        require(machine->step() == poplan::ExecutionStatus::running
+                    && machine->program_counter() == 07742
+                    && machine->translated_routine_count() == 1,
+                "12674 PRREAL is selected by semantic dispatch");
+        require(machine->accumulator() == test.value
+                    && machine->remainder() == Word48()
+                    && machine->alu_mode() == 007
+                    && machine->reg(010) == 03206
+                    && machine->reg(015) == 07742
+                    && machine->reg(016) == 025417
+                    && machine->reg(017) == 05000,
+                "12674 preserves the PRREAL return contract");
+        require(machine->memory(025412) == Word48(test.text.size()),
+                "12674 advances the packed-output character count");
+        for (std::size_t index = 0; index != test.text.size(); ++index) {
+            const Word48 word = machine->memory(static_cast<std::uint16_t>(
+                020440 + index / 6));
+            const unsigned shift = static_cast<unsigned>(5 - index % 6) * 8;
+            const auto byte = static_cast<std::uint8_t>(
+                (word.raw() >> shift) & 0377);
+            require(byte == expected_gost(test.text[index]),
+                    "12674 packs the native PRREAL text in GOST order");
+        }
+    }
+
+    auto prstri = std::make_unique<Machine>();
+    install_character_converter(*prstri);
+    install_character_output(*prstri);
+    prstri->memory(01567) = Word48(06600000000007475ULL);
+    prstri->memory(010033) = Word48(07740000000000000ULL);
+    prstri->memory(010047) = Word48(07100000000000000ULL);
+    prstri->memory(065772) = Word48((8ULL << 24) | 2);
+    prstri->memory(065773) = Word48(0x2a20302a2030ULL);
+    prstri->memory(065774) = Word48(0x2a2000000000ULL);
+    prstri->memory(070000) = Word48(07100000000065772ULL);
+    prstri->accumulator() = Word48(06600000000007773ULL);
+    prstri->reg(001) = 0141;
+    prstri->reg(005) = 01234;
+    prstri->reg(006) = 070000;
+    prstri->reg(015) = 03235;
+    prstri->reg(017) = 05000;
+    prstri->start(07773);
+    require(prstri->step() == poplan::ExecutionStatus::running
+                && prstri->program_counter() == 03235
+                && prstri->translated_routine_count() == 1,
+            "07773 PRSTRI is selected by semantic dispatch");
+    require(prstri->accumulator() == Word48(0141)
+                && prstri->reg(001) == 0141
+                && prstri->reg(005) == 01234
+                && prstri->reg(006) == 070001
+                && prstri->reg(010) == 03206
+                && prstri->reg(011) == 0
+                && prstri->reg(015) == 010013
+                && prstri->reg(017) == 05000,
+            "07773 restores its registers and balances both stacks");
+    require(prstri->memory(025412) == Word48(8)
+                && prstri->memory(03013)
+                    == Word48(06600000000007475ULL)
+                && prstri->memory(03272)
+                    == Word48(06600000000007475ULL)
+                && prstri->memory(03451)
+                    == Word48(06400000000000001ULL)
+                && prstri->memory(07513)
+                    == Word48(06400000000000040ULL)
+                && prstri->memory(021263)
+                    == Word48(06400000000000040ULL)
+                && prstri->memory(020440)
+                    == Word48(0x190f00190f00ULL)
+                && prstri->memory(020441)
+                    == Word48(0x190f00000000ULL),
+            "07773 converts and packs a multiword POP string natively");
+
+    auto prstri_flush = std::make_unique<Machine>();
+    install_character_converter(*prstri_flush);
+    install_character_output(*prstri_flush);
+    install_input_continue(*prstri_flush);
+    prstri_flush->accumulator() = Word48(031);
+    prstri_flush->reg(015) = 01234;
+    prstri_flush->reg(016) = 025417;
+    prstri_flush->reg(017) = 05000;
+    prstri_flush->p21443_advance_descriptor();
+    prstri_flush->memory(025412) = Word48(1);
+    prstri_flush->memory(01567) = Word48(06600000000007475ULL);
+    prstri_flush->memory(010033) = Word48(07740000000000000ULL);
+    prstri_flush->memory(010047) = Word48(07100000000000000ULL);
+    prstri_flush->memory(065770) = Word48((1ULL << 24) | 1);
+    prstri_flush->memory(065771) = Word48(0x0a0000000000ULL);
+    prstri_flush->memory(070000) = Word48(07100000000065770ULL);
+    prstri_flush->accumulator() = Word48(06600000000007773ULL);
+    prstri_flush->reg(001) = 0141;
+    prstri_flush->reg(005) = 01234;
+    prstri_flush->reg(006) = 070000;
+    prstri_flush->reg(015) = 03235;
+    prstri_flush->start(07773);
+    require(prstri_flush->step() == poplan::ExecutionStatus::running
+                && prstri_flush->console_output()
+                    == std::vector<std::uint8_t>({031})
+                && prstri_flush->memory(025412) == Word48()
+                && prstri_flush->memory(025417)
+                    == prstri_flush->memory(025410),
+            "07773 establishes the r10-relative E71 range and flushes 0377");
+
+    auto rebound_prstri = std::make_unique<Machine>();
+    rebound_prstri->memory(01567) = Word48(06600000000007472ULL);
+    constexpr std::uint32_t prstri_left = (042U << 12) | 1U;
+    constexpr std::uint32_t prstri_right = (043U << 12) | 5U;
+    rebound_prstri->memory(07773) = Word48(
+        (static_cast<std::uint64_t>(prstri_left) << 24) | prstri_right);
+    rebound_prstri->accumulator() = Word48(012345);
+    rebound_prstri->reg(001) = 0141;
+    rebound_prstri->reg(017) = 05000;
+    rebound_prstri->start(07773);
+    require(rebound_prstri->step() == poplan::ExecutionStatus::running
+                && rebound_prstri->program_counter() == 07773
+                && rebound_prstri->right_half()
+                && rebound_prstri->translated_routine_count() == 0
+                && rebound_prstri->reg(017) == 05000
+                && rebound_prstri->accumulator() == Word48(0141),
+            "07773 interprets its original body when 01567 is rebound");
+
     const auto install_tagged_byte_lookup = [](Machine &target) {
         target.reg(001) = 022261;
         target.memory(016756) =
@@ -882,23 +1055,6 @@ int main()
             Word48(00003041512060310ULL);
         target.memory(016447) =
             Word48(01501010101010101ULL);
-    };
-
-    const auto install_input_continue = [](Machine &target) {
-        target.memory(020322) =
-            Word48(02000000000000000ULL);
-        target.memory(020323) =
-            Word48(04000000000000000ULL);
-        target.memory(020326) = Word48(1);
-        target.memory(020333) = Word48(2);
-        target.memory(020365) =
-            Word48(00004000000040000ULL);
-        target.memory(020375) = Word48();
-        target.memory(020377) = Word48(012);
-        target.memory(020336) =
-            Word48(0100000077777777ULL);
-        target.memory(020367) =
-            Word48(04020025041120265ULL);
     };
 
     Machine dispatch;
@@ -6912,6 +7068,280 @@ int main()
         require_same_architectural_state(semantic, interpreted, label);
         return continuation;
     };
+
+    // Remaining zone1224 hot regions are stored partly as ordinary listing
+    // code and partly as executable generated words.  These fixtures keep
+    // the raw instruction words as the oracle and compare complete machine
+    // state at each preserved semantic boundary.
+    const std::pair<std::uint16_t, Word48> descriptor_step_code[] = {
+        {025421, Word48(00042001574000000ULL)},
+        {025422, Word48(00230363772400000ULL)},
+        {025423, Word48(00220000067106424ULL)},
+        {025424, Word48(07250000100420016ULL)},
+        {025425, Word48(00220364100000000ULL)},
+        {025426, Word48(07630000003000000ULL)},
+    };
+    auto semantic_descriptor_step = std::make_unique<Machine>();
+    auto interpreted_descriptor_step = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_descriptor_step.get(),
+                             interpreted_descriptor_step.get()}) {
+        for (const auto &[address, word] : descriptor_step_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 06000;
+        machine->memory(03637) = Word48(04567);
+        machine->start(025421);
+    }
+    require(compare_one_semantic_step(
+                *semantic_descriptor_step, *interpreted_descriptor_step,
+                {025421}, "25421 descriptor step", 16) == 06424,
+            "25421 retains the 06424 boundary");
+
+    auto semantic_descriptor_return = std::make_unique<Machine>();
+    auto interpreted_descriptor_return = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_descriptor_return.get(),
+                             interpreted_descriptor_return.get()}) {
+        for (const auto &[address, word] : descriptor_step_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0765432107654321ULL);
+        machine->remainder() = Word48(01234);
+        machine->alu_mode() = 021;
+        machine->reg(016) = 04567;
+        machine->reg(017) = 06001;
+        machine->memory(06000) = Word48(07123);
+        machine->start(025424);
+    }
+    require(compare_one_semantic_step(
+                *semantic_descriptor_return, *interpreted_descriptor_return,
+                {025424}, "25424 descriptor return", 16) == 07123,
+            "25424 returns through the saved stack word");
+
+    const std::pair<std::uint16_t, Word48> generated_bracket_code[] = {
+        {03337, Word48(07650000267103277ULL)},
+        {03340, Word48(07500777767103277ULL)},
+        {03341, Word48(07501777667105215ULL)},
+        {03342, Word48(06640323503003275ULL)},
+    };
+    auto semantic_generated_bracket = std::make_unique<Machine>();
+    auto interpreted_generated_bracket = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_generated_bracket.get(),
+                             interpreted_generated_bracket.get()}) {
+        for (const auto &[address, word] : generated_bracket_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(006) = 05000;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 06000;
+        machine->memory(05000) = Word48(06400000000000002ULL);
+        machine->start(03337);
+    }
+    require(compare_one_semantic_step(
+                *semantic_generated_bracket,
+                *interpreted_generated_bracket, {03337},
+                "03337 generated bracket", 8) == 03277,
+            "03337 retains the first POP boundary");
+
+    const std::pair<std::uint16_t, Word48> record_cycle_code[] = {
+        {016651, Word48(02640001414100000ULL)},
+        {016652, Word48(00511451014000000ULL)},
+        {016653, Word48(07510777100360075ULL)},
+        {016654, Word48(07513777175137771ULL)},
+        {016655, Word48(01413000075007771ULL)},
+        {016656, Word48(06711674202200000ULL)},
+    };
+    auto semantic_record_cycle = std::make_unique<Machine>();
+    auto interpreted_record_cycle = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_record_cycle.get(),
+                             interpreted_record_cycle.get()}) {
+        for (const auto &[address, word] : record_cycle_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(001) = 01000;
+        machine->reg(003) = 02000;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 03000;
+        machine->memory(02000) = Word48(0765432107654321ULL);
+        machine->memory(075510) = Word48(07777777777777777ULL);
+        machine->memory(02771) = Word48(06400000000000003ULL);
+        machine->start(016651);
+    }
+    require(compare_one_semantic_step(
+                *semantic_record_cycle, *interpreted_record_cycle,
+                {016651, 016653}, "16651 record cycle", 32) == 016742,
+            "16651 retains the 16742 boundary");
+
+    const std::pair<std::uint16_t, Word48> generated_loop_code[] = {
+        {021141, Word48(00043000100430015ULL)},
+        {021142, Word48(00642114104030037ULL)},
+        {021143, Word48(00403003504030036ULL)},
+        {021144, Word48(07503777204000035ULL)},
+        {021145, Word48(00220000067117045ULL)},
+    };
+    auto semantic_generated_loop = std::make_unique<Machine>();
+    auto interpreted_generated_loop = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_generated_loop.get(),
+                             interpreted_generated_loop.get()}) {
+        for (const auto &[address, word] : generated_loop_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(001) = 01111;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 06000;
+        machine->memory(021200) = Word48(06400000000000001ULL);
+        machine->memory(021176) = Word48(06400000000000002ULL);
+        machine->memory(021177) = Word48(06400000000000003ULL);
+        machine->start(021141);
+    }
+    require(compare_one_semantic_step(
+                *semantic_generated_loop, *interpreted_generated_loop,
+                {021141}, "21141 generated loop", 24) == 017045,
+            "21141 retains the first 17045 boundary");
+
+    const std::pair<std::uint16_t, Word48> hot_compiler_frame_code[] = {
+        {04214, Word48(00043000500430015ULL)},
+        {04215, Word48(01003056110030562ULL)},
+        {04216, Word48(01003056310030103ULL)},
+        {04217, Word48(00220000067117340ULL)},
+        {04231, Word48(01010010310120112ULL)},
+        {04232, Word48(01270050210100561ULL)},
+        {04233, Word48(01270050034031173ULL)},
+        {04234, Word48(00220000067105215ULL)},
+    };
+    auto semantic_compiler_frame = std::make_unique<Machine>();
+    auto interpreted_compiler_frame = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_compiler_frame.get(),
+                             interpreted_compiler_frame.get()}) {
+        for (const auto &[address, word] : hot_compiler_frame_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 03536;
+        machine->reg(005) = 05555;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 06000;
+        machine->memory(04317) = Word48(06400000000000001ULL);
+        machine->memory(04320) = Word48(06400000000000002ULL);
+        machine->memory(04321) = Word48(06400000000000003ULL);
+        machine->memory(03641) = Word48(06400000000000004ULL);
+        machine->start(04214);
+    }
+    require(compare_one_semantic_step(
+                *semantic_compiler_frame, *interpreted_compiler_frame,
+                {04214}, "4214 compiler frame", 24) == 017340,
+            "4214 retains the first 17340 boundary");
+
+    auto semantic_compiler_choice = std::make_unique<Machine>();
+    auto interpreted_compiler_choice = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_compiler_choice.get(),
+                             interpreted_compiler_choice.get()}) {
+        for (const auto &[address, word] : hot_compiler_frame_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0765432107654321ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 03536;
+        machine->reg(007) = 01000;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 06000;
+        machine->memory(03641) = Word48(01234);
+        machine->memory(03650) = Word48(01234);
+        machine->memory(04317) = Word48();
+        machine->memory(02173) = Word48(06400000000000005ULL);
+        machine->start(04231);
+    }
+    require(compare_one_semantic_step(
+                *semantic_compiler_choice, *interpreted_compiler_choice,
+                {04231}, "4231 compiler choice", 24) == 05215,
+            "4231 retains the 05215 boundary");
+
+    const std::pair<std::uint16_t, Word48> computed_frame_code[] = {
+        {03544, Word48(00220000067117242ULL)},
+        {03550, Word48(07340357710100105ULL)},
+        {03551, Word48(01012063012700023ULL)},
+        {03561, Word48(00220000067104322ULL)},
+        {03617, Word48(01010010510120630ULL)},
+        {03620, Word48(01260006610100627ULL)},
+        {03624, Word48(00220000067117242ULL)},
+    };
+    auto semantic_computed_frame = std::make_unique<Machine>();
+    auto interpreted_computed_frame = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_computed_frame.get(),
+                             interpreted_computed_frame.get()}) {
+        for (const auto &[address, word] : computed_frame_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 03536;
+        machine->reg(015) = 07123;
+        machine->reg(017) = 06000;
+        machine->start(03544);
+    }
+    require(compare_one_semantic_step(
+                *semantic_computed_frame, *interpreted_computed_frame,
+                {03544}, "3544 computed frame", 8) == 017242,
+            "3544 retains the 17242 boundary");
+
+    auto semantic_computed_branch = std::make_unique<Machine>();
+    auto interpreted_computed_branch = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_computed_branch.get(),
+                             interpreted_computed_branch.get()}) {
+        for (const auto &[address, word] : computed_frame_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0765432107654321ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 03536;
+        machine->reg(015) = 07123;
+        machine->reg(016) = 1;
+        machine->memory(03643) = Word48(06400000000000001ULL);
+        machine->memory(04366) = Word48();
+        machine->start(03550);
+    }
+    require(compare_one_semantic_step(
+                *semantic_computed_branch, *interpreted_computed_branch,
+                {03550, 03561}, "3550 computed branch", 24) == 04322,
+            "3550 preserves its computed 3561 arm");
+
+    auto semantic_computed_tail = std::make_unique<Machine>();
+    auto interpreted_computed_tail = std::make_unique<Machine>();
+    for (Machine *machine : {semantic_computed_tail.get(),
+                             interpreted_computed_tail.get()}) {
+        for (const auto &[address, word] : computed_frame_code) {
+            machine->memory(address) = word;
+        }
+        machine->accumulator() = Word48(0123456701234567ULL);
+        machine->remainder() = Word48(07654);
+        machine->alu_mode() = 025;
+        machine->reg(002) = 03536;
+        machine->reg(015) = 07123;
+        machine->memory(03643) = Word48(06400000000000001ULL);
+        machine->memory(04366) = Word48(06400000000000001ULL);
+        machine->start(03617);
+    }
+    require(compare_one_semantic_step(
+                *semantic_computed_tail, *interpreted_computed_tail,
+                {03617, 03624}, "3617 computed tail", 24) == 017242,
+            "3617 preserves its computed 3624 arm");
 
     const std::pair<std::uint16_t, Word48> generated_arithmetic_code[] = {
         {013207, Word48(0x10812901f000ULL)},

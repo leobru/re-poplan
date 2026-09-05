@@ -114,6 +114,7 @@ public:
     std::uint16_t p03506();
     std::uint16_t p03531();
     std::uint16_t p03536();
+    std::uint16_t p03544(std::uint16_t entry);
     std::uint16_t p03631();
     std::uint16_t p03632();
     std::uint16_t p03702();
@@ -122,6 +123,7 @@ public:
     std::uint16_t p03736();
     std::uint16_t p04074();
     std::uint16_t p04161();
+    std::uint16_t p04214(std::uint16_t entry);
     std::uint16_t p05160();
 
     // Short indirect-load helpers used by the evaluator and record code.
@@ -229,6 +231,10 @@ public:
     std::uint16_t p03206_prepare_ordinary_call();
     std::uint16_t p03235_bind_environment();
     std::uint16_t p03261_enter_function();
+    std::uint16_t p03337();
+    std::uint16_t p03340();
+    std::uint16_t p03341();
+    std::uint16_t p03342();
 
     // Literal translations of the activation/argument-transfer entries.
     std::uint16_t p20110_transfer_arguments();
@@ -268,6 +274,8 @@ public:
     std::uint16_t p11755_begin_generated_binding();
     std::uint16_t p11756_begin_generated_rebinding();
     std::uint16_t p11757_enter_generated_rebinding();
+    std::uint16_t p07773_prstri();
+    std::uint16_t p12674_prreal();
     std::uint16_t p13207();
     std::uint16_t p16313_begin_character_sequence();
     std::uint16_t p16321_dispatch_character();
@@ -297,6 +305,13 @@ public:
     std::uint16_t p16507_resume_record_shift();
     std::uint16_t p16511();
     std::uint16_t p16605();
+    std::uint16_t p16643();
+    std::uint16_t p16645();
+    std::uint16_t p16651();
+    std::uint16_t p16653();
+    std::uint16_t p16657();
+    std::uint16_t p16661();
+    std::uint16_t p16663();
     std::uint16_t p17242();
     std::uint16_t p17253();
     std::uint16_t p20245_begin_input_continue();
@@ -312,6 +327,19 @@ public:
     std::uint16_t p20673_return();
     std::uint16_t p20674();
     std::uint16_t p21107();
+    std::uint16_t p21141();
+    std::uint16_t p21146();
+    std::uint16_t p21151();
+    std::uint16_t p21152();
+    std::uint16_t p21153();
+    std::uint16_t p21155();
+    std::uint16_t p21156();
+    std::uint16_t p21157();
+    std::uint16_t p21162();
+    std::uint16_t p21163();
+    std::uint16_t p21164();
+    std::uint16_t p21167();
+    std::uint16_t p21170();
     std::uint16_t p21255_begin_character_input();
     std::uint16_t p21251_extract_character();
     std::uint16_t p21253_resume_character_extract();
@@ -332,6 +360,8 @@ public:
     std::uint16_t p25373_resume_token_source();
     std::uint16_t p25376_fetch_token_character();
     std::uint16_t p25377_finish_token_source();
+    std::uint16_t p25421();
+    std::uint16_t p25424();
     std::uint16_t p25427();
     std::uint16_t p25556();
     std::uint16_t p25641();
@@ -380,6 +410,9 @@ private:
     void xts(std::uint16_t address);
     void sti(std::size_t index);
     void stx(std::uint16_t address);
+    bool native_character_output_active() const;
+    void append_native_output_byte(std::uint8_t character);
+    void output_native_character(std::uint8_t character);
     std::uint16_t p06727_finish_arithmetic();
     std::uint16_t p01122_shared();
     std::uint16_t p01011();
