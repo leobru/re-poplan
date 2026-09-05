@@ -2669,6 +2669,273 @@ std::uint16_t Machine::p17756()
     return registers_[015];
 }
 
+std::uint16_t Machine::p04001(std::uint16_t entry)
+{
+    const auto load = [&](std::uint16_t address) {
+        accumulator_ = memory_[address];
+        select_alu_group(rau_logical);
+    };
+    const auto xor_with = [&](std::uint16_t address) {
+        const Word48 before = accumulator_;
+        accumulator_ = Word48(
+            accumulator_.raw() ^ memory_[address].raw());
+        remainder_ = before;
+        select_alu_group(rau_logical);
+    };
+    const auto add_cyclic = [&](std::uint16_t address) {
+        accumulator_ = cyclic_add(accumulator_, memory_[address]);
+        remainder_ = Word48();
+        select_alu_group(rau_multiplicative);
+    };
+
+    for (;;) {
+        switch (entry) {
+        case 04001:
+            registers_[015] = 04002;
+            return 04074;
+
+        case 04002:
+            registers_[015] = 04003;
+            return 04467;
+
+        case 04003:
+            registers_[015] = 04004;
+            return 04675;
+
+        case 04004:
+            load(address_add(registers_[002], 0103));
+            xor_with(address_add(registers_[002], 0122));
+            remainder_ = accumulator_;
+            if (accumulator_condition()) {
+                return address_add(registers_[002], 0231);
+            }
+            registers_[015] = 04006;
+            return 017337;
+
+        case 04006:
+            memory_[address_add(registers_[002], 0110)] = accumulator_;
+            registers_[015] = 04007;
+            return 03702;
+
+        case 04007:
+            registers_[015] = 04010;
+            return 017337;
+
+        case 04010:
+            memory_[address_add(registers_[002], 0624)] = accumulator_;
+            load(address_add(registers_[002], 0624));
+            remainder_ = accumulator_;
+            if (accumulator_.raw() == 0) {
+                return address_add(registers_[002], 0260);
+            }
+            entry = 04012;
+            continue;
+
+        case 04012:
+            registers_[016] = accumulator_.address();
+            load(address_add(registers_[016], 1));
+            remainder_ = accumulator_;
+            if (accumulator_condition()) {
+                return address_add(registers_[002], 0254);
+            }
+            load(address_add(registers_[007], 01173));
+            memory_[address_add(registers_[016], 1)] = accumulator_;
+            load(address_add(registers_[002], 0624));
+            memory_[address_add(registers_[007], 01173)] = accumulator_;
+            entry = 04016;
+            continue;
+
+        case 04016:
+            load(04464);
+            registers_[005] = accumulator_.address();
+            registers_[015] = 04020;
+            return 017337;
+
+        case 04020:
+            memory_[address_add(registers_[002], 0624)] = accumulator_;
+            load(address_add(registers_[002], 0107));
+            add_cyclic(address_add(registers_[002], 0646));
+            accumulator_ = accumulator_
+                & memory_[address_add(registers_[002], 0646)];
+            remainder_ = Word48();
+            select_alu_group(rau_logical);
+            memory_[address_add(registers_[002], 0107)] = accumulator_;
+            xts(address_add(registers_[002], 0624));
+            registers_[015] = 04024;
+            return 03716;
+
+        case 04024:
+            load(address_add(registers_[002], 0624));
+            xor_with(address_add(registers_[005], 1));
+            memory_[address_add(registers_[005], 1)] = accumulator_;
+            registers_[015] = 04026;
+            return 017337;
+
+        case 04026:
+            memory_[address_add(registers_[002], 0624)] = accumulator_;
+            registers_[013] = 04426;
+            xor_with(address_add(registers_[002], 0647));
+            remainder_ = accumulator_;
+            if (accumulator_.raw() == 0) {
+                return address_add(registers_[002], 0274);
+            }
+            load(address_add(registers_[002], 0624));
+            memory_[04464] = accumulator_;
+            registers_[005] = accumulator_.address();
+            entry = 04032;
+            continue;
+
+        case 04032:
+            load(address_add(registers_[002], 0107));
+            add_cyclic(address_add(registers_[002], 0110));
+            memory_[address_add(registers_[002], 0107)] = accumulator_;
+            load(registers_[005]);
+            accumulator_ = accumulator_
+                & memory_[address_add(registers_[002], 0650)];
+            remainder_ = Word48();
+            select_alu_group(rau_logical);
+            xor_with(address_add(registers_[002], 0633));
+            remainder_ = accumulator_;
+            if (accumulator_condition()) {
+                return address_add(registers_[002], 0302);
+            }
+            load(registers_[005]);
+            xor_with(address_add(registers_[002], 0651));
+            memory_[registers_[005]] = accumulator_;
+            return address_add(registers_[002], 0303);
+
+        case 04040:
+            registers_[015] = 04041;
+            return 04445;
+
+        case 04041:
+            load(address_add(registers_[002], 0103));
+            xor_with(address_add(registers_[002], 0632));
+            remainder_ = accumulator_;
+            if (accumulator_.raw() == 0) {
+                return address_add(registers_[002], 0243);
+            }
+            registers_[004] = 0;
+            entry = 04044;
+            continue;
+
+        case 04044:
+            registers_[015] = 04045;
+            return 017337;
+
+        case 04045:
+            add_cyclic(address_add(registers_[002], 0646));
+            accumulator_ = accumulator_
+                & memory_[address_add(registers_[002], 0646)];
+            remainder_ = Word48();
+            select_alu_group(rau_logical);
+            memory_[address_add(registers_[002], 0110)] = accumulator_;
+            xts(04463);
+            registers_[015] = 04050;
+            return 03716;
+
+        case 04050:
+            load(address_add(registers_[007], 01167));
+            remainder_ = accumulator_;
+            if (accumulator_.raw() == 0) {
+                return address_add(registers_[002], 0315);
+            }
+            xts(address_add(registers_[007], 01077));
+            registers_[015] = 04052;
+            return 05215;
+
+        case 04052:
+            memory_[address_add(registers_[007], 01077)] = accumulator_;
+            entry = 04053;
+            continue;
+
+        case 04053:
+            registers_[015] = 04054;
+            return 017337;
+
+        case 04054:
+            memory_[address_add(registers_[007], 01167)] = accumulator_;
+            registers_[005] = 02372;
+            load(address_add(registers_[007], 01173));
+            remainder_ = accumulator_;
+            if (accumulator_.raw() == 0) {
+                return address_add(registers_[002], 0322);
+            }
+            entry = 04056;
+            continue;
+
+        case 04056:
+            registers_[005] = accumulator_.address();
+            load(address_add(registers_[005], 1));
+            remainder_ = accumulator_;
+            if (accumulator_condition()) {
+                return address_add(registers_[002], 0320);
+            }
+            entry = 04060;
+            continue;
+
+        case 04060:
+            registers_[015] = 04061;
+            return 017337;
+
+        case 04061:
+            memory_[address_add(registers_[005], 1)] = accumulator_;
+            registers_[015] = 04062;
+            return 017337;
+
+        case 04062:
+            memory_[address_add(registers_[002], 0624)] = accumulator_;
+            registers_[015] = 04063;
+            return 017337;
+
+        case 04063:
+            registers_[016] = accumulator_.address();
+            load(address_add(registers_[002], 0624));
+            remainder_ = accumulator_;
+            if (accumulator_.raw() == 0) {
+                return address_add(registers_[002], 0332);
+            }
+            load(04463);
+            xor_with(address_add(registers_[016], 1));
+            memory_[address_add(registers_[016], 1)] = accumulator_;
+            load(address_add(registers_[002], 0624));
+            memory_[04463] = accumulator_;
+            entry = 04070;
+            continue;
+
+        case 04070:
+            load(address_add(registers_[002], 0107));
+            add_cyclic(address_add(registers_[002], 0110));
+            stx(address_add(registers_[002], 0107));
+            registers_[016] = registers_[004];
+            sti(015);
+            sti(004);
+            registers_[005] = accumulator_.address();
+            return registers_[015];
+
+        case 04111:
+            accumulator_ = Word48(registers_[005]);
+            select_alu_group(rau_logical);
+            its(004);
+            registers_[004] = 1;
+            its(015);
+            xts(address_add(registers_[002], 0627));
+            memory_[address_add(registers_[002], 0626)] = accumulator_;
+            registers_[015] = 04115;
+            return 04074;
+
+        case 04115:
+            load(address_add(registers_[002], 0104));
+            xts(address_add(registers_[002], 0633));
+            registers_[015] = 04001;
+            return 04447;
+
+        default:
+            throw MachineError("invalid 04001 compiler continuation");
+        }
+    }
+}
+
 std::uint16_t Machine::p04074()
 {
     its(015);

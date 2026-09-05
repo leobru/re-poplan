@@ -56,6 +56,7 @@ the quine trace is `11673`.
 | `03716` | — | Addressed cyclic update and computed transfer. | Follows the input address and its first word, adds the top hardware-stack word into the selected destination, then either returns or transfers to `r2+0160` according to the input object's second word. A fixed-seed game exercised 270 direct calls and 275 computed re-entries. |
 | `03724` | — | Shared-table transform wrapper. | Saves the accumulator and caller, reads and decrements descriptor `17353` through `17337`, applies the original mask, XOR, and two cyclic additions, then writes through `17340`. Values without bit 48 allocate through `04447` and re-enter at `03725`. A complete fixed-seed game exercised 904 entries and 153 allocation re-entries. |
 | `03736` | — | Compiler selection wrapper. | Saves the accumulator, caller, `r2`, and two copies of `r4`, selects compiler state `03536`, and enters `17417`. Its continuations preserve the original `04467` and `04214` calls, compare fields `+105`, `+630`, `+643`, `+103`, `+644`, and `+645`, then restore the saved frame or enter generated continuation `03762`. A complete fixed-seed game exercised 616 entries. |
+| `04001..04116` | — | Nested-function compiler paths. | Preserves calls to the existing table, allocation, evaluator, stack, and compiler helpers while translating the trace-entered comparisons, descriptor updates, and frame restoration directly. The profiled `zone1224` session made 488 semantic dispatches in this routine and left no raw instruction steps there. Adjacent generated entry `04117` remains a separate boundary. |
 | `04074` | — | Five-write shared-table wrapper. | Saves the input and caller, passes `04464`, `04463`, `r7+1173`, `r7+1167`, and `r2+0107` through `17340`, then clears and restores the observed state through `04103..04110`. A fixed-seed game exercised 270 entries and every continuation. |
 | `04161` | — | Compiler frame wrapper. | Saves the input, `r2`, and caller in its original three-word frame while retaining another caller copy in the accumulator, then preserves the `04322`, `04467`, `17242`, `03536`, `04447`, and diagnostic boundaries through `04213`. A complete fixed-seed game exercised 219 entries. |
 | `04214..04311` | — | Generated compiler frame and selection paths. | Saves three `r2`-relative local words and `r5`, publishes and replaces selected records through the existing table/allocation/compiler boundaries, then restores the complete frame. The profiled `zone1224` session made 119 semantic dispatches in this region and no raw instruction steps there. |
@@ -250,6 +251,10 @@ representative trace-observed internal branches. Together they replace 9,727
 raw instruction steps with 2,295 semantic dispatches: the profiled session
 moves from 121,771 to 112,044 raw steps and from 226,168 to 228,463 semantic
 steps, with zero raw execution left in all six regions.
+The `04001..04116` conversion then replaces another 2,276 raw steps with 488
+semantic dispatches. The same profiled session now executes 109,768 raw
+instructions and 228,951 semantic routine steps. The incoming `04000` branch
+and the distinct generated entry at `04117` remain interpreted boundaries.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 

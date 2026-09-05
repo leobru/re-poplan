@@ -638,6 +638,37 @@ bool Machine::dispatch_translated_routine()
     case 03754: continuation = p03754(); break;
     case 03757: continuation = p03757(); break;
     case 03761: continuation = p03761(); break;
+    case 04001:
+    case 04002:
+    case 04003:
+    case 04004:
+    case 04006:
+    case 04007:
+    case 04010:
+    case 04012:
+    case 04016:
+    case 04020:
+    case 04024:
+    case 04026:
+    case 04032:
+    case 04040:
+    case 04041:
+    case 04044:
+    case 04045:
+    case 04050:
+    case 04052:
+    case 04053:
+    case 04054:
+    case 04056:
+    case 04060:
+    case 04061:
+    case 04062:
+    case 04063:
+    case 04070:
+    case 04111:
+    case 04115:
+        continuation = p04001(program_counter_);
+        break;
     case 04074: continuation = p04074(); break;
     case 04076: continuation = p04076(); break;
     case 04100: continuation = p04100(); break;

@@ -121,6 +121,7 @@ public:
     std::uint16_t p03716();
     std::uint16_t p03724();
     std::uint16_t p03736();
+    std::uint16_t p04001(std::uint16_t entry);
     std::uint16_t p04074();
     std::uint16_t p04161();
     std::uint16_t p04214(std::uint16_t entry);

@@ -34,6 +34,35 @@ std::uint64_t circular_distance(std::uint64_t left, std::uint64_t right,
     return forward < backward ? forward : backward;
 }
 
+constexpr std::uint32_t short_instruction(std::uint8_t reg,
+                                          std::uint16_t opcode,
+                                          std::uint16_t address)
+{
+    const std::uint32_t encoded_address =
+        (address & 070000) == 070000
+        ? (std::uint32_t{1} << 18) | (address & 07777)
+        : address & 07777;
+    return (static_cast<std::uint32_t>(reg) << 20)
+        | (static_cast<std::uint32_t>(opcode) << 12)
+        | encoded_address;
+}
+
+constexpr std::uint32_t long_instruction(std::uint8_t reg,
+                                         std::uint16_t opcode,
+                                         std::uint16_t address)
+{
+    return (static_cast<std::uint32_t>(reg) << 20)
+        | (std::uint32_t{1} << 19)
+        | (static_cast<std::uint32_t>(opcode & 0370) << 12)
+        | (address & 077777);
+}
+
+constexpr std::uint64_t instruction_pair(std::uint32_t left,
+                                         std::uint32_t right)
+{
+    return (static_cast<std::uint64_t>(left) << 24) | right;
+}
+
 } // namespace
 
 int main()
@@ -7068,6 +7097,107 @@ int main()
         require_same_architectural_state(semantic, interpreted, label);
         return continuation;
     };
+
+    // 04001 is a semantic compiler routine with calls retained as explicit
+    // boundaries.  Build the instruction-only oracle from mnemonic fields;
+    // no extracted instruction words are embedded in this fixture.
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            machine->memory(04001) = Word48(instruction_pair(
+                long_instruction(0, 0220, 0),
+                long_instruction(015, 0310, 04074)));
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(015) = 07123;
+            machine->reg(017) = 06000;
+            machine->start(04001);
+        }
+        require(compare_one_semantic_step(
+                    *semantic, *interpreted, {04001},
+                    "04001 compiler entry", 4) == 04074,
+                "04001 preserves the 04074 call boundary");
+    }
+
+    {
+        const std::pair<std::uint16_t, Word48> code[] = {
+            {04020, Word48(instruction_pair(
+                short_instruction(002, 000, 0624),
+                short_instruction(002, 010, 0107)))},
+            {04021, Word48(instruction_pair(
+                short_instruction(002, 013, 0646),
+                short_instruction(002, 011, 0646)))},
+            {04022, Word48(instruction_pair(
+                short_instruction(002, 000, 0107),
+                short_instruction(002, 003, 0624)))},
+            {04023, Word48(instruction_pair(
+                long_instruction(0, 0220, 0),
+                long_instruction(015, 0310, 03716)))},
+        };
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(07654);
+            machine->alu_mode() = 025;
+            machine->reg(002) = 03000;
+            machine->reg(015) = 07123;
+            machine->reg(017) = 05000;
+            machine->memory(03107) = Word48(0000000000000025ULL);
+            machine->memory(03646) = Word48(0000000000000077ULL);
+            machine->start(04020);
+        }
+        require(compare_one_semantic_step(
+                    *semantic, *interpreted, {04020},
+                    "04020 compiler update", 12) == 03716,
+                "04020 preserves the 03716 call boundary");
+    }
+
+    {
+        const std::pair<std::uint16_t, Word48> code[] = {
+            {04070, Word48(instruction_pair(
+                short_instruction(002, 010, 0107),
+                short_instruction(002, 013, 0110)))},
+            {04071, Word48(instruction_pair(
+                short_instruction(002, 001, 0107),
+                short_instruction(004, 044, 0016)))},
+            {04072, Word48(instruction_pair(
+                short_instruction(0, 041, 0015),
+                short_instruction(0, 041, 0004)))},
+            {04073, Word48(instruction_pair(
+                short_instruction(0, 040, 0005),
+                long_instruction(015, 0300, 0)))},
+        };
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0765432107654321ULL);
+            machine->remainder() = Word48(01234);
+            machine->alu_mode() = 021;
+            machine->reg(002) = 03000;
+            machine->reg(004) = 04567;
+            machine->reg(015) = 07123;
+            machine->reg(017) = 05003;
+            machine->memory(03107) = Word48(0000000000000011ULL);
+            machine->memory(03110) = Word48(0000000000000022ULL);
+            machine->memory(05002) = Word48(06000);
+            machine->memory(05001) = Word48(04000);
+            machine->memory(05000) = Word48(02000);
+            machine->start(04070);
+        }
+        require(compare_one_semantic_step(
+                    *semantic, *interpreted, {04070},
+                    "04070 compiler return", 12) == 06000,
+                "04070 restores its frame and computed return");
+    }
 
     // Remaining zone1224 hot regions are stored partly as ordinary listing
     // code and partly as executable generated words.  These fixtures keep

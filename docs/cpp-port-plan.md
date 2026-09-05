@@ -202,10 +202,10 @@ testing with `POPLAN_INTERPRET_ONLY=1`; the long-term target is to make the
 fallback unnecessary by expanding the translated-entry set.
 `zone1224.pop2` now completes identically in hybrid and instruction-only
 modes; that run also exercises captured-slot paths through translated `03206`.
-The latest profile executes 228,463 semantic routine steps and 112,044 raw
-instructions. Regions `03337..03342`, `03544..03630`, `04214..04311`,
-`16643..16664`, `21141..21174`, and `25421..25426` contribute no remaining raw
-instructions in that session.
+The latest profile executes 228,951 semantic routine steps and 109,768 raw
+instructions. Regions `03337..03342`, `03544..03630`, `04001..04116`,
+`04214..04311`, `16643..16664`, `21141..21174`, and `25421..25426` contribute
+no remaining raw instructions in that session.
 
 ## Port Order
 
