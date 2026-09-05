@@ -9,6 +9,7 @@
 #include <deque>
 #include <iosfwd>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace poplan {
@@ -414,6 +415,8 @@ private:
     bool native_character_output_active() const;
     void append_native_output_byte(std::uint8_t character);
     void output_native_character(std::uint8_t character);
+    void store_native_message(std::uint16_t address, std::size_t words,
+                              std::string_view text);
     std::uint16_t p06727_finish_arithmetic();
     std::uint16_t p01122_shared();
     std::uint16_t p01011();

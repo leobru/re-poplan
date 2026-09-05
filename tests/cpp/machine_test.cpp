@@ -1,12 +1,17 @@
+#include "poplan/console.hpp"
 #include "poplan/machine.hpp"
 
 #include <ctime>
 #include <cstdlib>
+#include <iomanip>
 #include <initializer_list>
 #include <iostream>
+#include <locale>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -32,6 +37,37 @@ std::uint64_t circular_distance(std::uint64_t left, std::uint64_t right,
     const std::uint64_t forward = (left + modulus - right) % modulus;
     const std::uint64_t backward = (right + modulus - left) % modulus;
     return forward < backward ? forward : backward;
+}
+
+std::string format_test_jiffies(std::uint64_t jiffies)
+{
+    const std::uint64_t seconds = jiffies / 50;
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::setfill('0') << std::setw(2) << seconds / 3600
+           << '.' << std::setw(2) << seconds / 60 % 60
+           << '.' << std::setw(2) << seconds % 60;
+    return output.str();
+}
+
+std::vector<std::uint8_t> stored_message(const poplan::Machine &machine,
+                                         std::uint16_t address,
+                                         std::size_t words)
+{
+    std::vector<std::uint8_t> result;
+    for (std::size_t index = 0; index != words * 6; ++index) {
+        const poplan::Word48 word = machine.memory(
+            static_cast<std::uint16_t>(address + index / 6));
+        const unsigned shift = static_cast<unsigned>(5 - index % 6) * 8;
+        const auto byte = static_cast<std::uint8_t>(
+            (word.raw() >> shift) & 0377);
+        if (byte == 0172) {
+            return result;
+        }
+        result.push_back(byte);
+    }
+    require(false, "stored native message has a GOST terminator");
+    return result;
 }
 
 constexpr std::uint32_t short_instruction(std::uint8_t reg,
@@ -2562,6 +2598,44 @@ int main()
         {025230, Word48(0x0c0000090000ULL)},
     };
     {
+        auto machine = std::make_unique<Machine>();
+        machine->memory(020520) = Word48(0x0000001e3660ULL);
+        machine->memory(020521) = Word48(0x000000107ac0ULL);
+        machine->reg(001) = 01234;
+        machine->reg(015) = 07000;
+        machine->reg(017) = 05000;
+        const std::time_t time_before = std::time(nullptr);
+        machine->start(020456);
+        require(machine->step() == poplan::ExecutionStatus::running,
+                "20456 native startup formatter keeps running");
+        const std::time_t time_after = std::time(nullptr);
+        constexpr std::uint64_t jiffies_per_day = 24 * 60 * 60 * 50;
+        const std::uint64_t jiffies = machine->memory(020562).raw();
+        require(machine->program_counter() == 020674
+                    && machine->reg(001) == 01234
+                    && machine->reg(010) == 025641
+                    && machine->reg(015) == 07000
+                    && machine->reg(016) == 020526
+                    && machine->reg(017) == 05000,
+                "20456 restores its frame and enters MESSAGE_OUTPUT");
+        require(circular_distance(jiffies,
+                                  whole_second_jiffies(time_before),
+                                  jiffies_per_day) < 50
+                    || circular_distance(jiffies,
+                                         whole_second_jiffies(time_after),
+                                         jiffies_per_day) < 50,
+                "20456 stores current local time in 1/50-second jiffies");
+        const std::uint64_t hour = jiffies / 50 / 3600;
+        const std::string greeting = hour < 11
+            ? "ДОБРОЕ УТРО " : hour < 17
+                ? "ДОБРЫЙ ДЕНЬ " : "ДОБРЫЙ ВЕЧЕР";
+        const auto expected = poplan::encode_gost_text(
+            std::string("ПОПЛАН 2.1  ВРЕМЯ ")
+                + format_test_jiffies(jiffies) + "    " + greeting);
+        require(stored_message(*machine, 020526, 010) == expected,
+                "20456 forms the complete greeting natively in GOST");
+    }
+    {
         auto semantic = std::make_unique<Machine>();
         auto interpreted = std::make_unique<Machine>();
         for (Machine *machine : {semantic.get(), interpreted.get()}) {
@@ -2722,24 +2796,28 @@ int main()
     }
     {
         auto machine = std::make_unique<Machine>();
+        constexpr std::uint64_t jiffies_per_day = 24 * 60 * 60 * 50;
         machine->reg(001) = 01234;
         machine->reg(015) = 07000;
         machine->reg(017) = 05000;
         const std::time_t time_before = std::time(nullptr);
+        machine->memory(020562) = Word48(
+            (whole_second_jiffies(time_before) + jiffies_per_day - 50)
+            % jiffies_per_day);
         machine->start(020475);
         require(machine->step() == poplan::ExecutionStatus::running,
-                "20475 exit formatter entry keeps running");
+                "20475 native exit formatter keeps running");
         const std::time_t time_after = std::time(nullptr);
-        constexpr std::uint64_t jiffies_per_day = 24 * 60 * 60 * 50;
         const std::uint64_t jiffies = machine->memory(020563).raw();
-        require(machine->program_counter() == 025641
+        require(machine->program_counter() == 020674
                     && machine->reg(001) == 020456
-                    && machine->reg(015) == 020501
-                    && machine->reg(016) == 010
+                    && machine->reg(010) == 025641
+                    && machine->reg(015) == 020514
+                    && machine->reg(016) == 020536
                     && machine->reg(017) == 05002
                     && machine->memory(05000) == Word48(07000)
                     && machine->memory(05001) == Word48(01234),
-                "20475 saves its frame and enters FORMAT_NUMBER");
+                "20475 saves its frame and enters MESSAGE_OUTPUT");
         require(circular_distance(jiffies,
                                   whole_second_jiffies(time_before),
                                   jiffies_per_day) < 50
@@ -2747,6 +2825,26 @@ int main()
                                          whole_second_jiffies(time_after),
                                          jiffies_per_day) < 50,
                 "20475 stores current local time in 1/50-second jiffies");
+        const auto exit = stored_message(*machine, 020536, 012);
+        const std::uint64_t session =
+            (jiffies + jiffies_per_day - machine->memory(020562).raw())
+            % jiffies_per_day;
+        const auto expected_prefix = poplan::encode_gost_text(
+            std::string("ВЫХОД ") + format_test_jiffies(jiffies)
+                + "   ВРЕМЯ СЕАНСА " + format_test_jiffies(session)
+                + " ВРЕМЯ ЦП ");
+        require(exit.size() == expected_prefix.size() + 11
+                    && std::equal(expected_prefix.begin(),
+                                  expected_prefix.end(), exit.begin())
+                    && exit[expected_prefix.size() + 2] == 0016
+                    && exit[expected_prefix.size() + 5] == 0016
+                    && exit[exit.size() - 1] == 0017
+                    && exit[exit.size() - 2] == 0017
+                    && exit[exit.size() - 3] == 0017,
+                "20475 forms the timed exit line natively in GOST");
+        require(stored_message(*machine, 020550, 04)
+                    == poplan::encode_gost_text("ВСЕГО ВАМ ДОБРОГО "),
+                "20475 forms the farewell natively in GOST");
     }
     for (const std::uint16_t entry :
          {020501, 020506, 020511, 020514}) {

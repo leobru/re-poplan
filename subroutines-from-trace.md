@@ -155,8 +155,8 @@ the quine trace is `11673`.
 | `20256` | `INPUT_CONTINUE_IO` | Execute `Э71 0177`. | Interprets the runtime control word at `20367`, transfers the GOST bytes in its indexed buffer, and continues through `20257`. |
 | `20257` | `INPUT_CONTINUE_FINISH` | Post-`Э71 0177` completion entry. | Stores `1` at `20362` and returns through `r15`. |
 | `20263` | `IO_INIT` | Console and I/O-state initialization. | Probes `*71`, initializes state at `20362..20377`, and initializes message descriptors at `25415..25417`. |
-| `20456` | `FORMAT_STARTUP` | Numeric/time/message formatting during startup. | Calls `*53 10` and repeatedly invokes `25641`/`25660`. |
-| `20475` | — | Exit/session time formatting and final message setup. | Saves the caller and `r1`, reads current and elapsed 1/50-second times through `Э53`/`Э63` semantics, retains three `25641` formatting boundaries, and restores the frame before tail-entering `20674`. |
+| `20456` | `FORMAT_STARTUP` | Startup clock and time-of-day greeting construction. | Native C++ forms the complete GOST text at `20526`, restores the saved caller frame, and tail-enters `20674`; instruction fallback retains the original `25641` digit-building path. |
+| `20475` | — | Exit/session time formatting and final message setup. | Native C++ forms the wall-clock, session, CPU, and farewell GOST text at `20536`/`20550`, preserves the two `20674` transfers and `20514` frame restoration, and bypasses the original three `25641` calls. |
 | `20660` | `MEMORY_BOUND` | Memory-size or upper-bound initialization helper. | Uses constant `0016760000033064` and stores a computed bound through `r16`. |
 | `20667` | — | Generated compiler-frame entry. | Calls `16341` with link `20670`; the fixed-seed game exercised 2,972 entries. |
 | `20673` | `RETURN` | Trivial return/no-op routine. | Immediately executes `uj (15)`. |
@@ -252,9 +252,12 @@ raw instruction steps with 2,295 semantic dispatches: the profiled session
 moves from 121,771 to 112,044 raw steps and from 226,168 to 228,463 semantic
 steps, with zero raw execution left in all six regions.
 The `04001..04116` conversion then replaces another 2,276 raw steps with 488
-semantic dispatches. The same profiled session now executes 109,768 raw
-instructions and 228,951 semantic routine steps. The incoming `04000` branch
-and the distinct generated entry at `04117` remain interpreted boundaries.
+semantic dispatches. At that point the profiled session executed 109,768 raw
+instructions and 228,951 semantic routine steps. Native construction at
+`20456` subsequently removes eight startup formatting dispatches without
+changing the raw count, yielding 228,943 semantic steps. The incoming `04000`
+branch and the distinct generated entry at `04117` remain interpreted
+boundaries.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 

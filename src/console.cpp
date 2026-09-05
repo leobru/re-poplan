@@ -130,7 +130,9 @@ std::uint8_t unicode_to_gost(std::uint32_t codepoint)
     }
 }
 
-std::vector<std::uint8_t> utf8_to_gost(const std::string &text)
+} // namespace
+
+std::vector<std::uint8_t> encode_gost_text(std::string_view text)
 {
     std::vector<std::uint8_t> encoded;
     encoded.reserve(text.size());
@@ -180,6 +182,8 @@ std::vector<std::uint8_t> utf8_to_gost(const std::string &text)
     }
     return encoded;
 }
+
+namespace {
 
 char gost_to_ascii(std::uint8_t byte)
 {
@@ -348,7 +352,7 @@ int run_io_shell(Machine &machine, std::istream &input,
             line.pop_back();
         }
 
-        std::vector<std::uint8_t> encoded = utf8_to_gost(line);
+        std::vector<std::uint8_t> encoded = encode_gost_text(line);
         if (encoded.size() >= input_capacity) {
             encoded.resize(input_capacity - 1);
         }
@@ -453,7 +457,7 @@ int run_image_shell(Machine &machine, std::istream &input,
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
-        std::vector<std::uint8_t> encoded = utf8_to_gost(line);
+        std::vector<std::uint8_t> encoded = encode_gost_text(line);
         machine.queue_console_input(std::move(encoded));
     }
     std::ostringstream message;

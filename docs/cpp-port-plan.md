@@ -149,8 +149,10 @@ The address-preserving machine layer now translates:
   transfers, and post-extracode status/completion entries;
 - `20263..20320` console capability probing, descriptor construction, and I/O
   state initialization;
-- `20456..20474` startup time formatting and greeting selection;
-- `20475..20516` exit/session time formatting and final message selection;
+- `20456` native startup clock and time-of-day greeting construction, with
+  the original `20526` GOST descriptor and `20674` output boundary;
+- `20475` native exit/session/CPU clock and farewell construction, with the
+  original `20536`/`20550` GOST descriptors and `20674` output boundaries;
 - `20660..20665` memory-bound arithmetic and indirect store;
 - `20673` trivial register return;
 - `20674..20706` console message output and status handling;
@@ -202,10 +204,13 @@ testing with `POPLAN_INTERPRET_ONLY=1`; the long-term target is to make the
 fallback unnecessary by expanding the translated-entry set.
 `zone1224.pop2` now completes identically in hybrid and instruction-only
 modes; that run also exercises captured-slot paths through translated `03206`.
-The latest profile executes 228,951 semantic routine steps and 109,768 raw
+The latest profile executes 228,943 semantic routine steps and 109,768 raw
 instructions. Regions `03337..03342`, `03544..03630`, `04001..04116`,
 `04214..04311`, `16643..16664`, `21141..21174`, and `25421..25426` contribute
 no remaining raw instructions in that session.
+The startup and session-end owners at `20456` and `20475` now construct their
+complete GOST text natively. Their former `25641`/`25660` digit-building calls
+are bypassed, while semantic `20674` still performs the actual `Э71` transfer.
 
 ## Port Order
 

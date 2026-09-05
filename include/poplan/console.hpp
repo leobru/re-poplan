@@ -3,10 +3,16 @@
 
 #include <iosfwd>
 #include <cstdint>
+#include <string_view>
+#include <vector>
 
 namespace poplan {
 
 class Machine;
+
+// Encode host UTF-8 text as the one-byte GOST-10859 representation used by
+// POPLAN terminal buffers.
+std::vector<std::uint8_t> encode_gost_text(std::string_view text);
 
 // Host adapter for the translated Э71 device. This is an I/O demonstration
 // shell, not yet the complete POP-2 evaluator: non-terminating input lines are

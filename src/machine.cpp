@@ -1,4 +1,5 @@
 #include "poplan/machine.hpp"
+#include "poplan/console.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -49,6 +50,17 @@ std::uint64_t local_jiffies_since_midnight()
             (local->tm_hour * 60 + local->tm_min) * 60 + local->tm_sec);
     return seconds_since_midnight * 50
         + static_cast<std::uint64_t>(microseconds / 20000);
+}
+
+std::string format_jiffies(std::uint64_t jiffies)
+{
+    const std::uint64_t seconds = jiffies / 50;
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::setfill('0') << std::setw(2) << seconds / 3600
+           << '.' << std::setw(2) << seconds / 60 % 60
+           << '.' << std::setw(2) << seconds % 60;
+    return output.str();
 }
 
 struct MantissaExponent {
@@ -7609,6 +7621,22 @@ void Machine::output_native_character(std::uint8_t character)
         static_cast<std::uint8_t>(accumulator_.address() & 0377));
 }
 
+void Machine::store_native_message(std::uint16_t address, std::size_t words,
+                                   std::string_view text)
+{
+    constexpr std::uint8_t gost_end_of_information = 0172;
+    std::vector<std::uint8_t> bytes = encode_gost_text(text);
+    const std::size_t capacity = words * 6;
+    if (bytes.size() + 1 > capacity) {
+        throw MachineError("native POPLAN message exceeds its buffer");
+    }
+    bytes.push_back(gost_end_of_information);
+    bytes.resize(capacity);
+    for (std::size_t index = 0; index != capacity; ++index) {
+        set_memory_byte(address, index, bytes[index]);
+    }
+}
+
 std::uint16_t Machine::p07773_prstri()
 {
     // PRSTRI's normal path at 07773..10017 validates one tagged string,
@@ -10634,17 +10662,46 @@ std::uint16_t Machine::p20161()
 
 std::uint16_t Machine::p20456()
 {
+    // FORMAT_STARTUP owns both the clock text and the time-of-day greeting.
+    // Form its complete GOST message natively, retaining the historical
+    // descriptor at 20526 and the common MESSAGE_OUTPUT/Э71 boundary.
     accumulator_ = Word48(registers_[015]);
     select_alu_group(rau_logical);
     its(001);
     hardware_push_acc();
     registers_[001] = 020456;
     registers_[016] = 010;
-    accumulator_ = Word48(local_jiffies_since_midnight());
+    const std::uint64_t jiffies = local_jiffies_since_midnight();
+    accumulator_ = Word48(jiffies);
     select_alu_group(rau_logical);
     memory_[address_add(registers_[001], 0104)] = accumulator_;
-    registers_[015] = 020462;
-    return 025641;
+
+    std::string greeting = "ДОБРОЕ УТРО ";
+    alu_mode_ = 003;
+    arithmetic_add(memory_[address_add(registers_[001], 042)],
+                   false, true);
+    remainder_ = accumulator_;
+    if ((accumulator_.raw() & bit41) == 0) {
+        greeting = "ДОБРЫЙ ДЕНЬ ";
+        arithmetic_add(memory_[address_add(registers_[001], 043)],
+                       false, true);
+        remainder_ = accumulator_;
+        if ((accumulator_.raw() & bit41) == 0) {
+            greeting = "ДОБРЫЙ ВЕЧЕР";
+        }
+    }
+    store_native_message(
+        020526, 010,
+        std::string("ПОПЛАН 2.1  ВРЕМЯ ") + format_jiffies(jiffies)
+            + "    " + greeting);
+
+    registers_[010] = 025641;
+    registers_[016] = 020526;
+    hardware_pop_acc();
+    select_alu_group(rau_logical);
+    sti(001);
+    registers_[015] = accumulator_.address();
+    return 020674;
 }
 
 std::uint16_t Machine::p20462()
@@ -10690,17 +10747,45 @@ std::uint16_t Machine::p20462()
 
 std::uint16_t Machine::p20475()
 {
+    // The exit path emits two descriptors: a line containing wall-clock,
+    // session, and CPU times, followed by the farewell at 20550. Generate
+    // both buffers here and leave their actual transfer to MESSAGE_OUTPUT.
     accumulator_ = Word48(registers_[015]);
     select_alu_group(rau_logical);
     its(001);
     hardware_push_acc();
     registers_[001] = 020456;
     registers_[016] = 010;
-    accumulator_ = Word48(local_jiffies_since_midnight());
+    const std::uint64_t current = local_jiffies_since_midnight();
+    accumulator_ = Word48(current);
     select_alu_group(rau_logical);
     memory_[address_add(registers_[001], 0105)] = accumulator_;
-    registers_[015] = 020501;
-    return 025641;
+
+    constexpr std::uint64_t jiffies_per_day = 24 * 60 * 60 * 50;
+    const std::uint64_t started =
+        memory_[address_add(registers_[001], 0104)].raw();
+    const std::uint64_t session =
+        (current + jiffies_per_day - started) % jiffies_per_day;
+    const std::uint64_t cpu = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - execution_started_at_)
+            .count()
+        / 20);
+
+    store_native_message(
+        020536, 012,
+        std::string("ВЫХОД ") + format_jiffies(current)
+            + "   ВРЕМЯ СЕАНСА " + format_jiffies(session)
+            + " ВРЕМЯ ЦП " + format_jiffies(cpu) + "   ");
+    store_native_message(020550, 04, "ВСЕГО ВАМ ДОБРОГО ");
+
+    registers_[010] = 025641;
+    registers_[016] = 020536;
+    registers_[015] = 020514;
+    accumulator_ = memory_[020546];
+    remainder_ = Word48(memory_[020547].raw() ^ memory_[020525].raw());
+    select_alu_group(rau_logical);
+    return 020674;
 }
 
 std::uint16_t Machine::p20501()
