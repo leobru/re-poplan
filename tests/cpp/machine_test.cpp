@@ -2059,6 +2059,316 @@ int main()
                 label + " reaches its semantic boundary");
     };
 
+    const auto compare_recommended_slice = [
+        &run_interpreted_to, &require_same_architectural_state](
+            std::uint16_t entry, const auto &code,
+            const auto &initialize, const std::string &label) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : code) {
+                machine->memory(address) = word;
+            }
+            initialize(*machine);
+            machine->start(entry);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic path keeps running");
+        const std::uint16_t continuation = semantic->program_counter();
+        run_interpreted_to(*interpreted, continuation, 64, label);
+        require_same_architectural_state(*semantic, *interpreted, label);
+    };
+
+    const std::pair<std::uint16_t, Word48> code_01006[] = {
+        {01006, Word48(00010000034001167ULL)},
+        {01007, Word48(03400117334001077ULL)},
+        {01010, Word48(03400104767105405ULL)},
+    };
+    compare_recommended_slice(
+        01006, code_01006,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(007) = 02000;
+            machine.reg(015) = 07000;
+        },
+        "01006 initialization continuation");
+
+    const std::pair<std::uint16_t, Word48> code_03521[] = {
+        {03521, Word48(00040001600360130ULL)},
+        {03522, Word48(00040001144100000ULL)},
+        {03523, Word48(06444001467103506ULL)},
+    };
+    compare_recommended_slice(
+        03521, code_03521,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(
+                (std::uint64_t{04000} << 24) | 05000);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.memory(04000) = Word48(06600000000012345ULL);
+            machine.reg(015) = 01006;
+            machine.reg(017) = 06000;
+        },
+        "03521 linked operand entry");
+
+    const std::pair<std::uint16_t, Word48> code_04626[] = {
+        {04626, Word48(03401071710120073ULL)},
+        {04627, Word48(01270006610100235ULL)},
+        {04630, Word48(01400000213000053ULL)},
+    };
+    compare_recommended_slice(
+        04626, code_04626,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0777);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(002) = 05000;
+            machine.reg(003) = 06000;
+            machine.reg(007) = 02000;
+            machine.reg(017) = 04001;
+            machine.memory(04000) = Word48(0123);
+            machine.memory(05073) = Word48(0123);
+            machine.memory(05235) = Word48(07654);
+        },
+        "04626 generated comparison continuation");
+
+    const std::pair<std::uint16_t, Word48> code_07652[] = {
+        {07652, Word48(00043000100430005ULL)},
+        {07653, Word48(00043001500430015ULL)},
+        {07654, Word48(02640751470440001ULL)},
+        {07655, Word48(00740766400420016ULL)},
+        {07656, Word48(02413006424110324ULL)},
+        {07657, Word48(02660014506500001ULL)},
+        {07660, Word48(02410031567103275ULL)},
+    };
+    compare_recommended_slice(
+        07652, code_07652,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0765432107654321ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 0111;
+            machine.reg(005) = 0222;
+            machine.reg(015) = 07000;
+            machine.reg(016) = 1;
+            machine.reg(017) = 05000;
+            machine.memory(07600) = Word48();
+            machine.memory(07631) = Word48(06400000000000001ULL);
+            machine.memory(07640) = Word48(Word48::mask);
+        },
+        "07652 evaluator sequence entry");
+
+    const std::pair<std::uint16_t, Word48> code_11647[] = {
+        {011647, Word48(00043001500430016ULL)},
+        {011650, Word48(00043001667103277ULL)},
+    };
+    compare_recommended_slice(
+        011647, code_11647,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0660000000011746ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 011756;
+            machine.reg(016) = 04567;
+            machine.reg(017) = 05000;
+        },
+        "11647 generated update entry");
+
+    const std::pair<std::uint16_t, Word48> code_11651[] = {
+        {011651, Word48(07500777542411506ULL)},
+        {011652, Word48(04100771340120272ULL)},
+        {011653, Word48(04260000740110304ULL)},
+        {011654, Word48(04270000774100000ULL)},
+        {011655, Word48(00040001670100000ULL)},
+        {011656, Word48(04011027440120272ULL)},
+        {011657, Word48(00037000600040000ULL)},
+        {011660, Word48(07400000075107775ULL)},
+        {011661, Word48(04005031074160000ULL)},
+        {011662, Word48(04004025374000000ULL)},
+        {011663, Word48(00037000374100000ULL)},
+        {011664, Word48(04004027267111464ULL)},
+    };
+    compare_recommended_slice(
+        011651, code_11651,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000105ULL);
+            machine.remainder() = Word48(0105);
+            machine.alu_mode() = 007;
+            machine.reg(006) = 067673;
+            machine.reg(015) = 011651;
+            machine.reg(016) = 011760;
+            machine.reg(017) = 05003;
+            machine.memory(05000) = Word48(0660000000011746ULL);
+            machine.memory(05001) = Word48(011756);
+            machine.memory(05002) = Word48(011760);
+            machine.memory(011760) = Word48(01006);
+            machine.memory(012000) = Word48(06400000000000000ULL);
+            machine.memory(012002) = Word48(077);
+            machine.memory(012012) = Word48(07777777770000000ULL);
+            machine.memory(012016) = Word48(04050000000000000ULL);
+            machine.memory(011761) = Word48(04050004061115645ULL);
+        },
+        "11651 generated arithmetic body");
+
+    const std::pair<std::uint16_t, Word48> code_11665[] = {
+        {011665, Word48(00041001600410015ULL)},
+        {011666, Word48(00036005074000000ULL)},
+        {011667, Word48(07010000042411506ULL)},
+        {011670, Word48(04011031174120000ULL)},
+        {011671, Word48(07000000000420016ULL)},
+        {011672, Word48(06512777643000006ULL)},
+    };
+    compare_recommended_slice(
+        011665, code_11665,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(04000);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 011665;
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(0765432107654321ULL);
+            machine.memory(05001) = Word48(07000);
+            machine.memory(04000) = Word48(0777777777777777ULL);
+            machine.memory(012017) = Word48(Word48::mask);
+            machine.memory(06776) = Word48(012345);
+        },
+        "11665 generated update return");
+
+    const std::pair<std::uint16_t, Word48> code_17150[] = {
+        {017150, Word48(00042000100430015ULL)},
+        {017151, Word48(00043001106417150ULL)},
+        {017152, Word48(00036002572417567ULL)},
+        {017153, Word48(07003000004110021ULL)},
+        {017154, Word48(07412000070000000ULL)},
+        {017155, Word48(00220000067125556ULL)},
+    };
+    compare_recommended_slice(
+        017150, code_17150,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(04611);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 0141;
+            machine.reg(011) = 0123;
+            machine.reg(015) = 04611;
+            machine.reg(017) = 05000;
+            machine.memory(017567) = Word48(0777777777777777ULL);
+            machine.memory(017171) = Word48(04177777777777777ULL);
+        },
+        "17150 descriptor setup entry");
+
+    const std::pair<std::uint16_t, Word48> code_17175[] = {
+        {017175, Word48(00043000100430002ULL)},
+        {017176, Word48(00043000306417175ULL)},
+        {017177, Word48(00401004204010041ULL)},
+        {017200, Word48(00401004067105007ULL)},
+    };
+    compare_recommended_slice(
+        017175, code_17175,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(01200);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 0141;
+            machine.reg(002) = 04536;
+            machine.reg(003) = 03637;
+            machine.reg(015) = 032565;
+            machine.reg(017) = 05000;
+        },
+        "17175 table initialization entry");
+
+    const std::pair<std::uint16_t, Word48> code_17201[] = {
+        {017201, Word48(00400003700370003ULL)},
+        {017202, Word48(07240350470100000ULL)},
+        {017203, Word48(00405003570000000ULL)},
+        {017204, Word48(00231756212400000ULL)},
+        {017205, Word48(01341721467117341ULL)},
+        {017214, Word48(01641757714100000ULL)},
+        {017215, Word48(00220000067103531ULL)},
+    };
+    compare_recommended_slice(
+        017201, code_17201,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06600000000012345ULL);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(001) = 017175;
+            machine.reg(015) = 017201;
+            machine.reg(017) = 05000;
+            machine.memory(03504) = Word48(1);
+            machine.memory(017232) = Word48(1);
+            machine.memory(017562) = Word48();
+            machine.memory(017577) = Word48(0765432107654321ULL);
+        },
+        "17201 zero-count table initialization path");
+
+    const std::pair<std::uint16_t, Word48> code_17216[] = {
+        {017216, Word48(07410000014010002ULL)},
+        {017217, Word48(01401000114010000ULL)},
+        {017220, Word48(01641756014010002ULL)},
+        {017221, Word48(01401000114010000ULL)},
+        {017222, Word48(01640364514010000ULL)},
+        {017223, Word48(01640446314010001ULL)},
+        {017224, Word48(01400000004100037ULL)},
+        {017225, Word48(00231760000010000ULL)},
+        {017226, Word48(00040001504030040ULL)},
+        {017227, Word48(00403004104030042ULL)},
+        {017230, Word48(00041000300410002ULL)},
+        {017231, Word48(00041000167000000ULL)},
+    };
+    compare_recommended_slice(
+        017216, code_17216,
+        [](Machine &machine) {
+            machine.accumulator() = Word48();
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 007;
+            machine.reg(001) = 017175;
+            machine.reg(002) = 0;
+            machine.reg(003) = 017577;
+            machine.reg(015) = 017216;
+            machine.reg(017) = 05020;
+            for (std::uint16_t address = 05000;
+                 address != 05020; ++address) {
+                machine.memory(address) = Word48(address + 1);
+            }
+            machine.memory(017600) = Word48(06000);
+            machine.memory(017234) = Word48(06600000000012345ULL);
+        },
+        "17216 table initialization return");
+
+    const std::pair<std::uint16_t, Word48> code_25532[] = {
+        {025532, Word48(04242553200420015ULL)},
+        {025533, Word48(04640446344030000ULL)},
+        {025534, Word48(04403000102203645ULL)},
+        {025535, Word48(00003000046417560ULL)},
+        {025536, Word48(04403000044030001ULL)},
+        {025537, Word48(04403000246417577ULL)},
+        {025540, Word48(04403000044030001ULL)},
+        {025541, Word48(04403000274000000ULL)},
+        {025542, Word48(07241756067117614ULL)},
+    };
+    compare_recommended_slice(
+        025532, code_25532,
+        [](Machine &machine) {
+            machine.accumulator() = Word48(0141);
+            machine.remainder() = Word48(0123456701234567ULL);
+            machine.alu_mode() = 053;
+            machine.reg(015) = 04611;
+            machine.reg(017) = 05000;
+            machine.memory(04463) = Word48(07200000000065730ULL);
+            machine.memory(04464) = Word48(07200000000065726ULL);
+            machine.memory(03645) = Word48(3);
+            machine.memory(017560) = Word48();
+            machine.memory(017561) = Word48();
+            machine.memory(017562) = Word48(017557);
+            machine.memory(017577) = Word48();
+            machine.memory(017600) = Word48(07140000000065774ULL);
+            machine.memory(017601) = Word48(065774);
+        },
+        "25532 generated descriptor-frame entry");
+
     const std::pair<std::uint16_t, Word48> hot_runtime_code[] = {
         {03314, Word48(0xda069d0c06bdULL)},
         {03374, Word48(0xdc86bf090000ULL)},

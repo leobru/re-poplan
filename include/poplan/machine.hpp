@@ -113,6 +113,7 @@ public:
     std::uint16_t p03374();
     std::uint16_t p03516();
     std::uint16_t p03506();
+    std::uint16_t p03521();
     std::uint16_t p03531();
     std::uint16_t p03536();
     std::uint16_t p03544(std::uint16_t entry);
@@ -156,6 +157,7 @@ public:
     std::uint16_t p02767();
     std::uint16_t p02770();
     std::uint16_t p01004();
+    std::uint16_t p01006();
     std::uint16_t p01107();
     std::uint16_t p01167();
 
@@ -171,11 +173,13 @@ public:
     std::uint16_t p06740();
     std::uint16_t p06744();
     std::uint16_t p06750();
+    std::uint16_t p07652();
     std::uint16_t p07673();
     std::uint16_t p10232();
     std::uint16_t p11464();
     std::uint16_t p11500();
     std::uint16_t p11524();
+    std::uint16_t p11647();
     std::uint16_t p13007();
     std::uint16_t p13017();
     std::uint16_t p13047();
@@ -203,6 +207,7 @@ public:
     std::uint16_t p04467();
     std::uint16_t p04507();
     std::uint16_t p04536();
+    std::uint16_t p04624();
     std::uint16_t p04665();
     std::uint16_t p04675();
     std::uint16_t p04721();
@@ -212,6 +217,8 @@ public:
     std::uint16_t p17021();
     std::uint16_t p17045();
     std::uint16_t p17070();
+    std::uint16_t p17150();
+    std::uint16_t p17175();
     std::uint16_t p17337();
     std::uint16_t p17340();
     std::uint16_t p17341();
@@ -365,6 +372,7 @@ public:
     std::uint16_t p25421();
     std::uint16_t p25424();
     std::uint16_t p25427();
+    std::uint16_t p25532();
     std::uint16_t p25556();
     std::uint16_t p25641();
     std::uint16_t p25660();
@@ -433,8 +441,13 @@ private:
     std::uint16_t p03336();
     std::uint16_t p03375();
     std::uint16_t p03376();
+    std::uint16_t p03524();
+    std::uint16_t p03526();
+    std::uint16_t p03530();
     std::uint16_t p03532();
     std::uint16_t p03534();
+    std::uint16_t p04625();
+    std::uint16_t p04626();
     std::uint16_t p05240();
     std::uint16_t p05250();
     std::uint16_t p05252();
@@ -453,10 +466,18 @@ private:
     std::uint16_t p05341();
     std::uint16_t p07473();
     std::uint16_t p07536();
+    std::uint16_t p07661();
+    std::uint16_t p07663();
+    std::uint16_t p07664();
+    std::uint16_t p07667();
+    std::uint16_t p07670();
+    std::uint16_t p07672();
     std::uint16_t p11525();
     std::uint16_t p11526();
     std::uint16_t p11527();
     std::uint16_t p11530();
+    std::uint16_t p11651();
+    std::uint16_t p11665();
     std::uint16_t p13010();
     std::uint16_t p13013();
     std::uint16_t p13014();
@@ -500,8 +521,17 @@ private:
     std::uint16_t p20506();
     std::uint16_t p20511();
     std::uint16_t p20514();
-    std::uint16_t p25225();
-    std::uint16_t p25226();
+    std::uint16_t p17156();
+    std::uint16_t p17160();
+    std::uint16_t p17161();
+    std::uint16_t p17163();
+    std::uint16_t p17164();
+    std::uint16_t p17201();
+    std::uint16_t p17205();
+    std::uint16_t p17206();
+    std::uint16_t p17212();
+    std::uint16_t p17214();
+    std::uint16_t p17216();
     std::uint16_t p17575();
     std::uint16_t p17632();
     std::uint16_t p17633();
@@ -520,6 +550,8 @@ private:
     std::uint16_t p17747();
     std::uint16_t p17753();
     std::uint16_t p17756();
+    std::uint16_t p25225();
+    std::uint16_t p25226();
     std::uint16_t p25434();
     std::uint16_t p25437();
     std::uint16_t p25445();
@@ -536,6 +568,8 @@ private:
     std::uint16_t p25502();
     std::uint16_t p25506();
     std::uint16_t p25507();
+    std::uint16_t p25543();
+    std::uint16_t p25544();
     std::uint16_t p25647();
     std::uint16_t p25653();
     std::uint16_t p25655();

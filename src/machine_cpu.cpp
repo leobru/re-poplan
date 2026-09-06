@@ -538,6 +538,7 @@ bool Machine::dispatch_translated_routine()
     std::uint16_t continuation = 0;
     switch (program_counter_) {
     case 01004: continuation = p01004(); break;
+    case 01006: continuation = p01006(); break;
     case 01011: continuation = p01011(); break;
     case 01012: continuation = p01012(); break;
     case 01016: continuation = p01016(); break;
@@ -583,6 +584,10 @@ bool Machine::dispatch_translated_routine()
     case 03413: continuation = p03413_numeric_update(); break;
     case 03506: continuation = p03506(); break;
     case 03516: continuation = p03516(); break;
+    case 03521: continuation = p03521(); break;
+    case 03524: continuation = p03524(); break;
+    case 03526: continuation = p03526(); break;
+    case 03530: continuation = p03530(); break;
     case 03531: continuation = p03531(); break;
     case 03532: continuation = p03532(); break;
     case 03534: continuation = p03534(); break;
@@ -756,6 +761,9 @@ bool Machine::dispatch_translated_routine()
     case 04614: continuation = p04614(); break;
     case 04615: continuation = p04615(); break;
     case 04623: continuation = p04623(); break;
+    case 04624: continuation = p04624(); break;
+    case 04625: continuation = p04625(); break;
+    case 04626: continuation = p04626(); break;
     case 04665: continuation = p04665(); break;
     case 04667: continuation = p04667(); break;
     case 04670: continuation = p04670(); break;
@@ -912,6 +920,13 @@ bool Machine::dispatch_translated_routine()
     case 07475: continuation = p07475_cuchin(); break;
     case 07533: continuation = p07533(); break;
     case 07536: continuation = p07536(); break;
+    case 07652: continuation = p07652(); break;
+    case 07661: continuation = p07661(); break;
+    case 07663: continuation = p07663(); break;
+    case 07664: continuation = p07664(); break;
+    case 07667: continuation = p07667(); break;
+    case 07670: continuation = p07670(); break;
+    case 07672: continuation = p07672(); break;
     case 07673: continuation = p07673(); break;
     case 07704: continuation = p07704(); break;
     case 07706: continuation = p07706(); break;
@@ -946,6 +961,9 @@ bool Machine::dispatch_translated_routine()
     case 011530: continuation = p11530(); break;
     case 011536: continuation = p11536(); break;
     case 011541: continuation = p11541_match_tagged_value(); break;
+    case 011647: continuation = p11647(); break;
+    case 011651: continuation = p11651(); break;
+    case 011665: continuation = p11665(); break;
     case 011673: continuation = p11673_begin_generated_update(); break;
     case 011675: continuation = p11675_continue_generated_update(); break;
     case 011701: continuation = p11701_match_generated_value(); break;
@@ -1085,6 +1103,19 @@ bool Machine::dispatch_translated_routine()
     case 016663: continuation = p16663(); break;
     case 016742: continuation = p16742(); break;
     case 016744: continuation = p16744(); break;
+    case 017150: continuation = p17150(); break;
+    case 017156: continuation = p17156(); break;
+    case 017160: continuation = p17160(); break;
+    case 017161: continuation = p17161(); break;
+    case 017163: continuation = p17163(); break;
+    case 017164: continuation = p17164(); break;
+    case 017175: continuation = p17175(); break;
+    case 017201: continuation = p17201(); break;
+    case 017205: continuation = p17205(); break;
+    case 017206: continuation = p17206(); break;
+    case 017212: continuation = p17212(); break;
+    case 017214: continuation = p17214(); break;
+    case 017216: continuation = p17216(); break;
     case 017242: continuation = p17242(); break;
     case 017253: continuation = p17253(); break;
     case 017254: continuation = p17254_shared(); break;
@@ -1261,6 +1292,9 @@ bool Machine::dispatch_translated_routine()
     case 025502: continuation = p25502(); break;
     case 025506: continuation = p25506(); break;
     case 025507: continuation = p25507(); break;
+    case 025532: continuation = p25532(); break;
+    case 025543: continuation = p25543(); break;
+    case 025544: continuation = p25544(); break;
     case 025556: continuation = p25556(); break;
     case 025641: continuation = p25641(); break;
     case 025647: continuation = p25647(); break;
