@@ -108,9 +108,15 @@ dispatch; `POPLAN_INTERPRET_ONLY=1` disables semantic dispatch for differential
 trace comparisons. `POPLAN_DISABLE_TRANSLATED_ROUTINES=03235,03261` disables
 selected octal entries when isolating a semantic mismatch.
 
-All 98 direct `vjm` targets in the saved quine trace now have semantic
-dispatch. Other dynamically reached entries still use instruction fallback
-until their routine boundaries are extracted.
+All immutable-image code reached by the quine now has semantic dispatch,
+including its 98 direct `vjm` targets, computed continuations, short
+trampolines, and blocking `20205` console-input operation. The remaining quine
+instruction fallback is generated POP-2 code at `32535..32566` and
+`65556..65765`.
+
+All immutable-image code reached by `zone1224.pop2` now also has semantic
+dispatch. Its remaining instruction fallback is dynamically generated POP-2
+code; the low generated region exercised by this corpus is `32535..32566`.
 
 Extracode `050` implements the BESM-6 floating-point square root (`000`), sine
 (`001`), cosine (`002`), arctangent (`003`), arcsine (`004`), natural logarithm

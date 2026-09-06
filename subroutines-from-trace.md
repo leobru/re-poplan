@@ -276,6 +276,25 @@ as `25553 -> 32535` remain instruction-interpreted boundaries.
 The generated inventory in `build/calls.md` remains the authoritative quine
 count/caller table.
 
+The final immutable-image pass converts `01000..01002`, `03461..03475`,
+`07761..07772`, `11514`, `11746..11747`, `16145..16150`, `16513..16521`,
+`16530`, `16616..16623`, `16745..16747`, `17120..17121`, `17131`, the primary
+input `Э71` sites at `20200`/`20205`/`20207`, and `20564..20570`. The `20205`
+dispatch waits at its left-half routine entry and retries semantically once
+host input is queued. A fresh quine profile records 11,406 semantic dispatches
+and 95 raw instructions, with all 95 raw steps confined to generated code at
+`32535..32566` and `65556..65765`; no immutable-image address remains on
+instruction fallback.
+
+The final `zone1224.pop2` static sweep converts the remaining traced
+immutable-image regions: `03305`, `03424..03450`, `03712..04316`,
+`06132..07617`, `10217..12273`, `13454..13504`, `15322..15350`,
+`16517..17450`, `21125..21645`, and `25730..25753`. Dispatch is attached only
+to actual left-half entry words; right instructions remain reachable only by
+sequential execution inside their translated block. The resulting profile has
+zero immutable-image instruction steps, 231,482 semantic dispatches, and
+100,723 raw steps confined to generated POP-2 code.
+
 A complete fixed-seed host tic-tac-toe session after this sequence executed
 1,084,185 machine steps: 668,671 semantic routine dispatches and 415,514
 individual BESM instructions. The combined trace also contained 364 input-status

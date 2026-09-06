@@ -120,6 +120,7 @@ int main()
     e75_store.memory(01000) = Word48(
         (static_cast<std::uint64_t>(e75_left) << 24) | stop_right);
     e75_store.accumulator() = Word48(07246563567103301ULL);
+    e75_store.disable_translated_routine(01000);
     e75_store.start(01000);
     require(e75_store.step() == poplan::ExecutionStatus::running,
             "E75 execution continues with the right half");
@@ -161,6 +162,7 @@ int main()
         machine->accumulator() = operand;
         machine->remainder() = Word48(0765432107654321ULL);
         machine->alu_mode() = 020;
+        machine->disable_translated_routine(01000);
         machine->start(01000);
         require(machine->step() == poplan::ExecutionStatus::running,
                 "E50 elementary function continues with the right half");
@@ -177,6 +179,7 @@ int main()
     e53_time->memory(01000) = Word48(
         (static_cast<std::uint64_t>(e53_left) << 24) | stop_right);
     const std::time_t time_before = std::time(nullptr);
+    e53_time->disable_translated_routine(01000);
     e53_time->start(01000);
     require(e53_time->step() == poplan::ExecutionStatus::running,
             "E53/010 execution continues with the right half");
@@ -202,6 +205,7 @@ int main()
     e63_time->memory(01000) = Word48(
         (static_cast<std::uint64_t>(e63_left) << 24) | stop_right);
     e63_time->accumulator() = Word48(07777777777777777ULL);
+    e63_time->disable_translated_routine(01000);
     e63_time->start(01000);
     require(e63_time->step() == poplan::ExecutionStatus::running,
             "E63/004 execution continues with the right half");
@@ -217,6 +221,7 @@ int main()
     e64_ignored->accumulator() = Word48(07100000000012345ULL);
     e64_ignored->remainder() = Word48(07654);
     e64_ignored->alu_mode() = 020;
+    e64_ignored->disable_translated_routine(01000);
     e64_ignored->start(01000);
     require(e64_ignored->step() == poplan::ExecutionStatus::running,
             "E64 execution continues with the right half");
@@ -233,6 +238,7 @@ int main()
         static_cast<std::uint64_t>(e74_left) << 24);
     e74_exit->accumulator() = Word48(012345);
     e74_exit->alu_mode() = 020;
+    e74_exit->disable_translated_routine(01000);
     e74_exit->start(01000);
     require(e74_exit->step() == poplan::ExecutionStatus::halted
                 && e74_exit->accumulator() == Word48(012345)
@@ -1903,6 +1909,156 @@ int main()
                     label + " preserves complete BESM memory state");
         }
     };
+
+    const auto compare_static_semantic_entry = [
+        &require_same_architectural_state](
+            std::uint16_t entry, std::uint16_t expected_continuation,
+            std::initializer_list<std::pair<std::uint16_t, Word48>> code,
+            auto initialize, const std::string &label) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->reg(001) = 01111;
+            machine->reg(002) = 02222;
+            machine->reg(004) = 04444;
+            machine->reg(005) = 05555;
+            machine->reg(006) = 06666;
+            machine->reg(007) = 07777;
+            machine->reg(010) = 01010;
+            machine->reg(011) = 01111;
+            machine->reg(013) = 01313;
+            machine->reg(014) = 01414;
+            machine->reg(015) = 07000;
+            machine->reg(016) = 01616;
+            machine->reg(017) = 05000;
+            initialize(*machine);
+            machine->start(entry);
+        }
+
+        require(semantic->step() == poplan::ExecutionStatus::running,
+                label + " semantic entry keeps running");
+        interpreted->set_translated_routines_enabled(false);
+        for (unsigned steps = 0;
+             (interpreted->program_counter() != expected_continuation
+              || interpreted->right_half()) && steps != 64;
+             ++steps) {
+            require(interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                    label + " instruction path keeps running");
+        }
+        require(semantic->program_counter() == expected_continuation
+                    && !semantic->right_half()
+                    && interpreted->program_counter()
+                        == expected_continuation
+                    && !interpreted->right_half(),
+                label + " reaches its semantic boundary");
+        require_same_architectural_state(
+            *semantic, *interpreted, label);
+    };
+
+    compare_static_semantic_entry(
+        03305, 07000,
+        {
+            {03305, Word48(instruction_pair(
+                short_instruction(0, 037, 3),
+                short_instruction(0, 042, 6)))},
+            {03306, Word48(instruction_pair(
+                long_instruction(0, 0220, 017011),
+                short_instruction(0, 006, 0)))},
+            {03307, Word48(instruction_pair(
+                short_instruction(0, 037, 7),
+                long_instruction(015, 0300, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(006) = 067000;
+            machine.reg(015) = 07000;
+            machine.memory(017011) = Word48(04110000000000000ULL);
+        },
+        "03305 numeric stack-pointer conversion");
+
+    compare_static_semantic_entry(
+        04142, 03305,
+        {
+            {04142, Word48(instruction_pair(
+                short_instruction(0, 042, 2),
+                short_instruction(0, 043, 3)))},
+            {04143, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(015, 0310, 03305)))},
+        },
+        [](Machine &) {}, "04142 generated-loop frame");
+
+    compare_static_semantic_entry(
+        07011, 03277,
+        {
+            {07011, Word48(instruction_pair(
+                short_instruction(0, 042, 016),
+                short_instruction(0, 043, 014)))},
+            {07012, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(015, 0310, 03277)))},
+        },
+        [](Machine &) {}, "07011 primitive frame");
+
+    compare_static_semantic_entry(
+        010737, 02750,
+        {
+            {010737, Word48(instruction_pair(
+                short_instruction(0, 042, 2),
+                short_instruction(0, 043, 7)))},
+            {010740, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(007, 0240, 01200)))},
+            {010741, Word48(instruction_pair(
+                short_instruction(007, 010, 0567),
+                long_instruction(015, 0310, 02750)))},
+        },
+        [](Machine &machine) {
+            machine.memory(01767) = Word48(06400000000000123ULL);
+        },
+        "10737 library descriptor frame");
+
+    compare_static_semantic_entry(
+        013454, 03275,
+        {
+            {013454, Word48(instruction_pair(
+                short_instruction(0, 042, 1),
+                short_instruction(0, 043, 2)))},
+            {013455, Word48(instruction_pair(
+                short_instruction(0, 043, 7),
+                short_instruction(0, 043, 4)))},
+            {013456, Word48(instruction_pair(
+                long_instruction(001, 0240, 013454),
+                long_instruction(007, 0240, 01200)))},
+            {013457, Word48(instruction_pair(
+                short_instruction(001, 003, 047),
+                long_instruction(015, 0310, 03275)))},
+        },
+        [](Machine &machine) {
+            machine.memory(013523) = Word48(06400000000000456ULL);
+        },
+        "13454 applicator frame");
+
+    compare_static_semantic_entry(
+        021631, 025730,
+        {
+            {021631, Word48(instruction_pair(
+                short_instruction(0, 043, 1),
+                short_instruction(0, 043, 015)))},
+            {021632, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(001, 0240, 021631)))},
+            {021633, Word48(instruction_pair(
+                short_instruction(017, 010, 077775),
+                long_instruction(015, 0310, 025730)))},
+        },
+        [](Machine &) {}, "21631 generated descriptor frame");
 
     {
         const std::pair<std::uint16_t, Word48> descriptor_entry_code[] = {
@@ -7505,6 +7661,463 @@ int main()
         require_same_architectural_state(semantic, interpreted, label);
         return continuation;
     };
+
+    const auto compare_static_entry = [
+        &compare_one_semantic_step](
+            std::uint16_t entry,
+            const std::vector<std::pair<std::uint16_t, Word48>> &code,
+            const auto &setup, const std::string &label,
+            unsigned max_steps) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : code) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->reg(015) = 07000;
+            machine->reg(017) = 05000;
+            setup(*machine);
+            machine->start(entry);
+        }
+        return compare_one_semantic_step(
+            *semantic, *interpreted, {entry}, label, max_steps);
+    };
+
+    // Every immutable-image region observed as raw in the quine profile is
+    // checked against mnemonic-encoded BESM instructions. Generated code is
+    // deliberately left to the instruction emulator.
+    require(compare_static_entry(
+                01000,
+                {
+                    {01000, Word48(instruction_pair(
+                        long_instruction(0, 0300, 01001), 0))},
+                    {01001, Word48(instruction_pair(
+                        long_instruction(0, 0220, 0),
+                        long_instruction(015, 0310, 05230)))},
+                },
+                [](Machine &) {}, "01000 cold-start jump", 4) == 05230,
+            "01000 preserves the 05230 cold-start boundary");
+    require(compare_static_entry(
+                01002,
+                {
+                    {01002, Word48(instruction_pair(
+                        long_instruction(007, 0240, 01200),
+                        long_instruction(015, 0310, 01004)))},
+                },
+                [](Machine &) {}, "01002 cold-start continuation", 2)
+                == 01004,
+            "01002 preserves the 01004 initialization boundary");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> p03461_code = {
+        {03461, Word48(instruction_pair(
+            long_instruction(010, 0240, 03461),
+            short_instruction(0, 042, 015)))},
+        {03462, Word48(instruction_pair(
+            long_instruction(0, 0230, 03637),
+            short_instruction(0, 003, 3)))},
+        {03463, Word48(instruction_pair(
+            short_instruction(010, 000, 024),
+            short_instruction(010, 012, 022)))},
+        {03464, Word48(instruction_pair(
+            long_instruction(010, 0270, 5),
+            long_instruction(015, 0240, 03467)))},
+        {03465, Word48(instruction_pair(
+            long_instruction(0, 0300, 017075), 0))},
+        {03466, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 017070)))},
+        {03467, Word48(instruction_pair(
+            long_instruction(010, 0240, 03461),
+            short_instruction(017, 010, 0)))},
+        {03470, Word48(instruction_pair(
+            short_instruction(0, 040, 015),
+            long_instruction(010, 0230, 024)))},
+        {03471, Word48(instruction_pair(
+            long_instruction(010, 0300, 077710), 0))},
+        {03473, Word48(instruction_pair(
+            long_instruction(0, 0300, 017120), 0))},
+        {03475, Word48(instruction_pair(
+            long_instruction(0, 0300, 017131), 0))},
+    };
+    const auto setup_03461_equal = [](Machine &machine) {
+        machine.memory(03637) = Word48(04000);
+        machine.memory(04003) = Word48(012345);
+        machine.memory(03503) = Word48(012345);
+    };
+    require(compare_static_entry(
+                03461, p03461_code, setup_03461_equal,
+                "03461 equal path", 12) == 017075,
+            "03461 preserves the 17075 call boundary");
+    require(compare_static_entry(
+                03461, p03461_code,
+                [](Machine &machine) {
+                    machine.memory(03637) = Word48(04000);
+                    machine.memory(04003) = Word48(012345);
+                    machine.memory(03503) = Word48(067654);
+                },
+                "03461 unequal path", 12) == 03466,
+            "03461 preserves its 03466 continuation");
+    require(compare_static_entry(
+                03466, p03461_code, [](Machine &) {},
+                "03466 call", 4) == 017070,
+            "03466 preserves the 17070 call boundary");
+    require(compare_static_entry(
+                03467, p03461_code,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(07654);
+                    machine.memory(03505) = Word48(0102);
+                },
+                "03467 computed return", 8) == 03473,
+            "03467 reproduces the modified computed jump");
+    require(compare_static_entry(
+                03473, p03461_code, [](Machine &) {},
+                "03473 branch", 2) == 017120,
+            "03473 preserves the 17120 boundary");
+    require(compare_static_entry(
+                03475, p03461_code, [](Machine &) {},
+                "03475 branch", 2) == 017131,
+            "03475 preserves the 17131 boundary");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> p07761_code = {
+        {07761, Word48(instruction_pair(
+            short_instruction(005, 010, 0243),
+            short_instruction(005, 011, 0317)))},
+        {07762, Word48(instruction_pair(
+            short_instruction(005, 012, 0333),
+            long_instruction(005, 0270, 0304)))},
+        {07763, Word48(instruction_pair(
+            short_instruction(005, 010, 0334),
+            long_instruction(015, 0310, 03275)))},
+        {07764, Word48(instruction_pair(
+            long_instruction(0, 0220, 01567),
+            short_instruction(0, 010, 0)))},
+        {07765, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 02750)))},
+        {07766, Word48(instruction_pair(
+            short_instruction(005, 010, 0243),
+            long_instruction(015, 0310, 03275)))},
+        {07767, Word48(instruction_pair(
+            long_instruction(016, 0240, 07773),
+            long_instruction(015, 0310, 02764)))},
+        {07770, Word48(instruction_pair(
+            short_instruction(005, 010, 0334),
+            long_instruction(015, 0310, 03275)))},
+        {07771, Word48(instruction_pair(
+            long_instruction(0, 0220, 01567),
+            short_instruction(0, 010, 0)))},
+        {07772, Word48(instruction_pair(
+            long_instruction(015, 0240, 07742),
+            long_instruction(0, 0300, 02750)))},
+    };
+    const auto setup_07761 = [](Machine &machine) {
+        machine.reg(005) = 02000;
+        machine.memory(02243) = Word48(0777);
+        machine.memory(02317) = Word48(077);
+        machine.memory(02333) = Word48(077);
+        machine.memory(02334) = Word48(06400000000000001ULL);
+        machine.memory(01567) = Word48(06600000000012345ULL);
+    };
+    require(compare_static_entry(
+                07761, p07761_code, setup_07761,
+                "07761 selector", 8) == 03275,
+            "07761 preserves the first PUSH_ACC boundary");
+    require(compare_static_entry(
+                07764, p07761_code, setup_07761,
+                "07764 evaluator call", 6) == 02750,
+            "07764 preserves the first EVAL_DISPATCH boundary");
+    require(compare_static_entry(
+                07766, p07761_code, setup_07761,
+                "07766 push", 4) == 03275,
+            "07766 preserves the second PUSH_ACC boundary");
+    require(compare_static_entry(
+                07767, p07761_code, setup_07761,
+                "07767 descriptor call", 4) == 02764,
+            "07767 preserves the 02764 boundary");
+    require(compare_static_entry(
+                07770, p07761_code, setup_07761,
+                "07770 push", 4) == 03275,
+            "07770 preserves the third PUSH_ACC boundary");
+    require(compare_static_entry(
+                07771, p07761_code, setup_07761,
+                "07771 evaluator call", 6) == 02750,
+            "07771 preserves the final EVAL_DISPATCH boundary");
+
+    require(compare_static_entry(
+                011514,
+                {{011514, Word48(instruction_pair(
+                    long_instruction(015, 0240, 03235),
+                    long_instruction(0, 0300, 03275)))}},
+                [](Machine &) {}, "11514 push bracket", 4) == 03275,
+            "11514 preserves PUSH_ACC with the 03235 link");
+    require(compare_static_entry(
+                011746,
+                {
+                    {011746, Word48(instruction_pair(
+                        long_instruction(016, 0240, 011760),
+                        long_instruction(015, 0240, 011756)))},
+                    {011747, Word48(instruction_pair(
+                        long_instruction(0, 0300, 011647), 0))},
+                },
+                [](Machine &) {}, "11746 generated binding", 4)
+                == 011647,
+            "11746 preserves the 11647 boundary");
+
+    require(compare_static_entry(
+                016145,
+                {
+                    {016145, Word48(instruction_pair(
+                        long_instruction(010, 0240, 016005),
+                        long_instruction(010, 0230, 0232)))},
+                    {016146, Word48(instruction_pair(
+                        short_instruction(010, 000, 0233),
+                        short_instruction(010, 010, 0232)))},
+                    {016147, Word48(instruction_pair(
+                        short_instruction(010, 013, 0230),
+                        short_instruction(010, 000, 0232)))},
+                    {016150, Word48(instruction_pair(
+                        long_instruction(015, 0300, 0), 0))},
+                },
+                [](Machine &machine) {
+                    machine.memory(016237) = Word48(7);
+                    machine.memory(016235) = Word48(3);
+                },
+                "16145 table update", 10) == 07000,
+            "16145 preserves its caller return");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> record_code = {
+        {016513, Word48(instruction_pair(
+            short_instruction(003, 010, 0),
+            short_instruction(0, 036, 030)))},
+        {016514, Word48(instruction_pair(
+            short_instruction(017, 000, 077771),
+            long_instruction(015, 0310, 016477)))},
+        {016515, Word48(instruction_pair(
+            short_instruction(003, 010, 1),
+            short_instruction(001, 012, 074503)))},
+        {016516, Word48(instruction_pair(
+            long_instruction(001, 0270, 074136),
+            long_instruction(0, 0220, 0)))},
+        {016517, Word48(instruction_pair(
+            short_instruction(003, 010, 1),
+            short_instruction(0, 036, 040)))},
+        {016520, Word48(instruction_pair(
+            short_instruction(017, 012, 077771),
+            short_instruction(017, 000, 077771)))},
+        {016521, Word48(instruction_pair(
+            long_instruction(015, 0240, 016417),
+            long_instruction(001, 0300, 074224)))},
+        {016530, Word48(instruction_pair(
+            long_instruction(007, 0240, 077777),
+            long_instruction(0, 0220, 0)))},
+        {016616, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 016477)))},
+        {016617, Word48(instruction_pair(
+            short_instruction(003, 010, 1),
+            short_instruction(001, 012, 074512)))},
+        {016620, Word48(instruction_pair(
+            long_instruction(001, 0270, 074370),
+            short_instruction(003, 010, 0)))},
+        {016621, Word48(instruction_pair(
+            short_instruction(001, 012, 074513),
+            long_instruction(001, 0270, 074343)))},
+        {016622, Word48(instruction_pair(
+            long_instruction(004, 0240, 077),
+            long_instruction(005, 0240, 050)))},
+        {016623, Word48(instruction_pair(
+            long_instruction(002, 0240, 016647),
+            long_instruction(001, 0300, 074346)))},
+        {016745, Word48(instruction_pair(
+            long_instruction(015, 0310, 016477), 0))},
+        {016746, Word48(instruction_pair(
+            short_instruction(0, 037, 6),
+            long_instruction(015, 0310, 016742)))},
+        {016747, Word48(instruction_pair(
+            long_instruction(001, 0260, 074414),
+            long_instruction(001, 0300, 074230)))},
+    };
+    const auto setup_record = [](Machine &machine) {
+        machine.reg(001) = 022261;
+        machine.reg(003) = 03000;
+        machine.memory(03000) = Word48(0123456701234567ULL);
+        machine.memory(03001) = Word48(0765432107654321ULL);
+        machine.memory(016764) = Word48(1);
+        machine.memory(016773) = Word48(2);
+        machine.memory(016774) = Word48(3);
+    };
+    require(compare_static_entry(
+                016513, record_code, setup_record,
+                "16513 record call", 6) == 016477,
+            "16513 preserves the 16477 boundary");
+    require(compare_static_entry(
+                016515, record_code, setup_record,
+                "16515 record selector", 8) == 016417,
+            "16515 reproduces its r1-relative selected target");
+    require(compare_static_entry(
+                016530, record_code, setup_record,
+                "16530 record loop entry", 4) == 016531,
+            "16530 preserves the translated 16531 boundary");
+    require(compare_static_entry(
+                016616, record_code, setup_record,
+                "16616 record call", 4) == 016477,
+            "16616 preserves the 16477 boundary");
+    require(compare_static_entry(
+                016617, record_code, setup_record,
+                "16617 record selector", 12) == 016651,
+            "16617 reproduces its first r1-relative target");
+    require(compare_static_entry(
+                016745, record_code, setup_record,
+                "16745 record call", 4) == 016477,
+            "16745 preserves the 16477 boundary");
+    require(compare_static_entry(
+                016746, record_code, setup_record,
+                "16746 tagged lookup", 4) == 016742,
+            "16746 preserves the 16742 boundary");
+    require(compare_static_entry(
+                016747, record_code,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.accumulator() = Word48();
+                    machine.alu_mode() = 004;
+                },
+                "16747 zero branch", 2) == 016675,
+            "16747 reproduces its r1-relative zero branch");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> message_code = {
+        {017120, Word48(instruction_pair(
+            short_instruction(0, 010, 0),
+            long_instruction(0, 0220, 017566)))},
+        {017121, Word48(instruction_pair(
+            short_instruction(0, 000, 0),
+            long_instruction(0, 0300, 025427)))},
+        {017131, Word48(instruction_pair(
+            long_instruction(011, 0240, 0),
+            long_instruction(0, 0300, 017150)))},
+    };
+    require(compare_static_entry(
+                017120, message_code, [](Machine &) {},
+                "17120 message reset", 4) == 025427,
+            "17120 clears 17566 and preserves the 25427 boundary");
+    require(compare_static_entry(
+                017131, message_code, [](Machine &) {},
+                "17131 message path", 2) == 017150,
+            "17131 clears r11 and preserves the 17150 boundary");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> input_code = {
+        {020200, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            short_instruction(010, 071, 0146)))},
+        {020205, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            short_instruction(010, 071, 0174)))},
+        {020207, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            short_instruction(010, 071, 0146)))},
+    };
+    const auto setup_input_status = [](Machine &machine) {
+        machine.reg(010) = 020170;
+        machine.memory(020336) = Word48(0100000077777777ULL);
+    };
+    require(compare_static_entry(
+                020200, input_code, setup_input_status,
+                "20200 input status", 4) == 020201,
+            "20200 executes its E71 status query semantically");
+    require(compare_static_entry(
+                020207, input_code, setup_input_status,
+                "20207 input status", 4) == 020210,
+            "20207 executes its E71 status query semantically");
+    require(compare_static_entry(
+                020205, input_code,
+                [](Machine &machine) {
+                    machine.reg(010) = 020170;
+                    machine.memory(020364) = Word48(instruction_pair(
+                        short_instruction(010, 034, 0210),
+                        short_instruction(010, 012, 070221)));
+                    machine.queue_console_input({031, 052});
+                },
+                "20205 input transfer", 4) == 020206,
+            "20205 executes its resumable E71 transfer semantically");
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : input_code) {
+                machine->memory(address) = word;
+            }
+            machine->reg(010) = 020170;
+            machine->memory(020364) = Word48(instruction_pair(
+                short_instruction(010, 034, 0210),
+                short_instruction(010, 012, 070221)));
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->start(020205);
+        }
+        interpreted->disable_translated_routine(020205);
+        require(semantic->step() == poplan::ExecutionStatus::input_required,
+                "translated 20205 waits for host input");
+        require(interpreted->step() == poplan::ExecutionStatus::running
+                    && interpreted->step()
+                        == poplan::ExecutionStatus::input_required,
+                "instruction 20205 waits after its left UTC");
+        require(semantic->program_counter() == 020205
+                    && !semantic->right_half()
+                    && interpreted->program_counter() == 020205
+                    && interpreted->right_half(),
+                "semantic 20205 waits at its routine entry while the raw "
+                "path waits after sequential left-half execution");
+        require(semantic->accumulator() == interpreted->accumulator()
+                    && semantic->remainder() == interpreted->remainder()
+                    && semantic->alu_mode() == interpreted->alu_mode(),
+                "blocked 20205 preserves the raw data state");
+
+        semantic->queue_console_input({031, 052});
+        interpreted->queue_console_input({031, 052});
+        require(semantic->step() == poplan::ExecutionStatus::running
+                    && interpreted->step()
+                        == poplan::ExecutionStatus::running,
+                "20205 resumes after host input is queued");
+        require_same_architectural_state(
+            *semantic, *interpreted, "20205 completed transfer");
+    }
+
+    const std::vector<std::pair<std::uint16_t, Word48>> e67_code = {
+        {020564, Word48(instruction_pair(
+            long_instruction(010, 0240, 020564),
+            short_instruction(010, 067, 5)))},
+        {020566, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            short_instruction(010, 067, 6)))},
+        {020570, Word48(instruction_pair(
+            long_instruction(015, 0300, 0), 0))},
+    };
+    const auto setup_e67 = [](Machine &machine) {
+        machine.memory(020571) = Word48(
+            static_cast<std::uint64_t>(020566) << 24);
+        machine.memory(020572) = Word48(
+            static_cast<std::uint64_t>(020570) << 24);
+    };
+    require(compare_static_entry(
+                020564, e67_code, setup_e67,
+                "20564 supervisor transfer", 4) == 020566,
+            "20564 preserves the first E67 continuation");
+    require(compare_static_entry(
+                020566, e67_code,
+                [&setup_e67](Machine &machine) {
+                    setup_e67(machine);
+                    machine.reg(010) = 020564;
+                },
+                "20566 supervisor transfer", 4) == 020570,
+            "20566 preserves the second E67 continuation");
+    require(compare_static_entry(
+                020570, e67_code, [](Machine &) {},
+                "20570 supervisor return", 2) == 07000,
+            "20570 returns through r15");
 
     // 04001 is a semantic compiler routine with calls retained as explicit
     // boundaries.  Build the instruction-only oracle from mnemonic fields;

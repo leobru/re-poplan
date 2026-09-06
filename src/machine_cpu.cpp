@@ -156,9 +156,19 @@ void Machine::boot_static_image()
 
 ExecutionStatus Machine::step()
 {
-    if (translated_routines_enabled_ && dispatch_translated_routine()) {
-        ++instruction_count_;
-        return ExecutionStatus::running;
+    if (translated_routines_enabled_) {
+        try {
+            if (dispatch_translated_routine()) {
+                ++instruction_count_;
+                return ExecutionStatus::running;
+            }
+        } catch (const E71InputRequired &) {
+            // A blocking translated I/O routine remains at its left-half
+            // entry and is retried as a semantic unit after input arrives.
+            ++instruction_count_;
+            ++translated_routine_count_;
+            return ExecutionStatus::input_required;
+        }
     }
 
     const std::uint16_t old_pc = program_counter_;
@@ -524,8 +534,9 @@ ExecutionStatus Machine::step()
 
 bool Machine::dispatch_translated_routine()
 {
-    // A translated routine owns its documented left-half entry only. A jump
-    // to the right half of the same word is still an ordinary BESM transfer.
+    // BESM transfers always enter the left instruction of a word. A right
+    // instruction is reached only by sequential execution of the left one,
+    // so it can never be a semantic routine-dispatch entry.
     if (right_half_) {
         return false;
     }
@@ -537,6 +548,8 @@ bool Machine::dispatch_translated_routine()
 
     std::uint16_t continuation = 0;
     switch (program_counter_) {
+    case 01000: continuation = p01000(); break;
+    case 01002: continuation = p01002(); break;
     case 01004: continuation = p01004(); break;
     case 01006: continuation = p01006(); break;
     case 01011: continuation = p01011(); break;
@@ -571,10 +584,18 @@ bool Machine::dispatch_translated_routine()
         break;
     case 03301: continuation = p03301(); break;
     case 03303: continuation = p03303_store_stack_top(); break;
+    case 03305: continuation = p03305(); break;
     case 03314: continuation = p03314(); break;
     case 03330: continuation = p03330(); break;
     case 03336: continuation = p03336(); break;
     case 03337: continuation = p03337(); break;
+    case 03477: continuation = p03477(); break;
+    case 03424: continuation = p03424(); break;
+    case 03425: continuation = p03425(); break;
+    case 03426: continuation = p03426(); break;
+    case 03435: continuation = p03435(); break;
+    case 03436: continuation = p03436(); break;
+    case 03447: continuation = p03447(); break;
     case 03340: continuation = p03340(); break;
     case 03341: continuation = p03341(); break;
     case 03342: continuation = p03342(); break;
@@ -582,6 +603,11 @@ bool Machine::dispatch_translated_routine()
     case 03375: continuation = p03375(); break;
     case 03376: continuation = p03376(); break;
     case 03413: continuation = p03413_numeric_update(); break;
+    case 03461: continuation = p03461(); break;
+    case 03466: continuation = p03466(); break;
+    case 03467: continuation = p03467(); break;
+    case 03473: continuation = p03473(); break;
+    case 03475: continuation = p03475(); break;
     case 03506: continuation = p03506(); break;
     case 03516: continuation = p03516(); break;
     case 03521: continuation = p03521(); break;
@@ -643,6 +669,16 @@ bool Machine::dispatch_translated_routine()
     case 03754: continuation = p03754(); break;
     case 03757: continuation = p03757(); break;
     case 03761: continuation = p03761(); break;
+    case 03712: continuation = p03712(); break;
+    case 03714: continuation = p03714(); break;
+    case 03762: continuation = p03762(); break;
+    case 03763: continuation = p03763(); break;
+    case 03765: continuation = p03765(); break;
+    case 03770: continuation = p03770(); break;
+    case 03773: continuation = p03773(); break;
+    case 03774: continuation = p03774(); break;
+    case 03775: continuation = p03775(); break;
+    case 03777: continuation = p03777(); break;
     case 04001:
     case 04002:
     case 04003:
@@ -680,6 +716,26 @@ bool Machine::dispatch_translated_routine()
     case 04101: continuation = p04101(); break;
     case 04102: continuation = p04102(); break;
     case 04103: continuation = p04103(); break;
+    case 04117: continuation = p04117(); break;
+    case 04121: continuation = p04121(); break;
+    case 04123: continuation = p04123(); break;
+    case 04125: continuation = p04125(); break;
+    case 04126: continuation = p04126(); break;
+    case 04127: continuation = p04127(); break;
+    case 04131: continuation = p04131(); break;
+    case 04134: continuation = p04134(); break;
+    case 04135: continuation = p04135(); break;
+    case 04137: continuation = p04137(); break;
+    case 04142: continuation = p04142(); break;
+    case 04144: continuation = p04144(); break;
+    case 04147: continuation = p04147(); break;
+    case 04154: continuation = p04154(); break;
+    case 04155: continuation = p04155(); break;
+    case 04156: continuation = p04156(); break;
+    case 04157: continuation = p04157(); break;
+    case 04312: continuation = p04312(); break;
+    case 04315: continuation = p04315(); break;
+    case 04316: continuation = p04316(); break;
     case 04161: continuation = p04161(); break;
     case 04164: continuation = p04164(); break;
     case 04166: continuation = p04166(); break;
@@ -902,6 +958,24 @@ bool Machine::dispatch_translated_routine()
     case 06657: continuation = p06657(); break;
     case 06660: continuation = p06660(); break;
     case 06661: continuation = p06661(); break;
+    case 06634: continuation = p06634(); break;
+    case 06635: continuation = p06635(); break;
+    case 06636: continuation = p06636(); break;
+    case 06672:
+    case 06673:
+    case 06674:
+    case 06675:
+    case 06676:
+    case 06677:
+    case 06700:
+    case 06702:
+    case 06703:
+    case 06704:
+    case 06706:
+    case 06707:
+    case 06710:
+        continuation = p06672(program_counter_);
+        break;
     case 06712: continuation = p06712(); break;
     case 06733: continuation = p06733(); break;
     case 06734: continuation = p06734_error(); break;
@@ -913,8 +987,41 @@ bool Machine::dispatch_translated_routine()
     case 06745: continuation = p06745_error(); break;
     case 06746: continuation = p06746_multiply(); break;
     case 06750: continuation = p06750(); break;
+    case 06757: continuation = p06757(); break;
+    case 06761: continuation = p06761(); break;
+    case 06763: continuation = p06763(); break;
+    case 06765: continuation = p06765(); break;
+    case 06767: continuation = p06767(); break;
+    case 06771: continuation = p06771(); break;
+    case 07005: continuation = p07005(); break;
+    case 07011: continuation = p07011(); break;
+    case 07013: continuation = p07013(); break;
+    case 07022: continuation = p07022(); break;
+    case 07023: continuation = p07023(); break;
+    case 07024: continuation = p07024(); break;
+    case 07033: continuation = p07033(); break;
+    case 07042: continuation = p07042(); break;
+    case 07043: continuation = p07043(); break;
+    case 07165: continuation = p07165(); break;
+    case 07166: continuation = p07166(); break;
+    case 07173: continuation = p07173(); break;
+    case 07177: continuation = p07177(); break;
+    case 07207: continuation = p07207(); break;
+    case 07256: continuation = p07256(); break;
+    case 07262: continuation = p07262(); break;
+    case 07264: continuation = p07264(); break;
+    case 07312: continuation = p07312(); break;
+    case 07331: continuation = p07331(); break;
+    case 07332: continuation = p07332(); break;
+    case 07333: continuation = p07333(); break;
+    case 07142: continuation = p07142(); break;
+    case 07143: continuation = p07143(); break;
     case 06751: continuation = p06751_error(); break;
     case 06752: continuation = p06752_divide(); break;
+    case 06410: continuation = p06410(); break;
+    case 06414: continuation = p06414(); break;
+    case 06415: continuation = p06415(); break;
+    case 06417: continuation = p06417(); break;
     case 07472: continuation = p07472(); break;
     case 07473: continuation = p07473(); break;
     case 07475: continuation = p07475_cuchin(); break;
@@ -928,6 +1035,15 @@ bool Machine::dispatch_translated_routine()
     case 07670: continuation = p07670(); break;
     case 07672: continuation = p07672(); break;
     case 07673: continuation = p07673(); break;
+    case 07601: continuation = p07601(); break;
+    case 07603: continuation = p07603(); break;
+    case 07604: continuation = p07604(); break;
+    case 07605: continuation = p07605(); break;
+    case 07611: continuation = p07611(); break;
+    case 07613: continuation = p07613(); break;
+    case 07614: continuation = p07614(); break;
+    case 07615: continuation = p07615(); break;
+    case 07616: continuation = p07616(); break;
     case 07704: continuation = p07704(); break;
     case 07706: continuation = p07706(); break;
     case 07707: continuation = p07707(); break;
@@ -944,6 +1060,12 @@ bool Machine::dispatch_translated_routine()
     case 07742: continuation = p07742(); break;
     case 07751: continuation = p07751(); break;
     case 07752: continuation = p07752(); break;
+    case 07761: continuation = p07761(); break;
+    case 07764: continuation = p07764(); break;
+    case 07766: continuation = p07766(); break;
+    case 07767: continuation = p07767(); break;
+    case 07770: continuation = p07770(); break;
+    case 07771: continuation = p07771(); break;
     case 07773:
         if (!native_character_output_active()) {
             return false;
@@ -951,9 +1073,76 @@ bool Machine::dispatch_translated_routine()
         continuation = p07773_prstri();
         break;
     case 010232: continuation = p10232(); break;
+    case 010217: continuation = p10217(); break;
+    case 010220: continuation = p10220(); break;
+    case 010222: continuation = p10222(); break;
+    case 010224: continuation = p10224(); break;
+    case 010353: continuation = p10353(); break;
+    case 010357: continuation = p10357(); break;
+    case 010361: continuation = p10361(); break;
+    case 010363: continuation = p10363(); break;
+    case 010725: continuation = p10725(); break;
+    case 010727: continuation = p10727(); break;
+    case 010733: continuation = p10733(); break;
+    case 010737: continuation = p10737(); break;
+    case 010742: continuation = p10742(); break;
+    case 010743: continuation = p10743(); break;
+    case 010744: continuation = p10744(); break;
+    case 010745: continuation = p10745(); break;
+    case 010746: continuation = p10746(); break;
+    case 010747: continuation = p10747(); break;
+    case 010751: continuation = p10751(); break;
+    case 010752: continuation = p10752(); break;
+    case 010755: continuation = p10755(); break;
+    case 010756: continuation = p10756(); break;
+    case 011503: continuation = p11503(); break;
+    case 011506: continuation = p11506(); break;
+    case 011507: continuation = p11507(); break;
+    case 011531: continuation = p11531(); break;
+    case 011532: continuation = p11532(); break;
+    case 011533: continuation = p11533(); break;
+    case 011534: continuation = p11534(); break;
+    case 011535: continuation = p11535(); break;
+    case 011053: continuation = p11053(); break;
+    case 011054: continuation = p11054(); break;
+    case 011060: continuation = p11060(); break;
+    case 06132: continuation = p06132(); break;
+    case 06133: continuation = p06133(); break;
+    case 011432: continuation = p11432(); break;
+    case 011435: continuation = p11435(); break;
+    case 011436: continuation = p11436(); break;
+    case 011440: continuation = p11440(); break;
+    case 011441: continuation = p11441(); break;
     case 011464: continuation = p11464(); break;
+    case 012125: continuation = p12125(); break;
+    case 012130: continuation = p12130(); break;
+    case 012131: continuation = p12131(); break;
+    case 012133: continuation = p12133(); break;
+    case 012134: continuation = p12134(); break;
+    case 012135: continuation = p12135(); break;
+    case 012136: continuation = p12136(); break;
+    case 012137: continuation = p12137(); break;
+    case 012141: continuation = p12141(); break;
+    case 012142: continuation = p12142(); break;
+    case 012143: continuation = p12143(); break;
+    case 012145: continuation = p12145(); break;
+    case 012147: continuation = p12147(); break;
+    case 012151: continuation = p12151(); break;
+    case 012152: continuation = p12152(); break;
+    case 012153: continuation = p12153(); break;
+    case 012154: continuation = p12154(); break;
+    case 012156: continuation = p12156(); break;
+    case 012246: continuation = p12246(); break;
+    case 012251: continuation = p12251(); break;
+    case 012252: continuation = p12252(); break;
+    case 012253: continuation = p12253(); break;
+    case 012257: continuation = p12257(); break;
+    case 012266: continuation = p12266(); break;
+    case 012270: continuation = p12270(); break;
+    case 012271: continuation = p12271(); break;
     case 011471: continuation = p11471(); break;
     case 011500: continuation = p11500(); break;
+    case 011514: continuation = p11514(); break;
     case 011524: continuation = p11524(); break;
     case 011525: continuation = p11525(); break;
     case 011526: continuation = p11526(); break;
@@ -974,6 +1163,7 @@ bool Machine::dispatch_translated_routine()
     case 011726: continuation = p11726_begin_generated_rebinding(); break;
     case 011727: continuation = p11727_continue_generated_rebinding(); break;
     case 011731: continuation = p11731_finish_generated_rebinding(); break;
+    case 011746: continuation = p11746(); break;
     case 011755: continuation = p11755_begin_generated_binding(); break;
     case 011756: continuation = p11756_begin_generated_rebinding(); break;
     case 011757: continuation = p11757_enter_generated_rebinding(); break;
@@ -1009,10 +1199,39 @@ bool Machine::dispatch_translated_routine()
     case 013207: continuation = p13207(); break;
     case 013216: continuation = p13216(); break;
     case 013217: continuation = p13217(); break;
+    case 013454: continuation = p13454(); break;
+    case 013460: continuation = p13460(); break;
+    case 013461: continuation = p13461(); break;
+    case 013462: continuation = p13462(); break;
+    case 013463: continuation = p13463(); break;
+    case 013464: continuation = p13464(); break;
+    case 013465: continuation = p13465(); break;
+    case 013466: continuation = p13466(); break;
+    case 013470: continuation = p13470(); break;
+    case 013471: continuation = p13471(); break;
+    case 013472: continuation = p13472(); break;
+    case 013474: continuation = p13474(); break;
+    case 013476: continuation = p13476(); break;
+    case 013500: continuation = p13500(); break;
+    case 013501: continuation = p13501(); break;
+    case 013502: continuation = p13502(); break;
+    case 015322: continuation = p15322(); break;
+    case 015323: continuation = p15323(); break;
+    case 015324: continuation = p15324(); break;
+    case 015325: continuation = p15325(); break;
+    case 015330: continuation = p15330(); break;
+    case 015332: continuation = p15332(); break;
+    case 015335: continuation = p15335(); break;
+    case 015336: continuation = p15336(); break;
+    case 015341: continuation = p15341(); break;
+    case 015342: continuation = p15342(); break;
+    case 015344: continuation = p15344(); break;
+    case 015345: continuation = p15345(); break;
     case 015765: continuation = p15765_dispatch_special_function(); break;
     case 016005: continuation = p16005(); break;
     case 016022: continuation = p16022(); break;
     case 016026: continuation = p16026(); break;
+    case 016145: continuation = p16145(); break;
     case 016151: continuation = p16151(); break;
     case 016153: continuation = p16153(); break;
     case 016157: continuation = p16157(); break;
@@ -1077,6 +1296,12 @@ bool Machine::dispatch_translated_routine()
     case 016477: continuation = p16477(); break;
     case 016502: continuation = p16502(); break;
     case 016503: continuation = p16503(); break;
+    case 016513: continuation = p16513(); break;
+    case 016517: continuation = p16517(); break;
+    case 016522: continuation = p16522(); break;
+    case 016524: continuation = p16524(); break;
+    case 016515: continuation = p16515(); break;
+    case 016530: continuation = p16530(); break;
     case 016505: continuation = p16505_begin_record_shift(); break;
     case 016507: continuation = p16507_resume_record_shift(); break;
     case 016511: continuation = p16511(); break;
@@ -1094,6 +1319,8 @@ bool Machine::dispatch_translated_routine()
     case 016552: continuation = p16552_finish_empty_record_loop(); break;
     case 016605: continuation = p16605(); break;
     case 016606: continuation = p16606(); break;
+    case 016616: continuation = p16616(); break;
+    case 016617: continuation = p16617(); break;
     case 016643: continuation = p16643(); break;
     case 016645: continuation = p16645(); break;
     case 016651: continuation = p16651(); break;
@@ -1101,13 +1328,23 @@ bool Machine::dispatch_translated_routine()
     case 016657: continuation = p16657(); break;
     case 016661: continuation = p16661(); break;
     case 016663: continuation = p16663(); break;
+    case 016665: continuation = p16665(); break;
+    case 016666: continuation = p16666(); break;
+    case 016667: continuation = p16667(); break;
+    case 016670: continuation = p16670(); break;
     case 016742: continuation = p16742(); break;
     case 016744: continuation = p16744(); break;
+    case 016745: continuation = p16745(); break;
+    case 016746: continuation = p16746(); break;
+    case 016747: continuation = p16747(); break;
     case 017150: continuation = p17150(); break;
     case 017156: continuation = p17156(); break;
     case 017160: continuation = p17160(); break;
     case 017161: continuation = p17161(); break;
     case 017163: continuation = p17163(); break;
+    case 017120: continuation = p17120(); break;
+    case 017131: continuation = p17131(); break;
+    case 017132: continuation = p17132(); break;
     case 017164: continuation = p17164(); break;
     case 017175: continuation = p17175(); break;
     case 017201: continuation = p17201(); break;
@@ -1139,6 +1376,7 @@ bool Machine::dispatch_translated_routine()
     case 017436: continuation = p17436(); break;
     case 017440: continuation = p17440(); break;
     case 017442: continuation = p17442(); break;
+    case 017450: continuation = p17450(); break;
     case 017451: continuation = p17451(); break;
     case 017452: continuation = p17452(); break;
     case 017453: continuation = p17453(); break;
@@ -1195,6 +1433,7 @@ bool Machine::dispatch_translated_routine()
     case 017045: continuation = p17045(); break;
     case 017047: continuation = p17047(); break;
     case 017070: continuation = p17070(); break;
+    case 017075: continuation = p17075(); break;
     case 017072: continuation = p17072(); break;
     case 020077: continuation = p20077(); break;
     case 020101: continuation = p20101(); break;
@@ -1208,9 +1447,12 @@ bool Machine::dispatch_translated_routine()
     case 020170: continuation = p20170_input_primary(); break;
     case 020175: continuation = p20175_resume_input_primary(); break;
     case 020177: continuation = p20177_continue_input_primary(); break;
+    case 020200: continuation = p20200_query_input_status(); break;
     case 020201: continuation = p20201_resume_input_status(); break;
     case 020202: continuation = p20202_prepare_input_transfer(); break;
+    case 020205: continuation = p20205_transfer_input(); break;
     case 020206: continuation = p20206_resume_input_transfer(); break;
+    case 020207: continuation = p20207_query_input_status(); break;
     case 020210: continuation = p20210_finish_input_primary(); break;
     case 020245: continuation = p20245_begin_input_continue(); break;
     case 020252: continuation = p20252_query_console(); break;
@@ -1225,11 +1467,18 @@ bool Machine::dispatch_translated_routine()
     case 020506: continuation = p20506(); break;
     case 020511: continuation = p20511(); break;
     case 020514: continuation = p20514(); break;
+    case 020564: continuation = p20564(); break;
+    case 020566: continuation = p20566(); break;
+    case 020570: continuation = p20570(); break;
     case 020660: continuation = p20660(); break;
     case 020667: continuation = p20667(); break;
     case 020673: continuation = p20673_return(); break;
     case 020674: continuation = p20674(); break;
     case 021107: continuation = p21107(); break;
+    case 021125: continuation = p21125(); break;
+    case 021131: continuation = p21131(); break;
+    case 021134: continuation = p21134(); break;
+    case 021135: continuation = p21135(); break;
     case 021141: continuation = p21141(); break;
     case 021146: continuation = p21146(); break;
     case 021151: continuation = p21151(); break;
@@ -1261,6 +1510,9 @@ bool Machine::dispatch_translated_routine()
     case 021510: continuation = p21510(); break;
     case 021511: continuation = p21511(); break;
     case 021516: continuation = p21516(); break;
+    case 021631: continuation = p21631(); break;
+    case 021634: continuation = p21634(); break;
+    case 021636: continuation = p21636(); break;
     case 025223: continuation = p25223(); break;
     case 025225: continuation = p25225(); break;
     case 025226: continuation = p25226(); break;
@@ -1280,6 +1532,15 @@ bool Machine::dispatch_translated_routine()
     case 025437: continuation = p25437(); break;
     case 025445: continuation = p25445(); break;
     case 025446: continuation = p25446(); break;
+    case 025730: continuation = p25730(); break;
+    case 025734: continuation = p25734(); break;
+    case 025736: continuation = p25736(); break;
+    case 025737: continuation = p25737(); break;
+    case 025741: continuation = p25741(); break;
+    case 025742: continuation = p25742(); break;
+    case 025745: continuation = p25745(); break;
+    case 025747: continuation = p25747(); break;
+    case 025750: continuation = p25750(); break;
     case 025450: continuation = p25450(); break;
     case 025451: continuation = p25451(); break;
     case 025457: continuation = p25457(); break;

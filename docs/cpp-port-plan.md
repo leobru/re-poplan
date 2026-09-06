@@ -212,6 +212,22 @@ The startup and session-end owners at `20456` and `20475` now construct their
 complete GOST text natively. Their former `25641`/`25660` digit-building calls
 are bypassed, while semantic `20674` still performs the actual `Э71` transfer.
 
+The final quine-static pass converts `01000..01002`, `03461..03475`,
+`07761..07772`, `11514`, `11746..11747`, `16145..16150`, `16513..16521`,
+`16530`, `16616..16623`, `16745..16747`, `17120..17121`, `17131`, the primary
+input `Э71` sites at `20200`/`20205`/`20207`, and `20564..20570`. A fresh run
+records 11,406 semantic dispatches and 95 raw instruction steps. None of those
+raw steps is in the immutable image; all are generated POP-2 code at
+`32535..32566` or `65556..65765`.
+
+The subsequent `zone1224.pop2` static sweep converts every remaining traced
+immutable-image entry, including the hot `13454`, `04142`, `06757..07043`,
+`12125`, `12246`, `15322`, and `21631..25753` clusters and their left-half
+continuations. A fresh combined CPU/routine trace contains no instruction
+fallback in immutable code. The remaining 100,723 instruction steps are in
+dynamically generated POP-2 code; the same run makes 231,482 semantic
+dispatches.
+
 ## Port Order
 
 ### 1. Tagged Machine State
