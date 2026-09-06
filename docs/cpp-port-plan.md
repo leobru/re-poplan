@@ -228,6 +228,16 @@ fallback in immutable code. The remaining 100,723 instruction steps are in
 dynamically generated POP-2 code; the same run makes 231,482 semantic
 dispatches.
 
+The following full-game sweep converts the remaining immutable templates
+reached by fixed-seed `ttt.pop2`: `03310..03315`, `03371..03373`,
+`03442..03446`, `03542..03543`, `04227`, `04437..04444`, the dictionary
+`LOGAND` body at `12036..12054`, `16320`, `17054..17062`, `20073..20104`,
+the session exit at `20715..20723`, and `25640`. The scripted session answers
+both opening questions, plays `0 0 0` and `1 1 1`, resigns, declines another
+game, and exits. Its fresh trace contains 729,497 semantic dispatches and
+192,844 raw instructions, with no immutable-image fallback; the 665 raw
+half-instructions below `36000` are all generated code at `32535..32566`.
+
 ## Port Order
 
 ### 1. Tagged Machine State

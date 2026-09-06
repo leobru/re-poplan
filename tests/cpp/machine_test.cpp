@@ -2060,6 +2060,551 @@ int main()
         },
         [](Machine &) {}, "21631 generated descriptor frame");
 
+    compare_static_semantic_entry(
+        03310, 03277,
+        {{03310, Word48(instruction_pair(
+            long_instruction(015, 0310, 03277),
+            long_instruction(0, 0220, 0)))}},
+        [](Machine &) {}, "03310 generated POP-value entry");
+
+    compare_static_semantic_entry(
+        03371, 03277,
+        {{03371, Word48(instruction_pair(
+            long_instruction(015, 0310, 03277),
+            long_instruction(0, 0220, 0)))}},
+        [](Machine &) {}, "03371 generated logical entry");
+
+    compare_static_semantic_entry(
+        03442, 03277,
+        {{03442, Word48(instruction_pair(
+            long_instruction(015, 0310, 03277),
+            long_instruction(0, 0220, 0)))}},
+        [](Machine &) {}, "03442 generated arithmetic entry");
+
+    compare_static_semantic_entry(
+        04227, 04467,
+        {{04227, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 04467)))}},
+        [](Machine &) {}, "04227 compiler-call continuation");
+
+    compare_static_semantic_entry(
+        04437, 03277,
+        {{04437, Word48(instruction_pair(
+            long_instruction(015, 0310, 03277),
+            long_instruction(0, 0220, 0)))}},
+        [](Machine &) {}, "04437 generated primitive entry");
+
+    compare_static_semantic_entry(
+        04442, 03275,
+        {{04442, Word48(instruction_pair(
+            short_instruction(017, 010, 0),
+            long_instruction(015, 0310, 03275)))}},
+        [](Machine &machine) {
+            machine.reg(017) = 05001;
+            machine.memory(05000) = Word48(06400000000000001ULL);
+        },
+        "04442 generated primitive restore");
+
+    compare_static_semantic_entry(
+        04443, 02750,
+        {
+            {04443, Word48(instruction_pair(
+                long_instruction(0, 0220, 01427),
+                short_instruction(0, 010, 0)))},
+            {04444, Word48(instruction_pair(
+                long_instruction(015, 0240, 03235),
+                long_instruction(0, 0300, 02750)))},
+        },
+        [](Machine &machine) {
+            machine.memory(01427) = Word48(06600000000006702ULL);
+        },
+        "04443 generated evaluator tail");
+
+    compare_static_semantic_entry(
+        012036, 03277,
+        {
+            {012036, Word48(instruction_pair(
+                short_instruction(0, 042, 1),
+                long_instruction(001, 0240, 012050)))},
+            {012037, Word48(instruction_pair(
+                long_instruction(0, 0300, 012041),
+                long_instruction(0, 0220, 0)))},
+            {012041, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(015, 0310, 03277)))},
+        },
+        [](Machine &machine) {
+            machine.reg(001) = 0141;
+            machine.reg(017) = 05000;
+        },
+        "12036 LOGAND frame entry");
+
+    compare_static_semantic_entry(
+        012042, 03277,
+        {{012042, Word48(instruction_pair(
+            short_instruction(017, 000, 0),
+            long_instruction(015, 0310, 03277)))}},
+        [](Machine &machine) { machine.reg(017) = 05000; },
+        "12042 LOGAND second operand");
+
+    compare_static_semantic_entry(
+        017054, 021464,
+        {
+            {017054, Word48(instruction_pair(
+                short_instruction(0, 043, 015),
+                short_instruction(017, 003, 077776)))},
+            {017055, Word48(instruction_pair(
+                long_instruction(0, 0220, 0),
+                long_instruction(015, 0310, 021464)))},
+        },
+        [](Machine &machine) { machine.reg(017) = 05000; },
+        "17054 generated call frame");
+
+    compare_static_semantic_entry(
+        020073, 03277,
+        {
+            {020073, Word48(instruction_pair(
+                short_instruction(0, 042, 016),
+                short_instruction(0, 043, 015)))},
+            {020074, Word48(instruction_pair(
+                short_instruction(0, 043, 015),
+                long_instruction(015, 0310, 03277)))},
+        },
+        [](Machine &machine) { machine.reg(017) = 05000; },
+        "20073 generated return frame");
+
+    compare_static_semantic_entry(
+        020715, 07533,
+        {
+            {020715, Word48(instruction_pair(
+                long_instruction(0, 0220, 017010),
+                long_instruction(017, 0240, 1)))},
+            {020716, Word48(instruction_pair(
+                long_instruction(0, 0220, 0),
+                long_instruction(015, 0310, 07533)))},
+        },
+        [](Machine &) {}, "20715 session-end frame");
+
+    compare_static_semantic_entry(
+        020721, 025223,
+        {{020721, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 025223)))}},
+        [](Machine &) {}, "20721 session-end flush");
+
+    compare_static_semantic_entry(
+        020722, 020475,
+        {{020722, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 020475)))}},
+        [](Machine &) {}, "20722 session-end message");
+
+    compare_static_semantic_entry(
+        03311, 03314,
+        {
+            {03311, Word48(instruction_pair(
+                long_instruction(013, 0240, 03310),
+                short_instruction(0, 036, 0101)))},
+            {03312, Word48(instruction_pair(
+                short_instruction(013, 013, 0142),
+                long_instruction(013, 0270, 5)))},
+            {03313, Word48(instruction_pair(
+                long_instruction(0, 0220, 02207),
+                short_instruction(0, 010, 0)))},
+            {03315, Word48(instruction_pair(
+                short_instruction(013, 010, 0143),
+                long_instruction(013, 0300, 4)))},
+        },
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000000ULL);
+            machine.memory(03452) = Word48(05600000000000000ULL);
+            machine.memory(03453) = Word48(06400000000000001ULL);
+            machine.memory(02207) = Word48(06400000000000002ULL);
+        },
+        "03311 generated numeric selector");
+
+    compare_static_semantic_entry(
+        03372, 03314,
+        {
+            {03372, Word48(instruction_pair(
+                long_instruction(013, 0240, 03310),
+                short_instruction(013, 012, 0143)))},
+            {03373, Word48(instruction_pair(
+                long_instruction(013, 0260, 3),
+                long_instruction(013, 0300, 5)))},
+            {03313, Word48(instruction_pair(
+                long_instruction(0, 0220, 02207),
+                short_instruction(0, 010, 0)))},
+            {03315, Word48(instruction_pair(
+                short_instruction(013, 010, 0143),
+                long_instruction(013, 0300, 4)))},
+        },
+        [](Machine &machine) {
+            machine.accumulator() = Word48(06400000000000007ULL);
+            machine.memory(03453) = Word48(06400000000000001ULL);
+            machine.memory(02207) = Word48(06400000000000002ULL);
+        },
+        "03372 generated logical selector");
+
+    compare_static_semantic_entry(
+        03443, 03447,
+        {
+            {03443, Word48(instruction_pair(
+                long_instruction(013, 0240, 03310),
+                short_instruction(017, 000, 0)))},
+            {03444, Word48(instruction_pair(
+                short_instruction(0, 036, 0101),
+                short_instruction(013, 013, 0150)))},
+            {03445, Word48(instruction_pair(
+                long_instruction(016, 0240, 014000),
+                long_instruction(013, 0260, 0131)))},
+            {03446, Word48(instruction_pair(
+                short_instruction(017, 010, 0),
+                long_instruction(015, 0240, 03314)))},
+        },
+        [](Machine &machine) {
+            machine.accumulator() = Word48(03657600000000000ULL);
+            machine.memory(03460) = Word48(00600000000000000ULL);
+        },
+        "03443 generated arithmetic selector");
+
+    compare_static_semantic_entry(
+        03443, 03014,
+        {
+            {03443, Word48(instruction_pair(
+                long_instruction(013, 0240, 03310),
+                short_instruction(017, 000, 0)))},
+            {03444, Word48(instruction_pair(
+                short_instruction(0, 036, 0101),
+                short_instruction(013, 013, 0150)))},
+            {03445, Word48(instruction_pair(
+                long_instruction(016, 0240, 014000),
+                long_instruction(013, 0260, 0131)))},
+            {03441, Word48(instruction_pair(
+                short_instruction(017, 010, 0),
+                long_instruction(015, 0310, 03014)))},
+        },
+        [](Machine &machine) {
+            machine.accumulator() = Word48(07000000000000000ULL);
+            machine.memory(03460) = Word48(00600000000000000ULL);
+        },
+        "03443 generated arithmetic diagnostic");
+
+    compare_static_semantic_entry(
+        03542, 03547,
+        {
+            {03542, Word48(instruction_pair(
+                short_instruction(002, 010, 0627),
+                short_instruction(002, 000, 0626)))},
+            {03543, Word48(instruction_pair(
+                long_instruction(002, 0300, 011),
+                long_instruction(0, 0220, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(002) = 03536;
+            machine.memory(04165) = Word48(0765432101234567ULL);
+        },
+        "03542 generated compiler continuation");
+
+    compare_static_semantic_entry(
+        04440, 03275,
+        {
+            {04440, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(0, 0220, 01637)))},
+            {04441, Word48(instruction_pair(
+                short_instruction(0, 010, 0),
+                long_instruction(015, 0310, 03275)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05000;
+            machine.memory(01637) = Word48(06400000000000007ULL);
+        },
+        "04440 generated primitive frame");
+
+    const auto initialize_logand_frame = [](Machine &machine) {
+        machine.reg(001) = 012050;
+        machine.reg(013) = 01313;
+        machine.reg(015) = 012043;
+        machine.reg(017) = 05002;
+        machine.memory(05000) = Word48(00141);
+        machine.memory(05001) = Word48(06400000000000007ULL);
+        machine.accumulator() = Word48(06400000000000004ULL);
+        machine.memory(012113) = Word48(07760000000000000ULL);
+        machine.memory(012114) = Word48(06400000000000000ULL);
+    };
+    compare_static_semantic_entry(
+        012043, 03275,
+        {
+            {012043, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(013, 0240, 012036)))},
+            {012044, Word48(instruction_pair(
+                short_instruction(013, 011, 055),
+                short_instruction(013, 012, 056)))},
+            {012045, Word48(instruction_pair(
+                long_instruction(001, 0270, 0),
+                short_instruction(017, 010, 077776)))},
+            {012046, Word48(instruction_pair(
+                short_instruction(013, 011, 055),
+                short_instruction(013, 012, 056)))},
+            {012047, Word48(instruction_pair(
+                long_instruction(001, 0270, 1),
+                long_instruction(001, 0300, 2)))},
+            {012052, Word48(instruction_pair(
+                short_instruction(017, 010, 0),
+                short_instruction(017, 011, 0)))},
+            {012053, Word48(instruction_pair(
+                long_instruction(017, 0230, 0),
+                long_instruction(001, 0240, 0)))},
+            {012054, Word48(instruction_pair(
+                long_instruction(015, 0240, 03235),
+                long_instruction(0, 0300, 03275)))},
+        },
+        initialize_logand_frame,
+        "12043 LOGAND ordinary result");
+
+    compare_static_semantic_entry(
+        012043, 03014,
+        {
+            {012043, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(013, 0240, 012036)))},
+            {012044, Word48(instruction_pair(
+                short_instruction(013, 011, 055),
+                short_instruction(013, 012, 056)))},
+            {012045, Word48(instruction_pair(
+                long_instruction(001, 0270, 0),
+                short_instruction(017, 010, 077776)))},
+            {012050, Word48(instruction_pair(
+                long_instruction(016, 0240, 014630),
+                long_instruction(013, 0300, 053)))},
+            {012111, Word48(instruction_pair(
+                short_instruction(017, 010, 0),
+                long_instruction(0, 0300, 03014)))},
+        },
+        [](Machine &machine) {
+            machine.reg(001) = 012050;
+            machine.reg(015) = 012043;
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(0141);
+            machine.memory(05001) = Word48(1);
+            machine.accumulator() = Word48(2);
+            machine.memory(012113) = Word48(Word48::mask);
+            machine.memory(012114) = Word48();
+        },
+        "12043 LOGAND second-operand diagnostic");
+
+    compare_static_semantic_entry(
+        012043, 03014,
+        {
+            {012043, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                long_instruction(013, 0240, 012036)))},
+            {012044, Word48(instruction_pair(
+                short_instruction(013, 011, 055),
+                short_instruction(013, 012, 056)))},
+            {012045, Word48(instruction_pair(
+                long_instruction(001, 0270, 0),
+                short_instruction(017, 010, 077776)))},
+            {012046, Word48(instruction_pair(
+                short_instruction(013, 011, 055),
+                short_instruction(013, 012, 056)))},
+            {012047, Word48(instruction_pair(
+                long_instruction(001, 0270, 1),
+                long_instruction(001, 0300, 2)))},
+            {012051, Word48(instruction_pair(
+                long_instruction(016, 0240, 014730),
+                long_instruction(013, 0300, 054)))},
+            {012112, Word48(instruction_pair(
+                short_instruction(017, 010, 077776),
+                long_instruction(0, 0300, 03014)))},
+        },
+        [](Machine &machine) {
+            machine.reg(001) = 012050;
+            machine.reg(015) = 012043;
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(0141);
+            machine.memory(05001) = Word48(3);
+            machine.accumulator() = Word48();
+            machine.memory(012113) = Word48(Word48::mask);
+            machine.memory(012114) = Word48();
+        },
+        "12043 LOGAND first-operand diagnostic");
+
+    compare_static_semantic_entry(
+        016320, 021431,
+        {
+            {016320, Word48(instruction_pair(
+                long_instruction(016, 0240, 016340),
+                long_instruction(015, 0310, 021431)))},
+        },
+        [](Machine &) {}, "16320 buffered-character continuation");
+
+    compare_static_semantic_entry(
+        017056, 07000,
+        {
+            {017056, Word48(instruction_pair(
+                long_instruction(010, 0240, 017013),
+                short_instruction(017, 001, 077776)))},
+            {017057, Word48(instruction_pair(
+                short_instruction(0, 041, 015),
+                short_instruction(010, 012, 054)))},
+            {017060, Word48(instruction_pair(
+                long_instruction(010, 0260, 047),
+                short_instruction(010, 012, 054)))},
+            {017061, Word48(instruction_pair(
+                short_instruction(010, 010, 052),
+                long_instruction(015, 0300, 0)))},
+            {017062, Word48(instruction_pair(
+                short_instruction(010, 010, 053),
+                long_instruction(015, 0300, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(06440000000002044ULL);
+            machine.memory(05001) = Word48(07000);
+            machine.accumulator() = Word48(06440000000002044ULL);
+            machine.memory(017065) = Word48(06400000000000001ULL);
+            machine.memory(017066) = Word48(06400000000000002ULL);
+            machine.memory(017067) = Word48(06440000000002044ULL);
+        },
+        "17056 generated result selector");
+
+    compare_static_semantic_entry(
+        017056, 07000,
+        {
+            {017056, Word48(instruction_pair(
+                long_instruction(010, 0240, 017013),
+                short_instruction(017, 001, 077776)))},
+            {017057, Word48(instruction_pair(
+                short_instruction(0, 041, 015),
+                short_instruction(010, 012, 054)))},
+            {017060, Word48(instruction_pair(
+                long_instruction(010, 0260, 047),
+                short_instruction(010, 012, 054)))},
+            {017061, Word48(instruction_pair(
+                short_instruction(010, 010, 052),
+                long_instruction(015, 0300, 0)))},
+            {017062, Word48(instruction_pair(
+                short_instruction(010, 010, 053),
+                long_instruction(015, 0300, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(1);
+            machine.memory(05001) = Word48(07000);
+            machine.accumulator() = Word48(1);
+            machine.memory(017065) = Word48(06400000000000001ULL);
+            machine.memory(017066) = Word48(06400000000000002ULL);
+            machine.memory(017067) = Word48(06440000000002044ULL);
+        },
+        "17056 generated alternate result selector");
+
+    compare_static_semantic_entry(
+        020075, 07000,
+        {
+            {020075, Word48(instruction_pair(
+                long_instruction(010, 0240, 020073),
+                short_instruction(010, 012, 014)))},
+            {020076, Word48(instruction_pair(
+                long_instruction(010, 0270, 012),
+                long_instruction(010, 0300, 010)))},
+            {020103, Word48(instruction_pair(
+                short_instruction(0, 041, 015),
+                short_instruction(0, 041, 015)))},
+            {020104, Word48(instruction_pair(
+                long_instruction(015, 0300, 0),
+                short_instruction(0, 000, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(06000);
+            machine.memory(05001) = Word48(07000);
+            machine.memory(020107) = Word48(06400000000000000ULL);
+            machine.accumulator() = Word48(06400000000000000ULL);
+        },
+        "20075 generated direct return");
+
+    compare_static_semantic_entry(
+        020075, 06000,
+        {
+            {020075, Word48(instruction_pair(
+                long_instruction(010, 0240, 020073),
+                short_instruction(010, 012, 014)))},
+            {020076, Word48(instruction_pair(
+                long_instruction(010, 0270, 012),
+                long_instruction(010, 0300, 010)))},
+            {020105, Word48(instruction_pair(
+                short_instruction(0, 041, 015),
+                short_instruction(0, 041, 015)))},
+            {020106, Word48(instruction_pair(
+                short_instruction(0, 040, 016),
+                long_instruction(016, 0300, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05002;
+            machine.memory(05000) = Word48(06000);
+            machine.memory(05001) = Word48(07000);
+            machine.memory(020107) = Word48();
+            machine.accumulator() = Word48(1);
+        },
+        "20075 generated indirect return");
+
+    compare_static_semantic_entry(
+        020717, 025356,
+        {
+            {020717, Word48(instruction_pair(
+                long_instruction(0, 0220, 020376),
+                short_instruction(0, 010, 1)))},
+            {020720, Word48(instruction_pair(
+                long_instruction(0, 0260, 020721),
+                long_instruction(015, 0310, 025356)))},
+        },
+        [](Machine &machine) {
+            machine.memory(020377) = Word48(012);
+        },
+        "20717 session-end output decision");
+
+    compare_static_semantic_entry(
+        025640, 07000,
+        {
+            {025640, Word48(instruction_pair(
+                short_instruction(017, 010, 0),
+                long_instruction(015, 0300, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05001;
+            machine.memory(05000) = Word48(06400000000000176ULL);
+        },
+        "25640 generated stack return");
+
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        const Word48 exit_word(instruction_pair(
+            long_instruction(0, 0220, 0),
+            short_instruction(0, 074, 0)));
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            machine->memory(020723) = exit_word;
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->reg(016) = 01234;
+            machine->start(020723);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::halted,
+                "20723 semantic E74 halts");
+        interpreted->set_translated_routines_enabled(false);
+        require(interpreted->step() == poplan::ExecutionStatus::running,
+                "20723 raw MODA reaches E74");
+        require(interpreted->step() == poplan::ExecutionStatus::halted,
+                "20723 raw E74 halts");
+        require_same_architectural_state(
+            *semantic, *interpreted, "20723 semantic E74");
+    }
+
     {
         const std::pair<std::uint16_t, Word48> descriptor_entry_code[] = {
             {02764, Word48(0x8a05e502300eULL)},

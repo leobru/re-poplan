@@ -295,6 +295,17 @@ sequential execution inside their translated block. The resulting profile has
 zero immutable-image instruction steps, 231,482 semantic dispatches, and
 100,723 raw steps confined to generated POP-2 code.
 
+The next fixed-seed tic-tac-toe sweep converts executable static templates at
+`03310`, `03371`, `03442`, `03542`, `04227`, `04437`, `12036`, `16320`,
+`17054`, `20073`, `20715`, and `25640`, together with continuations reached
+after translated calls. `12036` is the dictionary `LOGAND` entry; `20723`
+semantically reports the final `Э74` halt. In the complete scripted game,
+`04437..04443` dispatch 307 times each, `16320` dispatches 347 times, and the
+three `12036` entries dispatch 56 times each. A fresh combined trace records
+729,497 semantic dispatches and 192,844 generated-code instruction steps. It
+contains no immutable-image fallback; the 665 raw half-instructions below
+`36000` are the generated block at `32535..32566`.
+
 A complete fixed-seed host tic-tac-toe session after this sequence executed
 1,084,185 machine steps: 668,671 semantic routine dispatches and 415,514
 individual BESM instructions. The combined trace also contained 364 input-status

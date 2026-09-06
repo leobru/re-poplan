@@ -118,6 +118,10 @@ All immutable-image code reached by `zone1224.pop2` now also has semantic
 dispatch. Its remaining instruction fallback is dynamically generated POP-2
 code; the low generated region exercised by this corpus is `32535..32566`.
 
+The complete fixed-seed `ttt.pop2` session through moves `0 0 0` and `1 1 1`
+likewise has no immutable-image instruction fallback. Its remaining raw steps
+are generated POP-2 code, including the low block at `32535..32566`.
+
 Extracode `050` implements the BESM-6 floating-point square root (`000`), sine
 (`001`), cosine (`002`), arctangent (`003`), arcsine (`004`), natural logarithm
 (`005`), and exponential (`006`) operations and clears the remainder register.
