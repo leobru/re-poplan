@@ -541,7 +541,7 @@ private:
     void store_native_message(std::uint16_t address, std::size_t words,
                               std::string_view text);
     std::uint16_t p06727_finish_arithmetic();
-    std::uint16_t p01122_shared();
+    std::uint16_t p01122_shared(bool native_identifier_lookup);
     std::uint16_t p01011();
     std::uint16_t p01012();
     std::uint16_t p01016();

@@ -28,7 +28,10 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(poplan_core_tests tests/cpp/machine_test.cpp)
     target_link_libraries(poplan_core_tests PRIVATE poplan_core)
-    add_test(NAME poplan-core-tests COMMAND poplan_core_tests)
+    add_test(
+        NAME poplan-core-tests
+        COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin
+    )
 
     add_executable(poplan_console_tests tests/cpp/console_test.cpp)
     target_link_libraries(poplan_console_tests PRIVATE poplan_core)

@@ -73,7 +73,7 @@ cpp-zone1224: cpp image
 	diff -u $(CPP_ZONE1224_INTERPRETED_NORMALIZED) \
 		$(CPP_ZONE1224_NORMALIZED)
 
-test:
+test: image
 	./tests/run.sh
 
 $(IMAGE): tools/extract-image.sh

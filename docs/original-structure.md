@@ -23,7 +23,7 @@ The first translated C++ routines retain their original addresses:
 
 | Address | C++ routine | Original operation |
 |---:|---|---|
-| `01107` | `p01107` | Build the observed hash value, search its collision chain, and allocate a record when absent |
+| `01107` | `p01107` | Build the observed hash value, natively compare packed identifiers in the selected four-word collision chain, and allocate a record when absent |
 | `01167` | `p01167` | Select the alternate modifier-register setup and enter the shared `01122` body |
 | `02750` | `p02750_dispatch` | Validate and dispatch a POP function |
 | `02767` | `p02767` | Load an indirect evaluator value and redispatch it |
@@ -90,6 +90,13 @@ The static dictionary is a sequence of four-word records:
 2. class word, normally tagged `650`;
 3. properties or associated data;
 4. value, often a tagged `660` function containing its original entry point.
+
+`01107` retains the original hash calculation and bucket selection, then walks
+these image-resident records natively.  It compares the packed name in word
+zero and follows the word-two link; fixed records such as `01520`, `01524`,
+`01530`, and `01534` are therefore data, not a second C++ keyword table.
+An absent name still returns through `05430` and the original `01140` or
+`01151` allocation continuation.
 
 `tools/extract-dictionary.py build/poplan.lst` produces the current inventory.
 This table supplies public routine entry points such as `COMPIL` at `10217`

@@ -5638,7 +5638,7 @@ std::uint16_t Machine::p01107()
     registers_[011] = 01200;
     registers_[012] = 4;
     registers_[013] = 1;
-    return p01122_shared();
+    return p01122_shared(/* native_identifier_lookup = */ true);
 }
 
 std::uint16_t Machine::p01167()
@@ -5648,10 +5648,10 @@ std::uint16_t Machine::p01167()
     registers_[011] = 06143;
     registers_[012] = 2;
     registers_[013] = 0;
-    return p01122_shared();
+    return p01122_shared(/* native_identifier_lookup = */ false);
 }
 
-std::uint16_t Machine::p01122_shared()
+std::uint16_t Machine::p01122_shared(bool native_identifier_lookup)
 {
     // Preserve the seven-word frame exactly: the last XTS word is consumed
     // first during the common 01160 restoration sequence.
@@ -5693,6 +5693,38 @@ std::uint16_t Machine::p01122_shared()
         registers_[016] = registers_[012];
         registers_[015] = 01140;
         return 05430;
+    }
+
+    if (native_identifier_lookup) {
+        // 01107 searches four-word identifier records.  The bucket word
+        // selects one of its two collision chains above; word +2 in each
+        // record links to the next record.  Compare the packed identifiers
+        // directly on the host instead of replaying 01144..01147 for every
+        // keyword.  The image remains the dictionary: no identifier words or
+        // record addresses are duplicated in C++.
+        const Word48 identifier = memory_[registers_[004]];
+        for (;;) {
+            registers_[003] = registers_[016];
+            const Word48 record_identifier = memory_[registers_[016]];
+            if (record_identifier == identifier) {
+                return p01160_finish();
+            }
+
+            // Preserve the exposed state of the last failed BESM comparison
+            // and link load.  It matters when the chain ends at the 05430
+            // allocation boundary.
+            remainder_ = Word48(
+                record_identifier.raw() ^ identifier.raw());
+            accumulator_ = memory_[address_add(registers_[016], 2)];
+            select_alu_group(rau_logical);
+            registers_[016] = accumulator_.address();
+            if (registers_[016] != 0) {
+                continue;
+            }
+            registers_[016] = registers_[012];
+            registers_[015] = 01151;
+            return 05430;
+        }
     }
 
     for (;;) {
