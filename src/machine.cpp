@@ -6089,15 +6089,12 @@ std::uint16_t Machine::p06346()
     remainder_ = masked;
     select_alu_group(rau_logical);
     remainder_ = accumulator_;
-    if (accumulator_.raw() == 0) {
-        return p06352();
+    if (accumulator_.raw() != 0) {
+        registers_[016] = 0;
+        return p06360();
     }
-    registers_[016] = 0;
-    return p06360();
-}
 
-std::uint16_t Machine::p06352()
-{
+    // 06352
     accumulator_ = memory_[address_add(registers_[017], -4)];
     select_alu_group(rau_logical);
     const Word48 left = accumulator_;
@@ -6107,8 +6104,28 @@ std::uint16_t Machine::p06352()
     remainder_ = left;
     select_alu_group(rau_logical);
     remainder_ = accumulator_;
+    if (accumulator_.raw() != 0) {
+        registers_[015] = 06354;
+        return 06424;
+    }
+
+    // 06363
+    accumulator_ = memory_[address_add(registers_[005], 0242)];
+    select_alu_group(rau_logical);
+    accumulator_ = cyclic_add(
+        accumulator_, memory_[address_add(registers_[005], 0430)]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    memory_[address_add(registers_[005], 0242)] = accumulator_;
+    const Word48 updated = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[005], 0430)].raw());
+    remainder_ = updated;
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
     if (accumulator_.raw() == 0) {
-        return p06363();
+        return p06345();
     }
     registers_[015] = 06354;
     return 06424;
@@ -6137,7 +6154,17 @@ std::uint16_t Machine::p06354()
     remainder_ = masked;
     select_alu_group(rau_logical);
     remainder_ = accumulator_;
-    return accumulator_.raw() == 0 ? p06367() : p06360();
+    if (accumulator_.raw() != 0) {
+        return p06360();
+    }
+
+    // 06367
+    registers_[007] = registers_[016];
+    accumulator_ = memory_[02047];
+    select_alu_group(rau_logical);
+    xts(address_add(registers_[005], 0244));
+    registers_[015] = 06372;
+    return 05215;
 }
 
 std::uint16_t Machine::p06360()
@@ -6149,39 +6176,6 @@ std::uint16_t Machine::p06360()
     sti(007);
     sti(005);
     return registers_[015];
-}
-
-std::uint16_t Machine::p06363()
-{
-    accumulator_ = memory_[address_add(registers_[005], 0242)];
-    select_alu_group(rau_logical);
-    accumulator_ = cyclic_add(
-        accumulator_, memory_[address_add(registers_[005], 0430)]);
-    remainder_ = Word48();
-    select_alu_group(rau_multiplicative);
-    memory_[address_add(registers_[005], 0242)] = accumulator_;
-    const Word48 left = accumulator_;
-    accumulator_ = Word48(
-        accumulator_.raw()
-        ^ memory_[address_add(registers_[005], 0430)].raw());
-    remainder_ = left;
-    select_alu_group(rau_logical);
-    remainder_ = accumulator_;
-    if (accumulator_.raw() == 0) {
-        return p06345();
-    }
-    registers_[015] = 06354;
-    return 06424;
-}
-
-std::uint16_t Machine::p06367()
-{
-    registers_[007] = registers_[016];
-    accumulator_ = memory_[02047];
-    select_alu_group(rau_logical);
-    xts(address_add(registers_[005], 0244));
-    registers_[015] = 06372;
-    return 05215;
 }
 
 std::uint16_t Machine::p06372()
@@ -6218,8 +6212,13 @@ std::uint16_t Machine::p06374()
     return 021125;
 }
 
-std::uint16_t Machine::p06375()
+std::uint16_t Machine::p06401()
 {
+    memory_[02117] = accumulator_;
+    accumulator_ = memory_[address_add(registers_[007], 1)];
+    select_alu_group(rau_logical);
+
+    // 06375
     registers_[007] = accumulator_.address();
     const Word48 left = accumulator_;
     accumulator_ = Word48(accumulator_.raw() ^
@@ -6236,14 +6235,6 @@ std::uint16_t Machine::p06375()
     xts(02117);
     registers_[015] = 06401;
     return 021125;
-}
-
-std::uint16_t Machine::p06401()
-{
-    memory_[02117] = accumulator_;
-    accumulator_ = memory_[address_add(registers_[007], 1)];
-    select_alu_group(rau_logical);
-    return p06375();
 }
 
 std::uint16_t Machine::p06403()
@@ -6844,7 +6835,11 @@ std::uint16_t Machine::p07673()
     select_alu_group(rau_multiplicative);
     remainder_ = accumulator_;
     if ((accumulator_.raw() & bit48) != 0) {
-        return p07703();
+        // 07703
+        accumulator_ = memory_[address_add(registers_[005], 0243)];
+        select_alu_group(rau_logical);
+        registers_[015] = 07704;
+        return 03330;
     }
 
     accumulator_ = memory_[address_add(registers_[005], 0243)];
@@ -6853,19 +6848,54 @@ std::uint16_t Machine::p07673()
     return 012674;
 }
 
-std::uint16_t Machine::p07703()
-{
-    accumulator_ = memory_[address_add(registers_[005], 0243)];
-    select_alu_group(rau_logical);
-    registers_[015] = 07704;
-    return 03330;
-}
-
 std::uint16_t Machine::p07704()
 {
     remainder_ = accumulator_;
     if (accumulator_.raw() == 0) {
-        return p07746();
+        // 07746
+        accumulator_ = memory_[address_add(registers_[005], 0243)];
+        select_alu_group(rau_logical);
+        accumulator_ = accumulator_
+            & memory_[address_add(registers_[005], 0317)];
+        remainder_ = Word48();
+        select_alu_group(rau_logical);
+        const Word48 selected = accumulator_;
+        accumulator_ = Word48(
+            accumulator_.raw()
+            ^ memory_[address_add(registers_[005], 0332)].raw());
+        remainder_ = selected;
+        select_alu_group(rau_logical);
+        remainder_ = accumulator_;
+        if (accumulator_.raw() == 0) {
+            registers_[016] = 07753;
+            registers_[015] = 07751;
+            return 07673;
+        }
+
+        // 07730
+        accumulator_ = memory_[address_add(registers_[005], 0243)];
+        select_alu_group(rau_logical);
+        registers_[016] = accumulator_.address();
+        accumulator_ = accumulator_
+            & memory_[address_add(registers_[005], 0317)];
+        remainder_ = Word48();
+        select_alu_group(rau_logical);
+        const Word48 loop_selected = accumulator_;
+        accumulator_ = Word48(
+            accumulator_.raw()
+            ^ memory_[address_add(registers_[005], 0330)].raw());
+        remainder_ = loop_selected;
+        select_alu_group(rau_logical);
+        remainder_ = accumulator_;
+        if (accumulator_.raw() != 0) {
+            return address_add(registers_[005], 0245);
+        }
+
+        accumulator_ = memory_[registers_[016]];
+        select_alu_group(rau_logical);
+        registers_[001] = 0;
+        registers_[002] = 077773;
+        return p07734();
     }
     accumulator_ = memory_[address_add(registers_[005], 0326)];
     select_alu_group(rau_logical);
@@ -6907,7 +6937,11 @@ std::uint16_t Machine::p07712()
 {
     remainder_ = accumulator_;
     if (accumulator_.raw() != 0) {
-        return p07726();
+        // 07726
+        accumulator_ = memory_[address_add(registers_[005], 0327)];
+        select_alu_group(rau_logical);
+        registers_[015] = 07727;
+        return 03275;
     }
     registers_[016] = 07757;
     registers_[015] = 07742;
@@ -6971,41 +7005,10 @@ std::uint16_t Machine::p07725()
     return p07714();
 }
 
-std::uint16_t Machine::p07726()
-{
-    accumulator_ = memory_[address_add(registers_[005], 0327)];
-    select_alu_group(rau_logical);
-    registers_[015] = 07727;
-    return 03275;
-}
-
 std::uint16_t Machine::p07727()
 {
     registers_[016] = 1;
     return p07741();
-}
-
-std::uint16_t Machine::p07746()
-{
-    accumulator_ = memory_[address_add(registers_[005], 0243)];
-    select_alu_group(rau_logical);
-    accumulator_ = accumulator_
-        & memory_[address_add(registers_[005], 0317)];
-    remainder_ = Word48();
-    select_alu_group(rau_logical);
-    const Word48 selected = accumulator_;
-    accumulator_ = Word48(
-        accumulator_.raw()
-        ^ memory_[address_add(registers_[005], 0332)].raw());
-    remainder_ = selected;
-    select_alu_group(rau_logical);
-    remainder_ = accumulator_;
-    if (accumulator_.raw() != 0) {
-        return p07730();
-    }
-    registers_[016] = 07753;
-    registers_[015] = 07751;
-    return 07673;
 }
 
 std::uint16_t Machine::p07751()
@@ -7018,33 +7021,6 @@ std::uint16_t Machine::p07751()
 std::uint16_t Machine::p07752()
 {
     return p07742();
-}
-
-std::uint16_t Machine::p07730()
-{
-    accumulator_ = memory_[address_add(registers_[005], 0243)];
-    select_alu_group(rau_logical);
-    registers_[016] = accumulator_.address();
-    accumulator_ = accumulator_
-        & memory_[address_add(registers_[005], 0317)];
-    remainder_ = Word48();
-    select_alu_group(rau_logical);
-    const Word48 selected = accumulator_;
-    accumulator_ = Word48(
-        accumulator_.raw()
-        ^ memory_[address_add(registers_[005], 0330)].raw());
-    remainder_ = selected;
-    select_alu_group(rau_logical);
-    remainder_ = accumulator_;
-    if (accumulator_.raw() != 0) {
-        return address_add(registers_[005], 0245);
-    }
-
-    accumulator_ = memory_[registers_[016]];
-    select_alu_group(rau_logical);
-    registers_[001] = 0;
-    registers_[002] = 077773;
-    return p07734();
 }
 
 std::uint16_t Machine::p07734()
