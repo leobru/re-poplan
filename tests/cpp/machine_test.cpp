@@ -53,6 +53,32 @@ std::string format_test_jiffies(std::uint64_t jiffies)
     return output.str();
 }
 
+std::string format_test_date(std::time_t time)
+{
+    const std::tm *local = std::localtime(&time);
+    require(local != nullptr, "the test can determine the local date");
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::setfill('0') << std::setw(2) << local->tm_mday
+           << '.' << std::setw(2) << local->tm_mon + 1
+           << '.' << std::setw(2) << (local->tm_year + 1900) % 100;
+    return output.str();
+}
+
+std::string stored_text(const poplan::Machine &machine,
+                        std::uint16_t address, std::size_t length)
+{
+    std::string result;
+    result.reserve(length);
+    for (std::size_t index = 0; index != length; ++index) {
+        const poplan::Word48 word = machine.memory(
+            static_cast<std::uint16_t>(address + index / 6));
+        const unsigned shift = static_cast<unsigned>(5 - index % 6) * 8;
+        result.push_back(static_cast<char>((word.raw() >> shift) & 0377));
+    }
+    return result;
+}
+
 std::vector<std::uint8_t> stored_message(const poplan::Machine &machine,
                                          std::uint16_t address,
                                          std::size_t words)
@@ -8898,6 +8924,78 @@ int main(int argc, char **argv)
                 03475, p03461_code, [](Machine &) {},
                 "03475 branch", 2) == 017131,
             "03475 preserves the 17131 boundary");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> p15667_code = {
+        {015667, Word48(instruction_pair(
+            long_instruction(010, 0240, 015667),
+            short_instruction(010, 010, 016)))},
+        {015670, Word48(instruction_pair(
+            short_instruction(006, 000, 077777),
+            long_instruction(006, 0250, 077777)))},
+        {015671, Word48(instruction_pair(
+            long_instruction(016, 0240, 01723),
+            long_instruction(015, 0310, 02767)))},
+    };
+    require(compare_static_entry(
+                015667, p15667_code,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.memory(015705) =
+                        Word48(06400000000000010ULL);
+                },
+                "15667 POPDAT string allocation", 8) == 02767,
+            "15667 preserves the original string-allocation boundary");
+
+    {
+        auto popdat = std::make_unique<Machine>();
+        popdat->accumulator() = Word48(0765432107654321ULL);
+        popdat->remainder() = Word48(0123456701234567ULL);
+        popdat->alu_mode() = 053;
+        popdat->reg(006) = 06000;
+        popdat->reg(010) = 01234;
+        popdat->reg(014) = 02345;
+        popdat->reg(015) = 015672;
+        popdat->reg(016) = 03456;
+        popdat->reg(017) = 05000;
+        popdat->memory(06000) =
+            Word48(07100000000000000ULL | 05000);
+        popdat->memory(015711) = Word48(06400000000000000ULL);
+
+        const std::time_t time_before = std::time(nullptr);
+        popdat->start(015672);
+        require(popdat->step() == poplan::ExecutionStatus::running,
+                "15672 native POPDAT formatter keeps running");
+        const std::time_t time_after = std::time(nullptr);
+
+        const std::string date = stored_text(*popdat, 05001, 12);
+        const std::string date_before = format_test_date(time_before) + ".00.";
+        const std::string date_after = format_test_date(time_after) + ".00.";
+        require(date == date_before || date == date_after,
+                "15672 stores DD.MM.YY in the POP character strip");
+
+        constexpr std::uint64_t jiffies_per_day = 24 * 60 * 60 * 50;
+        const std::uint64_t jiffies = popdat->remainder().raw();
+        require(circular_distance(jiffies,
+                                  whole_second_jiffies(time_before),
+                                  jiffies_per_day) < 50
+                    || circular_distance(jiffies,
+                                         whole_second_jiffies(time_after),
+                                         jiffies_per_day) < 50,
+                "15672 returns current time in 1/50-second jiffies");
+        require(popdat->program_counter() == 03235
+                    && popdat->reg(006) == 05777
+                    && popdat->reg(010) == 015667
+                    && popdat->reg(014) == 05000
+                    && popdat->reg(016) == 010
+                    && popdat->reg(017) == 05000
+                    && popdat->alu_mode() == 047,
+                "15672 preserves the traced POPDAT continuation state");
+        require(popdat->accumulator()
+                    == Word48(06400000000000000ULL | jiffies)
+                    && popdat->memory(05777) == popdat->accumulator()
+                    && popdat->translated_routine_count() == 1,
+                "15672 pushes the tagged POP time result semantically");
+    }
 
     const std::vector<std::pair<std::uint16_t, Word48>> p17122_code = {
         {017122, Word48(instruction_pair(

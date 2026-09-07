@@ -137,6 +137,10 @@ Extracode `050` implements the BESM-6 floating-point square root (`000`), sine
 (`005`), and exponential (`006`) operations and clears the remainder register.
 Extracode `053` with address `010` returns local time since midnight in
 1/50-second jiffies, including the current 20 ms fraction.
+Dictionary primitive `POPDAT` dispatches semantically at `15667` and `15672`.
+It uses the host local calendar to fill the original eight-character POP
+string as `DD.MM.YY` and returns the same current-time jiffy value as its
+second result.
 Extracode `063` with address `004` returns elapsed image-execution time in the
 same 1/50-second units.
 Extracode `064` formatted output is accepted as a no-op; POPLAN's emulated

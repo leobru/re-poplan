@@ -57,6 +57,7 @@ The first translated C++ routines retain their original addresses:
 | `07673` | `p07673` | Preserve a five-word compiler frame around the original classification, helper, bit-loop, and cleanup paths through `07745` |
 | `11464` | `p11464` | Preserve an address and caller frame, allocate through `05430` when nonzero, and resume at `11471` to store the transformed word |
 | `11500` | `p11500` | Load a word indexed by the frame word at `r17-1` |
+| `15667`, `15672` | `p15667_popdat`, `p15672_finish_popdat` | Allocate the original eight-character result, fill `DD.MM.YY` from the host local calendar, and push current time in 1/50-second jiffies |
 | `15765` | `p15765_dispatch_special_function` | Expand a `664` descriptor's counted values and redispatch its nested function |
 | `16254` | `p16254` | Narrow two scratch values through the original multiply/RMR-derived table offsets and return the selected address |
 | `16341` | `p16341` | Preserve the observed compiler registers around record processing |

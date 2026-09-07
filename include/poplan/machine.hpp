@@ -431,6 +431,8 @@ public:
     std::uint16_t p16321_dispatch_character();
     std::uint16_t p16325_continue_character_sequence();
     std::uint16_t p16346();
+    std::uint16_t p15667_popdat();
+    std::uint16_t p15672_finish_popdat();
     std::uint16_t p15765_dispatch_special_function();
     std::uint16_t p16406();
     std::uint16_t p16421_lookup_tagged_byte();

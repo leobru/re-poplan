@@ -32,7 +32,12 @@ constexpr std::uint8_t rau_overflow_disable = 040;
 constexpr std::uint8_t rau_group_mask =
     rau_logical | rau_multiplicative | rau_additive;
 
-std::uint64_t local_jiffies_since_midnight()
+struct LocalDateTime {
+    std::tm calendar{};
+    std::uint64_t jiffies = 0;
+};
+
+LocalDateTime current_local_date_time()
 {
     using namespace std::chrono;
 
@@ -41,15 +46,31 @@ std::uint64_t local_jiffies_since_midnight()
     const std::time_t time = system_clock::to_time_t(whole_second);
     const std::tm *local = std::localtime(&time);
     if (local == nullptr) {
-        throw MachineError("cannot determine local time for E53/010");
+        throw MachineError("cannot determine local date and time");
     }
     const auto microseconds = duration_cast<std::chrono::microseconds>(
         now - whole_second).count();
     const std::uint64_t seconds_since_midnight =
         static_cast<std::uint64_t>(
             (local->tm_hour * 60 + local->tm_min) * 60 + local->tm_sec);
-    return seconds_since_midnight * 50
-        + static_cast<std::uint64_t>(microseconds / 20000);
+    return {*local,
+            seconds_since_midnight * 50
+                + static_cast<std::uint64_t>(microseconds / 20000)};
+}
+
+std::uint64_t local_jiffies_since_midnight()
+{
+    return current_local_date_time().jiffies;
+}
+
+std::string format_local_date(const std::tm &calendar)
+{
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::setfill('0') << std::setw(2) << calendar.tm_mday
+           << '.' << std::setw(2) << calendar.tm_mon + 1
+           << '.' << std::setw(2) << (calendar.tm_year + 1900) % 100;
+    return output.str();
 }
 
 std::string format_jiffies(std::uint64_t jiffies)
@@ -9195,6 +9216,45 @@ std::uint16_t Machine::p21516()
     sti(001);
     registers_[016] = 012020;
     return 03014;
+}
+
+std::uint16_t Machine::p15667_popdat()
+{
+    registers_[010] = 015667;
+    accumulator_ = memory_[address_add(registers_[010], 016)];
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[006], -1)] = accumulator_;
+    registers_[006] = address_add(registers_[006], -1);
+    registers_[016] = 01723;
+    registers_[015] = 015672;
+    return 02767;
+}
+
+std::uint16_t Machine::p15672_finish_popdat()
+{
+    registers_[010] = 015667;
+    accumulator_ = memory_[registers_[006]];
+    select_alu_group(rau_logical);
+    registers_[014] = accumulator_.address();
+
+    const LocalDateTime current = current_local_date_time();
+    const std::string stored_date = format_local_date(current.calendar)
+        + ".00.";
+    for (std::size_t index = 0; index != stored_date.size(); ++index) {
+        set_memory_byte(address_add(registers_[014], 1), index,
+                        static_cast<std::uint8_t>(stored_date[index]));
+    }
+
+    registers_[016] = 010;
+    const Word48 time(current.jiffies);
+    accumulator_ = Word48(
+        time.raw()
+        ^ memory_[address_add(registers_[010], 022)].raw());
+    remainder_ = time;
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[006], -1)] = accumulator_;
+    registers_[006] = address_add(registers_[006], -1);
+    return 03235;
 }
 
 std::uint16_t Machine::p15765_dispatch_special_function()

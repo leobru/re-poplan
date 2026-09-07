@@ -99,6 +99,9 @@ The address-preserving machine layer now translates:
 - `11755..11757` runtime-installed binding and rebinding templates;
 - `12674` native fixed-point text formation for dictionary primitive
   `PRREAL`, retaining the packed-output and `07742` restoration boundaries;
+- `15667..15704` native local-date and jiffy formation for dictionary
+  primitive `POPDAT`, retaining the original string allocation and `03235`
+  return boundaries;
 - `13207..13215` generated multiply/add/subtract and masked return leaf;
 - `13362..13431` diagnostic formatter initialization, runtime-table
   installation, counted clearing loop, and character-sequence handoff;
