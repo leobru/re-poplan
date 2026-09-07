@@ -534,6 +534,107 @@ ExecutionStatus Machine::step()
     return ExecutionStatus::running;
 }
 
+bool Machine::execute_generated_routine(std::uint16_t &continuation)
+{
+    // Generated POP-2 routines are straight-line call glue. Preflight the
+    // current words so an unfamiliar generated instruction retains the
+    // ordinary per-instruction fallback without partially changing state.
+    std::uint16_t scan_pc = program_counter_;
+    bool scan_right = false;
+    bool terminated = false;
+    for (std::size_t halves = 0; halves != core_words * 2; ++halves) {
+        if (scan_pc < 036000) {
+            return false;
+        }
+        const std::uint64_t word = memory_[scan_pc].raw();
+        const std::uint32_t half = static_cast<std::uint32_t>(
+            scan_right ? word & 077777777ULL : word >> 24);
+        const std::uint16_t opcode = decode_instruction(half).opcode;
+        switch (opcode) {
+        case 001:  // STX
+        case 003:  // XTS
+        case 0220: // UTC
+        case 0240: // VTM
+            break;
+        case 0300: // UJ
+        case 0310: // VJM
+            terminated = true;
+            break;
+        default:
+            return false;
+        }
+        if (terminated) {
+            break;
+        }
+        if (scan_right) {
+            scan_pc = address_add(scan_pc, 1);
+            scan_right = false;
+        } else {
+            scan_right = true;
+        }
+    }
+    if (!terminated) {
+        return false;
+    }
+
+    std::uint16_t pc = program_counter_;
+    bool right = false;
+    std::uint16_t modifier = instruction_modifier_;
+    for (;;) {
+        const std::uint64_t word = memory_[pc].raw();
+        const std::uint32_t half = static_cast<std::uint32_t>(
+            right ? word & 077777777ULL : word >> 24);
+        Instruction instruction = decode_instruction(half);
+        const std::uint16_t next_word = address_add(pc, 1);
+
+        if (right) {
+            pc = next_word;
+            right = false;
+        } else {
+            right = true;
+        }
+        instruction.address = address_add(instruction.address, modifier);
+        modifier = 0;
+
+        const auto effective_address = [&]() {
+            return address_add(
+                instruction.address, register_value(instruction.reg));
+        };
+        switch (instruction.opcode) {
+        case 001:
+            memory_[effective_address()] = accumulator_;
+            hardware_pop_acc();
+            select_alu_group(rau_logical);
+            break;
+        case 003:
+            hardware_push_acc();
+            accumulator_ = memory_[effective_address()];
+            select_alu_group(rau_logical);
+            break;
+        case 0220:
+            modifier = effective_address();
+            break;
+        case 0240:
+            set_register(instruction.reg, instruction.address);
+            break;
+        case 0300:
+            continuation = effective_address();
+            instruction_modifier_ = 0;
+            return true;
+        case 0310:
+            set_register(instruction.reg, next_word);
+            continuation = instruction.address;
+            instruction_modifier_ = 0;
+            return true;
+        default:
+            // The preflight above guarantees this is unreachable unless a
+            // generated STX rewrites a later instruction in the same call.
+            throw MachineError(
+                "generated POP-2 routine rewrote itself while executing");
+        }
+    }
+}
+
 bool Machine::dispatch_translated_routine()
 {
     // BESM transfers always enter the left instruction of a word. A right
@@ -549,6 +650,17 @@ bool Machine::dispatch_translated_routine()
     }
 
     std::uint16_t continuation = 0;
+    if (program_counter_ >= 036000) {
+        if (!execute_generated_routine(continuation)) {
+            return false;
+        }
+        program_counter_ = continuation;
+        right_half_ = false;
+        instruction_modifier_ = 0;
+        ++translated_routine_count_;
+        return true;
+    }
+
     switch (program_counter_) {
     case 01000: continuation = p01000(); break;
     case 01002: continuation = p01002(); break;
@@ -1216,6 +1328,18 @@ bool Machine::dispatch_translated_routine()
     case 013207: continuation = p13207(); break;
     case 013216: continuation = p13216(); break;
     case 013217: continuation = p13217(); break;
+    case 013362: continuation = p13362(); break;
+    case 013367: continuation = p13367(); break;
+    case 013370: continuation = p13370(); break;
+    case 013375: continuation = p13375(); break;
+    case 013376: continuation = p13376(); break;
+    case 013411: continuation = p13411(); break;
+    case 013414: continuation = p13414(); break;
+    case 013421: continuation = p13421(); break;
+    case 013422: continuation = p13422(); break;
+    case 013424: continuation = p13424(); break;
+    case 013426: continuation = p13426(); break;
+    case 013430: continuation = p13430(); break;
     case 013454: continuation = p13454(); break;
     case 013460: continuation = p13460(); break;
     case 013461: continuation = p13461(); break;
@@ -1248,6 +1372,10 @@ bool Machine::dispatch_translated_routine()
     case 016005: continuation = p16005(); break;
     case 016022: continuation = p16022(); break;
     case 016026: continuation = p16026(); break;
+    case 016076: continuation = p16076(); break;
+    case 016104: continuation = p16104(); break;
+    case 016106: continuation = p16106(); break;
+    case 016110: continuation = p16110(); break;
     case 016145: continuation = p16145(); break;
     case 016151: continuation = p16151(); break;
     case 016153: continuation = p16153(); break;
@@ -1379,6 +1507,8 @@ bool Machine::dispatch_translated_routine()
     case 017275: continuation = p17275_shared(); break;
     case 017302: continuation = p17302(); break;
     case 017306: continuation = p17306(); break;
+    case 017330: continuation = p17330(); break;
+    case 017335: continuation = p17335(); break;
     case 017337: continuation = p17337(); break;
     case 017340: continuation = p17340(); break;
     case 017341: continuation = p17341(); break;
@@ -1501,6 +1631,7 @@ bool Machine::dispatch_translated_routine()
     case 020667: continuation = p20667(); break;
     case 020673: continuation = p20673_return(); break;
     case 020674: continuation = p20674(); break;
+    case 021075: continuation = p21075(); break;
     case 021107: continuation = p21107(); break;
     case 021125: continuation = p21125(); break;
     case 021131: continuation = p21131(); break;
@@ -1590,6 +1721,15 @@ bool Machine::dispatch_translated_routine()
     case 025653: continuation = p25653(); break;
     case 025655: continuation = p25655(); break;
     case 025660: continuation = p25660(); break;
+    case 032535: continuation = p32535(); break;
+    case 032540: continuation = p32540(); break;
+    case 032545: continuation = p32545(); break;
+    case 032546: continuation = p32546(); break;
+    case 032553: continuation = p32553(); break;
+    case 032556: continuation = p32556(); break;
+    case 032562: continuation = p32562(); break;
+    case 032564: continuation = p32564(); break;
+    case 032565: continuation = p32565(); break;
     default:
         return false;
     }

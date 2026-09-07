@@ -8421,6 +8421,381 @@ int main(int argc, char **argv)
             *semantic, *interpreted, {entry}, label, max_steps);
     };
 
+    const auto compare_image_entry = [
+        &image_bytes, &compare_one_semantic_step](
+            std::uint16_t entry, const auto &setup,
+            const std::string &label, unsigned max_steps) {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            std::istringstream image_stream(image_bytes);
+            machine->load_image(image_stream);
+            machine->memory(0) = Word48();
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->reg(001) = 013362;
+            machine->reg(002) = 01200;
+            machine->reg(006) = 06000;
+            machine->reg(010) = 017254;
+            machine->reg(013) = 05000;
+            machine->reg(014) = 3;
+            machine->reg(015) = 06000;
+            machine->reg(016) = 04000;
+            machine->reg(017) = 05000;
+            setup(*machine);
+            machine->start(entry);
+        }
+        return compare_one_semantic_step(
+            *semantic, *interpreted, {entry}, label, max_steps);
+    };
+
+    {
+        const std::vector<std::pair<std::uint16_t, Word48>> generated = {
+            {040000, Word48(instruction_pair(
+                long_instruction(003, 0240, 02000),
+                long_instruction(004, 0240, 03000)))},
+            {040001, Word48(instruction_pair(
+                long_instruction(0, 0220, 5),
+                short_instruction(003, 003, 2)))},
+            {040002, Word48(instruction_pair(
+                short_instruction(004, 001, 1),
+                long_instruction(015, 0310, 05215)))},
+        };
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            for (const auto &[address, word] : generated) {
+                machine->memory(address) = word;
+            }
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->reg(017) = 05000;
+            machine->memory(02007) = Word48(0712345670123456ULL);
+            machine->start(040000);
+        }
+        interpreted->set_translated_routines_enabled(false);
+        require(compare_one_semantic_step(
+                    *semantic, *interpreted, {},
+                    "generated VJM glue", 8) == 05215,
+                "generated VJM returns its static continuation");
+        require(semantic->reg(003) == 02000
+                    && semantic->reg(004) == 03000
+                    && semantic->reg(015) == 040003
+                    && semantic->reg(017) == 05000
+                    && semantic->memory(03001)
+                        == Word48(0712345670123456ULL)
+                    && semantic->accumulator()
+                        == Word48(0123456701234567ULL),
+                "generated glue preserves UTC, stack, and VJM semantics");
+        require(semantic->instruction_count() == 1
+                    && semantic->translated_routine_count() == 1
+                    && interpreted->instruction_count() == 6,
+                "generated glue is dispatched as one semantic routine");
+    }
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        const Word48 generated_jump(instruction_pair(
+            long_instruction(005, 0240, 010),
+            long_instruction(005, 0300, 02000)));
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            machine->memory(041000) = generated_jump;
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->start(041000);
+        }
+        interpreted->set_translated_routines_enabled(false);
+        require(compare_one_semantic_step(
+                    *semantic, *interpreted, {},
+                    "generated UJ glue", 4) == 02010,
+                "generated UJ returns its indexed continuation");
+    }
+    {
+        auto unsupported_generated = std::make_unique<Machine>();
+        unsupported_generated->memory(043000) = Word48(instruction_pair(
+            short_instruction(0, 010, 01234),
+            long_instruction(0, 0330, 0)));
+        unsupported_generated->memory(01234) = Word48(07654321);
+        unsupported_generated->start(043000);
+        require(unsupported_generated->step()
+                    == poplan::ExecutionStatus::running
+                    && unsupported_generated->program_counter() == 043000
+                    && unsupported_generated->right_half()
+                    && unsupported_generated->accumulator()
+                        == Word48(07654321)
+                    && unsupported_generated->translated_routine_count() == 0,
+                "unsupported generated opcodes retain instruction fallback");
+    }
+
+    require(compare_image_entry(
+                032535, [](Machine &) {},
+                "32535 low generated entry", 12) == 025427,
+            "32535 preserves the first 25427 boundary");
+    require(compare_image_entry(
+                032540,
+                [](Machine &machine) {
+                    machine.memory(03637) = Word48(1);
+                    machine.memory(032552) = Word48(2);
+                },
+                "32540 unequal path", 8) == 032546,
+            "32540 selects its direct restoration path");
+    require(compare_image_entry(
+                032540,
+                [](Machine &machine) {
+                    machine.memory(03637) = Word48(012345);
+                    machine.memory(032552) = Word48(012345);
+                },
+                "32540 equal path", 16) == 017070,
+            "32540 preserves the 17070 boundary");
+    require(compare_image_entry(
+                032545, [](Machine &) {},
+                "32545 second table call", 4) == 025427,
+            "32545 preserves the second 25427 boundary");
+    require(compare_image_entry(
+                032546,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(06000);
+                },
+                "32546 stack return", 8) == 06000,
+            "32546 restores its caller through r17");
+    require(compare_image_entry(
+                032553, [](Machine &) {},
+                "32553 compiler frame", 16) == 04675,
+            "32553 preserves the 04675 compiler boundary");
+    require(compare_image_entry(
+                032556,
+                [](Machine &machine) {
+                    machine.memory(03641) = Word48(02343);
+                    machine.memory(032567) = Word48(02343);
+                },
+                "32556 matching compiler word", 8) == 032562,
+            "32556 preserves the allocation path");
+    require(compare_image_entry(
+                032556,
+                [](Machine &machine) {
+                    machine.memory(03641) = Word48(02343);
+                    machine.memory(032567) = Word48(07654);
+                },
+                "32556 mismatching compiler word", 12) == 03014,
+            "32556 preserves diagnostic code 04600");
+    require(compare_image_entry(
+                032562, [](Machine &) {},
+                "32562 pair allocation", 8) == 05215,
+            "32562 preserves the 05215 allocation boundary");
+    require(compare_image_entry(
+                032564, [](Machine &) {},
+                "32564 common-list update", 4) == 05410,
+            "32564 preserves the 05410 boundary");
+    require(compare_image_entry(
+                032565,
+                [](Machine &machine) {
+                    machine.reg(007) = 01200;
+                    machine.reg(017) = 05002;
+                    machine.memory(05001) = Word48(012345);
+                    machine.memory(05000) = Word48(06701);
+                },
+                "32565 compiler restoration", 12) == 017175,
+            "32565 restores r7 and preserves the 17175 boundary");
+
+    require(compare_image_entry(
+                013362, [](Machine &) {},
+                "13362 diagnostic formatter setup", 32) == 03275,
+            "13362 preserves the first PUSH_ACC boundary");
+    require(compare_image_entry(
+                013367, [](Machine &) {},
+                "13367 formatter dispatch", 4) == 02750,
+            "13367 preserves the first EVAL_DISPATCH boundary");
+    require(compare_image_entry(
+                013370, [](Machine &) {},
+                "13370 formatter table setup", 16) == 017330,
+            "13370 preserves the first 17330 boundary");
+    require(compare_image_entry(
+                013375, [](Machine &) {},
+                "13375 alternate descriptor", 4) == 017330,
+            "13375 preserves the second 17330 boundary");
+    require(compare_image_entry(
+                013376, [](Machine &) {},
+                "13376 formatter installation", 32) == 05215,
+            "13376 preserves the pair-allocation boundary");
+    require(compare_image_entry(
+                013411, [](Machine &) {},
+                "13411 formatter loop count", 16) == 013414,
+            "13411 preserves the formatter-loop boundary");
+    require(compare_image_entry(
+                013414,
+                [](Machine &machine) {
+                    machine.memory(04001) = Word48(0123);
+                    machine.memory(013442) = Word48(0777);
+                    machine.memory(013446) = Word48(0123);
+                },
+                "13414 tagged slot", 12) == 013421,
+            "13414 recognizes its tagged-slot case");
+    require(compare_image_entry(
+                013414,
+                [](Machine &machine) {
+                    machine.memory(04001) = Word48();
+                    machine.memory(013442) = Word48(0777);
+                },
+                "13414 zero slot", 8) == 013422,
+            "13414 preserves the zero-slot boundary");
+    require(compare_image_entry(
+                013421, [](Machine &) {},
+                "13421 slot write", 4) == 013426,
+            "13421 returns to the counted formatter loop");
+    require(compare_image_entry(
+                013422,
+                [](Machine &machine) {
+                    machine.memory(04000) = Word48(2ULL << 24);
+                },
+                "13422 slot length", 8) == 013424,
+            "13422 preserves the clearing-loop boundary");
+    require(compare_image_entry(
+                013424,
+                [](Machine &machine) {
+                    machine.reg(012) = 3;
+                },
+                "13424 slot clearing", 16) == 013426,
+            "13424 clears the requested number of slots");
+    require(compare_image_entry(
+                013426,
+                [](Machine &machine) {
+                    machine.reg(014) = 2;
+                },
+                "13426 counted continuation", 2) == 013414,
+            "13426 preserves the nonzero counted branch");
+    require(compare_image_entry(
+                013426,
+                [](Machine &machine) {
+                    machine.reg(014) = 0;
+                },
+                "13426 character handoff", 8) == 016313,
+            "13426 preserves the character-sequence boundary");
+    require(compare_image_entry(
+                013430,
+                [](Machine &machine) {
+                    machine.memory(013447) = Word48(06543);
+                    machine.memory(013450) = Word48(1);
+                },
+                "13430 computed continuation", 4) == 06543,
+            "13430 reproduces the modified conditional branch");
+    {
+        auto semantic = std::make_unique<Machine>();
+        auto interpreted = std::make_unique<Machine>();
+        for (Machine *machine : {semantic.get(), interpreted.get()}) {
+            std::istringstream image_stream(image_bytes);
+            machine->load_image(image_stream);
+            machine->memory(0) = Word48();
+            machine->memory(013450) = Word48();
+            machine->accumulator() = Word48(0123456701234567ULL);
+            machine->remainder() = Word48(0765432107654321ULL);
+            machine->alu_mode() = 053;
+            machine->reg(001) = 013362;
+            machine->start(013430);
+        }
+        require(semantic->step() == poplan::ExecutionStatus::halted,
+                "13430 zero path halts semantically");
+        interpreted->disable_translated_routine(013430);
+        require(interpreted->step() == poplan::ExecutionStatus::running
+                    && interpreted->step()
+                        == poplan::ExecutionStatus::running
+                    && interpreted->step()
+                        == poplan::ExecutionStatus::running
+                    && interpreted->step()
+                        == poplan::ExecutionStatus::halted,
+                "13430 instruction zero path reaches E74");
+        require_same_architectural_state(
+            *semantic, *interpreted, "13430 E74 exit");
+    }
+    require(compare_image_entry(
+                017330,
+                [](Machine &machine) {
+                    machine.memory(04000) = Word48(04100);
+                    machine.memory(04100) = Word48(1);
+                },
+                "17330 populated descriptor", 12) == 017260,
+            "17330 preserves the shared table-read boundary");
+    require(compare_image_entry(
+                017330,
+                [](Machine &machine) {
+                    machine.memory(04000) = Word48(04100);
+                    machine.memory(04100) = Word48();
+                },
+                "17330 empty descriptor", 12) == 017335,
+            "17330 preserves the descriptor-default boundary");
+    require(compare_image_entry(
+                017335,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(06000);
+                },
+                "17335 descriptor default", 8) == 06000,
+            "17335 restores the saved link through r17");
+    require(compare_image_entry(
+                021075,
+                [](Machine &machine) {
+                    machine.memory(04001) = Word48(
+                        (static_cast<std::uint64_t>(04200) << 24)
+                        | 04100);
+                    machine.memory(04101) =
+                        Word48(0765432107654321ULL);
+                    machine.memory(04201) =
+                        Word48(0123456701234567ULL);
+                },
+                "21075 packed field update", 32) == 06000,
+            "21075 balances r17 and returns through r15");
+    require(compare_image_entry(
+                016076,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(04000);
+                    machine.memory(04000) = Word48();
+                },
+                "16076 packed update setup", 24) == 021075,
+            "16076 preserves the packed-field update boundary");
+    require(compare_image_entry(
+                016076,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(04000);
+                    machine.memory(04000) = Word48(1);
+                    machine.memory(016233) = Word48(1);
+                },
+                "16076 direct return", 8) == 06000,
+            "16076 preserves its conditional caller return");
+    require(compare_image_entry(
+                016104,
+                [](Machine &machine) {
+                    machine.reg(017) = 05002;
+                    machine.memory(05001) = Word48(04000);
+                },
+                "16104 descriptor update", 8) == 021107,
+            "16104 preserves the descriptor-update boundary");
+    require(compare_image_entry(
+                016106, [](Machine &) {},
+                "16106 table compaction", 8) == 016151,
+            "16106 preserves the table-compaction boundary");
+    require(compare_image_entry(
+                016110,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(012345);
+                    machine.reg(017) = 05002;
+                    machine.memory(05001) = Word48(04000);
+                    machine.memory(05000) = Word48(06000);
+                    machine.memory(04000) = Word48(07654);
+                },
+                "16110 frame restoration", 16) == 020573,
+            "16110 restores the saved link and preserves 20573");
+    require(compare_image_entry(
+                016110,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48();
+                    machine.alu_mode() = 004;
+                },
+                "16110 zero diagnostic", 4) == 016114,
+            "16110 preserves its zero-result diagnostic boundary");
+
     // Every immutable-image region observed as raw in the quine profile is
     // checked against mnemonic-encoded BESM instructions. Generated code is
     // deliberately left to the instruction emulator.

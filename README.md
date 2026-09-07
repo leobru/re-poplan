@@ -102,25 +102,30 @@ uppercase-only GOST alphabet, including its noncontiguous `Ъ` code.
 
 Image execution is hybrid: whenever the PC reaches the left-half entry of an
 implemented `pXXXXX` routine, that semantic C++ routine runs as one machine
-step and returns its continuation address. All other addresses fall back to
-the BESM instruction interpreter. `POPLAN_ROUTINE_TRACE=1` prints each such
-dispatch; `POPLAN_INTERPRET_ONLY=1` disables semantic dispatch for differential
-trace comparisons. `POPLAN_DISABLE_TRANSLATED_ROUTINES=03235,03261` disables
-selected octal entries when isolating a semantic mismatch.
+step and returns its continuation address. Generated routines starting at
+`036000` or above are decoded from memory and execute their observed straight-
+line `stx`, `xts`, `utc`, and `vtm` operations as one semantic unit, returning
+at the first `uj` or `vjm`. An unfamiliar generated opcode retains ordinary
+instruction fallback. `POPLAN_ROUTINE_TRACE=1` prints each such dispatch;
+`POPLAN_INTERPRET_ONLY=1` disables semantic dispatch for differential trace
+comparisons. `POPLAN_DISABLE_TRANSLATED_ROUTINES=03235,03261` disables selected
+octal entries when isolating a semantic mismatch.
 
 All immutable-image code reached by the quine now has semantic dispatch,
 including its 98 direct `vjm` targets, computed continuations, short
-trampolines, and blocking `20205` console-input operation. The remaining quine
-instruction fallback is generated POP-2 code at `32535..32566` and
-`65556..65765`.
+trampolines, and blocking `20205` console-input operation. Generated quine code
+occurs at `32535..32566` and `65556..65765`; the high block is handled by
+generated-routine semantic dispatch, and the low family now has explicit
+semantic entries. A fresh quine trace makes 11,437 semantic dispatches and has
+zero raw instruction steps.
 
-All immutable-image code reached by `zone1224.pop2` now also has semantic
-dispatch. Its remaining instruction fallback is dynamically generated POP-2
-code; the low generated region exercised by this corpus is `32535..32566`.
+All code reached by `zone1224.pop2` now has semantic dispatch, including the
+low generated family at `32535..32566`. A fresh trace makes 265,316 semantic
+dispatches and has zero raw instruction steps.
 
 The complete fixed-seed `ttt.pop2` session through moves `0 0 0` and `1 1 1`
-likewise has no immutable-image instruction fallback. Its remaining raw steps
-are generated POP-2 code, including the low block at `32535..32566`.
+likewise has semantic dispatch for every executed instruction path. The
+scripted session makes 789,885 semantic dispatches and has zero raw steps.
 
 Extracode `050` implements the BESM-6 floating-point square root (`000`), sine
 (`001`), cosine (`002`), arctangent (`003`), arcsine (`004`), natural logarithm

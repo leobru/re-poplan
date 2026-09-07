@@ -379,6 +379,28 @@ public:
     std::uint16_t p03057_begin_error_format();
     std::uint16_t p03072_resume_error_format();
 
+    // Literal translations of the diagnostic formatter initialization and
+    // its shared descriptor probe. Calls remain semantic boundaries.
+    std::uint16_t p13362();
+    std::uint16_t p13367();
+    std::uint16_t p13370();
+    std::uint16_t p13375();
+    std::uint16_t p13376();
+    std::uint16_t p13411();
+    std::uint16_t p13414();
+    std::uint16_t p13421();
+    std::uint16_t p13422();
+    std::uint16_t p13424();
+    std::uint16_t p13426();
+    std::uint16_t p13430();
+    std::uint16_t p17330();
+    std::uint16_t p17335();
+    std::uint16_t p21075();
+    std::uint16_t p16076();
+    std::uint16_t p16104();
+    std::uint16_t p16106();
+    std::uint16_t p16110();
+
     // Primitive-runtime entries reached by the first diagnostic-format call.
     std::uint16_t p07472();
     std::uint16_t p07475_cuchin();
@@ -491,6 +513,15 @@ public:
     std::uint16_t p25556();
     std::uint16_t p25641();
     std::uint16_t p25660();
+    std::uint16_t p32535();
+    std::uint16_t p32540();
+    std::uint16_t p32545();
+    std::uint16_t p32546();
+    std::uint16_t p32553();
+    std::uint16_t p32556();
+    std::uint16_t p32562();
+    std::uint16_t p32564();
+    std::uint16_t p32565();
 
 private:
     static std::uint16_t address_add(std::uint16_t value, int delta)
@@ -535,6 +566,7 @@ private:
     void xts(std::uint16_t address);
     void sti(std::size_t index);
     void stx(std::uint16_t address);
+    bool execute_generated_routine(std::uint16_t &continuation);
     bool native_character_output_active() const;
     void append_native_output_byte(std::uint8_t character);
     void output_native_character(std::uint8_t character);

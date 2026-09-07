@@ -100,10 +100,14 @@ The address-preserving machine layer now translates:
 - `12674` native fixed-point text formation for dictionary primitive
   `PRREAL`, retaining the packed-output and `07742` restoration boundaries;
 - `13207..13215` generated multiply/add/subtract and masked return leaf;
+- `13362..13431` diagnostic formatter initialization, runtime-table
+  installation, counted clearing loop, and character-sequence handoff;
 - `15765..16003` special-function argument expansion and evaluator
   redispatch;
 - `16005..16027` descriptor-chain scan, allocation, record initialization,
   and computed return;
+- `16076..16113` packed-update setup, descriptor update, table compaction,
+  and saved-frame restoration;
 - `16254..16303` trace-confirmed arithmetic table search, including its
   multiply/RMR offset path and two-value narrowing loop;
 - `16313..16333` packed-character sequence entry, dispatch, and restoration;
@@ -129,6 +133,8 @@ The address-preserving machine layer now translates:
 - `17242..17253` shared long/short table-scan entries;
 - `17254..17266` shared table read and its allocation continuation;
 - `17275..17306` shared table write and its allocation continuation;
+- `17330..17336` shared descriptor probe, default installation, and
+  stack-selected return;
 - `17337..17342` descriptor-selecting wrappers for those shared table bodies;
 - `17417..17461` object/compiler classification, nested call continuations,
   generated transfer, and saved-frame restoration;
@@ -156,6 +162,7 @@ The address-preserving machine layer now translates:
 - `20660..20665` memory-bound arithmetic and indirect store;
 - `20673` trivial register return;
 - `20674..20706` console message output and status handling;
+- `21075..21106` packed two-address field update and balanced return;
 - `21107..21117` descriptor-mask and record-word update;
 - `21141..21174` generated two-arm allocation/update loop and frame
   restoration;
@@ -172,6 +179,8 @@ The address-preserving machine layer now translates:
 - `25356` and `25370..25405` end-character and packed token-source paths;
 - `25421..25426` descriptor advance wrapper around the preserved `06424`
   boundary.
+- `32535..32566` low generated compiler wrapper, including its table calls,
+  comparison arms, allocation path, diagnostic exit, and frame restoration.
 
 The C++ tests compare the one-argument `20124` transition at generated entry
 `65576` with the BESM trace, exercise a three-argument activation round trip,
@@ -196,6 +205,12 @@ adapter supplies prompts, line input, record output, and GOST-10859 UTF-8
 conversion in both directions, including Unicode Cyrillic input. Э75 stores
 generated instruction words into memory, so the
 historical compiler and evaluator run unchanged inside this machine layer.
+Generated routine entries at `036000` and above now use a memory-driven
+semantic dispatcher for the six dynamically observed opcodes: `stx`, `xts`,
+`utc`, `vtm`, `uj`, and `vjm`. It preflights each straight-line body before
+changing state, executes through stack/modifier setup, and returns the first
+jump or call target as its semantic continuation. Other generated opcodes
+retain instruction fallback.
 `make cpp-quine` matches the existing normalized quine fixture through the
 final host-EOF input request. This raw-image route is a whole-system
 conformance path, not a substitute for continuing the address-preserving
@@ -216,17 +231,16 @@ The final quine-static pass converts `01000..01002`, `03461..03475`,
 `07761..07772`, `11514`, `11746..11747`, `16145..16150`, `16513..16521`,
 `16530`, `16616..16623`, `16745..16747`, `17120..17121`, `17131`, the primary
 input `Э71` sites at `20200`/`20205`/`20207`, and `20564..20570`. A fresh run
-records 11,406 semantic dispatches and 95 raw instruction steps. None of those
-raw steps is in the immutable image; all are generated POP-2 code at
-`32535..32566` or `65556..65765`.
+with the low generated wrapper translated records 11,437 semantic dispatches
+and zero raw instruction steps.
 
 The subsequent `zone1224.pop2` static sweep converts every remaining traced
 immutable-image entry, including the hot `13454`, `04142`, `06757..07043`,
 `12125`, `12246`, `15322`, and `21631..25753` clusters and their left-half
 continuations. A fresh combined CPU/routine trace contains no instruction
-fallback in immutable code. The remaining 100,723 instruction steps are in
-dynamically generated POP-2 code; the same run makes 231,482 semantic
-dispatches.
+fallback in immutable code. With high generated-routine dispatch, a fresh run
+makes 265,316 semantic dispatches and zero raw instruction steps. The former
+low generated fallback at `32535..32566` is fully covered by semantic entries.
 
 The following full-game sweep converts the remaining immutable templates
 reached by fixed-seed `ttt.pop2`: `03310..03315`, `03371..03373`,
@@ -234,9 +248,10 @@ reached by fixed-seed `ttt.pop2`: `03310..03315`, `03371..03373`,
 `LOGAND` body at `12036..12054`, `16320`, `17054..17062`, `20073..20104`,
 the session exit at `20715..20723`, and `25640`. The scripted session answers
 both opening questions, plays `0 0 0` and `1 1 1`, resigns, declines another
-game, and exits. Its fresh trace contains 729,497 semantic dispatches and
-192,844 raw instructions, with no immutable-image fallback; the 665 raw
-half-instructions below `36000` are all generated code at `32535..32566`.
+game, and exits. With high generated-routine dispatch, its fresh trace contains
+789,885 semantic dispatches and zero raw instructions. The broader game trace
+exercises the translated low generated family without exposing another raw
+path.
 
 ## Port Order
 
