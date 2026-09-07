@@ -11702,6 +11702,11 @@ std::uint16_t Machine::p03473()
     return 017120;
 }
 
+std::uint16_t Machine::p03474()
+{
+    return 017122;
+}
+
 std::uint16_t Machine::p03475()
 {
     return 017131;
@@ -11914,6 +11919,31 @@ std::uint16_t Machine::p17120()
     select_alu_group(rau_logical);
     memory_[017566] = accumulator_;
     return 025427;
+}
+
+std::uint16_t Machine::p17122()
+{
+    accumulator_ = Word48(registers_[015]);
+    select_alu_group(rau_logical);
+    hardware_push_acc();
+    registers_[015] = 017124;
+    return 017571;
+}
+
+std::uint16_t Machine::p17124()
+{
+    registers_[010] = 017122;
+    xts(address_add(registers_[010], 6));
+    registers_[015] = 017126;
+    return 04447;
+}
+
+std::uint16_t Machine::p17126()
+{
+    hardware_pop_acc();
+    select_alu_group(rau_logical);
+    set_register(015, accumulator_.address());
+    return 025532;
 }
 
 std::uint16_t Machine::p17131()

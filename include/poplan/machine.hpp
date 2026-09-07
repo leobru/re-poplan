@@ -332,6 +332,7 @@ public:
     std::uint16_t p03466();
     std::uint16_t p03467();
     std::uint16_t p03473();
+    std::uint16_t p03474();
     std::uint16_t p03475();
     std::uint16_t p07761();
     std::uint16_t p11514();
@@ -342,6 +343,9 @@ public:
     std::uint16_t p16616();
     std::uint16_t p16745();
     std::uint16_t p17120();
+    std::uint16_t p17122();
+    std::uint16_t p17124();
+    std::uint16_t p17126();
     std::uint16_t p17131();
     std::uint16_t p20200_query_input_status();
     std::uint16_t p20205_transfer_input();

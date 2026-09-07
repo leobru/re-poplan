@@ -123,6 +123,11 @@ All code reached by `zone1224.pop2` now has semantic dispatch, including the
 low generated family at `32535..32566`. A fresh trace makes 265,316 semantic
 dispatches and has zero raw instruction steps.
 
+All code reached while loading `zone1222.pop2` likewise has semantic dispatch.
+The former `03474` and `17122..17127` instruction path is represented by four
+call-preserving semantic entries; a fresh trace makes 66,970 semantic
+dispatches and zero raw instruction steps.
+
 The complete fixed-seed `ttt.pop2` session through moves `0 0 0` and `1 1 1`
 likewise has semantic dispatch for every executed instruction path. The
 scripted session makes 789,885 semantic dispatches and has zero raw steps.

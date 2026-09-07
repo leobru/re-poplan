@@ -234,6 +234,13 @@ input `Э71` sites at `20200`/`20205`/`20207`, and `20564..20570`. A fresh run
 with the low generated wrapper translated records 11,437 semantic dispatches
 and zero raw instruction steps.
 
+The `zone1222.pop2` macro/debug definitions exposed one additional computed
+trampoline at `03474` and the call-separated body `17122..17127`. They now
+dispatch through entries `03474`, `17122`, `17124`, and `17126`, preserving
+the original calls to `17571` and `04447` and the final `25532` boundary. A
+fresh combined CPU/routine trace makes 66,970 semantic dispatches and zero raw
+instruction steps.
+
 The subsequent `zone1224.pop2` static sweep converts every remaining traced
 immutable-image entry, including the hot `13454`, `04142`, `06757..07043`,
 `12125`, `12246`, `15322`, and `21631..25753` clusters and their left-half

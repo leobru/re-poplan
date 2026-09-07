@@ -727,6 +727,7 @@ bool Machine::dispatch_translated_routine()
     case 03466: continuation = p03466(); break;
     case 03467: continuation = p03467(); break;
     case 03473: continuation = p03473(); break;
+    case 03474: continuation = p03474(); break;
     case 03475: continuation = p03475(); break;
     case 03506: continuation = p03506(); break;
     case 03516: continuation = p03516(); break;
@@ -1489,6 +1490,9 @@ bool Machine::dispatch_translated_routine()
     case 017161: continuation = p17161(); break;
     case 017163: continuation = p17163(); break;
     case 017120: continuation = p17120(); break;
+    case 017122: continuation = p17122(); break;
+    case 017124: continuation = p17124(); break;
+    case 017126: continuation = p17126(); break;
     case 017131: continuation = p17131(); break;
     case 017132: continuation = p17132(); break;
     case 017164: continuation = p17164(); break;

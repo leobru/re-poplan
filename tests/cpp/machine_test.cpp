@@ -8849,6 +8849,9 @@ int main(int argc, char **argv)
             long_instruction(010, 0300, 077710), 0))},
         {03473, Word48(instruction_pair(
             long_instruction(0, 0300, 017120), 0))},
+        {03474, Word48(instruction_pair(
+            long_instruction(0, 0300, 017122),
+            long_instruction(0, 0220, 0)))},
         {03475, Word48(instruction_pair(
             long_instruction(0, 0300, 017131), 0))},
     };
@@ -8888,9 +8891,64 @@ int main(int argc, char **argv)
                 "03473 branch", 2) == 017120,
             "03473 preserves the 17120 boundary");
     require(compare_static_entry(
+                03474, p03461_code, [](Machine &) {},
+                "03474 branch", 2) == 017122,
+            "03474 preserves the 17122 boundary");
+    require(compare_static_entry(
                 03475, p03461_code, [](Machine &) {},
                 "03475 branch", 2) == 017131,
             "03475 preserves the 17131 boundary");
+
+    const std::vector<std::pair<std::uint16_t, Word48>> p17122_code = {
+        {017122, Word48(instruction_pair(
+            short_instruction(0, 042, 015),
+            short_instruction(017, 000, 0)))},
+        {017123, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 017571)))},
+        {017124, Word48(instruction_pair(
+            long_instruction(010, 0240, 017122),
+            short_instruction(010, 003, 6)))},
+        {017125, Word48(instruction_pair(
+            long_instruction(0, 0220, 0),
+            long_instruction(015, 0310, 04447)))},
+        {017126, Word48(instruction_pair(
+            short_instruction(017, 010, 0),
+            short_instruction(0, 040, 015)))},
+        {017127, Word48(instruction_pair(
+            long_instruction(0, 0300, 025532),
+            long_instruction(0, 0220, 0)))},
+    };
+    require(compare_static_entry(
+                017122, p17122_code,
+                [](Machine &machine) {
+                    machine.reg(015) = 03554;
+                    machine.reg(017) = 05000;
+                },
+                "17122 saved-link setup", 6) == 017571,
+            "17122 saves r15 and preserves the 17571 boundary");
+    require(compare_static_entry(
+                017124, p17122_code,
+                [](Machine &machine) {
+                    machine.reg(010) = 01234;
+                    machine.reg(015) = 017575;
+                    machine.reg(017) = 05001;
+                    machine.memory(017130) =
+                        Word48(0100000000000000ULL);
+                },
+                "17124 argument setup", 6) == 04447,
+            "17124 preserves the 04447 boundary");
+    require(compare_static_entry(
+                017126, p17122_code,
+                [](Machine &machine) {
+                    machine.reg(015) = 017126;
+                    machine.reg(017) = 05002;
+                    machine.memory(05000) =
+                        Word48(0765432107654321ULL);
+                    machine.memory(05001) = Word48(01234);
+                },
+                "17126 stack restoration", 4) == 025532,
+            "17126 restores r15 and preserves the 25532 boundary");
 
     const std::vector<std::pair<std::uint16_t, Word48>> p07761_code = {
         {07761, Word48(instruction_pair(
