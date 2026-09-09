@@ -281,6 +281,42 @@ already exhausts its storage there. Ordinary live call depth alone therefore
 does not explain the failure; retained activation and closure environments
 must account for the additional pressure.
 
+## Library Disk Input
+
+The input `[POPLIB FOURS].LIBRARY.COMPILE;` reaches the raw static routine at
+`24025`. Words `24025..24041` assemble an `Э70` control word from the current
+file descriptor: the observed request `0010360000570000` selects a read from
+logical unit `057`, zone zero, into page `036` (`074000..075777`). At `24042`
+the routine addresses that control word through `r15=r13+7` and executes
+`Э70 (r15)`. Words `24043..24046` derive the destination address from the page
+field and validate the first loaded word against the `026062` file-header
+signature at `25142`; `24047` takes the diagnostic exit when it differs.
+
+A clean-image trace then requests zone `0006`, checks word `0012` against
+`0002704112630442`, relocates the loaded object, and transfers into it. Thus
+zone 6 is an executable overlay, not the zone-zero catalog. The same word was
+found at word `0012` of an unrelated surviving object whose embedded title is
+"КОНТРОЛЬ ТЕКУЩЕЙ СТАТИСТИКИ"; POPLAN accepted and relocated it but ran its
+unrelated code. The word is therefore an object-format signature, not enough
+to identify or reconstruct the missing POPLAN library overlay.
+
+The host-simulated path consequently dispatches at `14662`, after `14705` has
+placed the decoded user and file words at `14216` and `14217`. A recognized
+native directory queues its source lines and returns the existing `CHARIN`
+supplier through the original `14677..14704` result/restore epilogue. If the
+native marker or requested record is absent, `14662` performs the original
+`NTR 3` effect, sets the `VJM` link to `14663`, and continues at `14723`; the
+historical disk path is not hidden by the semantic implementation.
+
+The compatibility `poplib.bin` remains a flat six-byte-per-word image. Zone 0
+contains its explicit `RPN57` directory, zones 1 through 5 are empty, zone 6
+contains a synthetic loader-compatible overlay, and source payloads begin at
+zone 7. `tools/run-dispak.sh` imports this flat file into physical volume 2157
+with `besmtool write` before running historical dispak. The overlay recognizes
+the same directory records and supplies the source through the resident
+compiler interface; it is experimental compatibility code, not recovered
+evidence for the historical catalog or overlay format.
+
 ## Four-Argument Man-Or-Boy Variant
 
 `tests/inputs/man-or-boy-four.pop2` removes `X5` and rotates four functional

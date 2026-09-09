@@ -143,9 +143,39 @@ string as `DD.MM.YY` and returns the same current-time jiffy value as its
 second result.
 Extracode `063` with address `004` returns elapsed image-execution time in the
 same 1/50-second units.
+Extracode `070` reads logical disk `057` from the flat `poplib.bin` in the
+current directory. The control word may be in memory or, for effective address
+zero, in ACC; each selected zone is decoded as `02000` big-endian six-byte BESM
+words and transferred to the requested memory page. Other devices retain the
+existing fallback behavior, and writes to `057` are deliberately unsupported.
+`tools/run-dispak.sh` imports the same flat file into physical volume `2157`
+with `besmtool write 2157 --start=0 --from-file=poplib.bin` before running
+dispak.
+`LIBRARY` dispatches semantically after its two identifiers have been decoded,
+at `14662`. An emulator-native POPLIB directory supplies source text through
+existing `CHARIN` interface; an absent, malformed, or unmatched native
+directory takes the original `NTR 3; VJM 14723(16)` path. Build a FOURS image
+from the recovered source zone and run it with:
+
+```sh
+tools/make-poplib.py poplib.bin \
+    --entry POPLIB FOURS zone1220.bin 9172 \
+    --entry POPLIB DEBUG zone1222.pop2 - \
+    --entry POPLIB MEMOFNS zone1223.pop2 - \
+    --entry POPLIB EXAMPL zone1224.pop2 -
+printf '%s\n' '[POPLIB FOURS].LIBRARY.COMPILE;' | build/cpp/poplan
+```
+
+The explicit length excludes the non-source marker and patterned fill after
+byte 9172. The native directory layout is documented in
+[`docs/poplib-format.md`](docs/poplib-format.md).
 Extracode `064` formatted output is accepted as a no-op; POPLAN's emulated
 console path uses `Э71` for observable terminal I/O.
 Extracode `074` with address `000` terminates image execution normally.
+
+Set `POPLAN_E70_TRACE=1` to print decoded disk controls and
+`POPLAN_CPU_DETAIL_TRACE=1` to print decoded raw instructions with their
+effective addresses and register state.
 
 The historical UTF-8 Cyrillic example corpus can be checked in both hybrid
 and instruction-only modes with:

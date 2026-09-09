@@ -29,6 +29,10 @@ summarize_coverage = load_module(
 convert_koi7_lower = load_module(
     "convert_koi7_lower", ROOT / "tools" / "convert-koi7-lower.py"
 )
+show_poplib_catalog = load_module(
+    "show_poplib_catalog", ROOT / "tools" / "show-poplib-catalog.py"
+)
+make_poplib = load_module("make_poplib", ROOT / "tools" / "make-poplib.py")
 
 
 class NormalizeOutputTests(unittest.TestCase):
@@ -49,6 +53,60 @@ class ConvertKoi7LowerTests(unittest.TestCase):
         self.assertEqual(
             convert_koi7_lower.convert("abcxyz ABC [] `{|}~"),
             "АБЦЬЫЗ ABC [] ЮШЭЩЧ",
+        )
+
+
+class ShowPoplibCatalogTests(unittest.TestCase):
+    def test_finds_and_renders_catalog(self):
+        directory_size = 8
+        words = [0] * show_poplib_catalog.WORDS_PER_ZONE
+        words[:8] = [
+            show_poplib_catalog.HEADER_VALUE | directory_size,
+            show_poplib_catalog.MAGIC_WORD,
+            2,
+            1,
+            int.from_bytes(bytes((0o60, 0o56, 0o60, 0o104, 0o102, 0o42)),
+                           "big"),
+            int.from_bytes(bytes((0o100, 0o56, 0o111, 0o107, 0o110, 0o17)),
+                           "big"),
+            0o7,
+            9172,
+        ]
+
+        catalogs = show_poplib_catalog.find_catalogs(words)
+        output = show_poplib_catalog.render(
+            Path("poplib.bin"), show_poplib_catalog.ZONE_BYTES, catalogs
+        )
+
+        self.assertEqual(len(catalogs), 1)
+        self.assertEqual(catalogs[0].records[0].user, "POPLIB")
+        self.assertEqual(catalogs[0].records[0].name, "FOURS")
+        self.assertIn("POPLIB  FOURS   0007  0010  9172", output)
+
+    def test_rejects_inconsistent_directory_size(self):
+        words = [0] * show_poplib_catalog.WORDS_PER_ZONE
+        words[:4] = [
+            show_poplib_catalog.HEADER_VALUE | 4,
+            show_poplib_catalog.MAGIC_WORD,
+            2,
+            1,
+        ]
+        with self.assertRaisesRegex(
+                show_poplib_catalog.CatalogError, "records require 8"):
+            show_poplib_catalog.find_catalogs(words)
+
+
+class MakePoplibTests(unittest.TestCase):
+    def test_restores_unicode_cyrillic_to_internal_koi7(self):
+        self.assertEqual(
+            make_poplib.encode_source("ФУНКЦИЯ\n".encode()),
+            b"funkciq\012",
+        )
+
+    def test_library_names_use_poplan_six_character_word(self):
+        self.assertEqual(
+            make_poplib.name_word("MEMOFNS"),
+            make_poplib.name_word("MEMOFN"),
         )
 
 

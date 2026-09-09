@@ -1,6 +1,7 @@
 #include "poplan/console.hpp"
 #include "poplan/machine.hpp"
 
+#include <cstdio>
 #include <ctime>
 #include <cstdlib>
 #include <fstream>
@@ -142,6 +143,13 @@ poplan::Word48 packed_identifier(std::string_view identifier)
     return poplan::Word48(word);
 }
 
+void write_word(std::ostream &output, std::uint64_t word)
+{
+    for (int shift = 40; shift >= 0; shift -= 8) {
+        output.put(static_cast<char>((word >> shift) & 0377));
+    }
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -158,7 +166,8 @@ int main(int argc, char **argv)
 
     // POPLAN's compiler emits code through extracode 075, then branches to
     // the newly written instruction words.
-    Machine e75_store;
+    auto e75_store_storage = std::make_unique<Machine>();
+    Machine &e75_store = *e75_store_storage;
     constexpr std::uint32_t e75_left = (075U << 12) | 01234U;
     constexpr std::uint32_t stop_right =
         (1U << 19) | (0330U << 12);
@@ -276,6 +285,167 @@ int main(int argc, char **argv)
                 && e64_ignored->reg(016) == 07536
                 && e64_ignored->alu_mode() == 004,
             "ignored E64 preserves data state and exposes its address");
+
+    auto e70_read = std::make_unique<Machine>();
+    std::ostringstream poplib_name_stream;
+    poplib_name_stream << "/tmp/poplan-library-" << e70_read.get() << ".bin";
+    const std::string poplib_path = poplib_name_stream.str();
+    {
+        std::ofstream poplib(poplib_path, std::ios::binary);
+        require(static_cast<bool>(poplib),
+                "the E70 test can create its NU 57 image");
+        for (std::size_t index = 0; index != 04000; ++index) {
+            const std::uint64_t word =
+                (index < 02000 ? 0123400000000000ULL
+                               : 0234500000000000ULL)
+                + index % 02000;
+            for (int shift = 40; shift >= 0; shift -= 8) {
+                poplib.put(static_cast<char>((word >> shift) & 0377));
+            }
+        }
+        require(static_cast<bool>(poplib),
+                "the E70 test writes two complete NU 57 zones");
+    }
+    e70_read->set_poplib_path(poplib_path);
+    constexpr std::uint16_t e70_control_address = 02000;
+    constexpr std::uint16_t e70_destination = 074000;
+    constexpr std::uint64_t e70_control =
+        (std::uint64_t{1} << 39)
+        | (std::uint64_t{036} << 30)
+        | (std::uint64_t{057} << 12);
+    constexpr std::uint32_t e70_left =
+        (070U << 12) | e70_control_address;
+    e70_read->memory(01000) = Word48(
+        (static_cast<std::uint64_t>(e70_left) << 24) | stop_right);
+    e70_read->memory(e70_control_address) = Word48(e70_control);
+    e70_read->memory(e70_destination - 1) = Word48(07654);
+    e70_read->accumulator() = Word48(0123456701234567ULL);
+    e70_read->remainder() = Word48(0765432107654321ULL);
+    e70_read->alu_mode() = 020;
+    e70_read->disable_translated_routine(01000);
+    e70_read->start(01000);
+    require(e70_read->step() == poplan::ExecutionStatus::running,
+            "E70 NU 57 read continues with the right half");
+    require(e70_read->memory(e70_destination)
+                == Word48(0123400000000000ULL)
+                && e70_read->memory(e70_destination + 1)
+                    == Word48(0123400000000001ULL)
+                && e70_read->memory(075777)
+                    == Word48(0123400000001777ULL),
+            "E70 reads the selected NU 57 zone as big-endian 48-bit words");
+    require(e70_read->memory(e70_destination - 1) == Word48(07654),
+            "E70 confines the transfer to the selected memory page");
+    require(e70_read->accumulator() == Word48(0123456701234567ULL)
+                && e70_read->remainder() == Word48(0765432107654321ULL)
+                && e70_read->reg(016) == e70_control_address
+                && e70_read->alu_mode() == 004,
+            "E70 preserves arithmetic data and exposes its effective address");
+
+    auto e70_accumulator_control = std::make_unique<Machine>();
+    constexpr std::uint16_t e70_accumulator_destination = 072000;
+    constexpr std::uint64_t e70_accumulator_word =
+        (std::uint64_t{1} << 39)
+        | (std::uint64_t{035} << 30)
+        | (std::uint64_t{057} << 12)
+        | 1;
+    constexpr std::uint32_t e70_accumulator_left = 070U << 12;
+    e70_accumulator_control->set_poplib_path(poplib_path);
+    e70_accumulator_control->memory(01000) = Word48(
+        (static_cast<std::uint64_t>(e70_accumulator_left) << 24)
+        | stop_right);
+    e70_accumulator_control->accumulator() =
+        Word48(e70_accumulator_word);
+    e70_accumulator_control->disable_translated_routine(01000);
+    e70_accumulator_control->start(01000);
+    require(e70_accumulator_control->step()
+                == poplan::ExecutionStatus::running
+                && e70_accumulator_control->memory(
+                       e70_accumulator_destination)
+                    == Word48(0234500000000000ULL)
+                && e70_accumulator_control->memory(073777)
+                    == Word48(0234500000001777ULL),
+            "E70 takes its NU 57 control word from ACC at address zero");
+    require(e70_accumulator_control->accumulator()
+                == Word48(e70_accumulator_word)
+                && e70_accumulator_control->reg(016) == 0,
+            "E70 address-zero transfer preserves ACC and reports r16 zero");
+    require(std::remove(poplib_path.c_str()) == 0,
+            "the E70 test removes its temporary NU 57 image");
+
+    // The native library directory retains the validated POPLAN zone-zero
+    // header, followed by an explicit marker and four-word source records.
+    auto native_library = std::make_unique<Machine>();
+    std::ostringstream native_poplib_name;
+    native_poplib_name << "/tmp/poplan-native-library-"
+                       << native_library.get() << ".bin";
+    const std::string native_poplib_path = native_poplib_name.str();
+    constexpr std::uint64_t poplib_name = 01402706021041042ULL;
+    constexpr std::uint64_t demo_name = 01762245413407417ULL;
+    constexpr std::string_view native_source = "2+2=>\nNEXT";
+    {
+        std::ofstream poplib(native_poplib_path, std::ios::binary);
+        require(static_cast<bool>(poplib),
+                "the native-library test can create its NU 57 image");
+        write_word(poplib, 01303100000000010ULL);
+        write_word(poplib, 02445011615233400ULL);
+        write_word(poplib, 1);
+        write_word(poplib, 1);
+        write_word(poplib, poplib_name);
+        write_word(poplib, demo_name);
+        write_word(poplib, 1);
+        write_word(poplib, native_source.size());
+        poplib.seekp(6144);
+        poplib.write(native_source.data(),
+                   static_cast<std::streamsize>(native_source.size()));
+        poplib.seekp(2 * 6144 - 1);
+        poplib.put('\0');
+        require(static_cast<bool>(poplib),
+                "the native-library test writes its source payload");
+    }
+    native_library->set_poplib_path(native_poplib_path);
+    native_library->reg(001) = 015117;
+    native_library->memory(014216) = Word48(poplib_name);
+    native_library->memory(014217) = Word48(demo_name);
+    native_library->memory(01513) = Word48(06600000000007472ULL);
+    native_library->start(014662);
+    require(native_library->step() == poplan::ExecutionStatus::running
+                && native_library->program_counter() == 014677
+                && native_library->memory(014224)
+                    == Word48(06600000000007472ULL),
+            "14662 selects the native source and enters the original epilogue");
+
+    native_library->reg(010) = 020170;
+    native_library->memory(020364) = Word48(04034021041120221ULL);
+    native_library->emulate_e71(020364);
+    std::vector<std::uint8_t> first_line =
+        poplan::encode_gost_text("2+2=>");
+    std::string expected_first(first_line.begin(), first_line.end());
+    expected_first.push_back(static_cast<char>(0377));
+    require(stored_text(*native_library, 020400, expected_first.size())
+                == expected_first,
+            "the native library queues its first source line for CHARIN");
+    native_library->emulate_e71(020364);
+    std::vector<std::uint8_t> second_line =
+        poplan::encode_gost_text("NEXT");
+    std::string expected_second(second_line.begin(), second_line.end());
+    expected_second.push_back(static_cast<char>(0377));
+    require(stored_text(*native_library, 020400, expected_second.size())
+                == expected_second,
+            "the native library queues all remaining source lines in order");
+    require(std::remove(native_poplib_path.c_str()) == 0,
+            "the native-library test removes its NU 57 image");
+
+    auto native_library_fallback_storage = std::make_unique<Machine>();
+    Machine &native_library_fallback = *native_library_fallback_storage;
+    native_library_fallback.set_poplib_path(
+        "/tmp/re-poplan-native-library-does-not-exist");
+    native_library_fallback.start(014662);
+    require(native_library_fallback.step()
+                == poplan::ExecutionStatus::running
+                && native_library_fallback.program_counter() == 014723
+                && native_library_fallback.reg(016) == 014663
+                && native_library_fallback.alu_mode() == 3,
+            "14662 preserves its raw NTR/VJM path without a native directory");
 
     auto e74_exit = std::make_unique<Machine>();
     constexpr std::uint32_t e74_left = (074U << 12);
@@ -547,7 +717,8 @@ int main(int argc, char **argv)
                 && zero_register_read->reg(0) == 012,
             "register-source instructions read architectural r0 as zero");
 
-    Machine machine;
+    auto machine_storage = std::make_unique<Machine>();
+    Machine &machine = *machine_storage;
     machine.reg(06) = 070000;
     machine.accumulator() = Word48(06400000000000001ULL);
     machine.p03275_push_acc();
@@ -1173,7 +1344,8 @@ int main(int argc, char **argv)
             Word48(01501010101010101ULL);
     };
 
-    Machine dispatch;
+    auto dispatch_storage = std::make_unique<Machine>();
+    Machine &dispatch = *dispatch_storage;
     install_dispatch_constants(dispatch);
     dispatch.accumulator() = Word48(06606562700065576ULL);
     require(dispatch.p02750_dispatch() == 03206,
@@ -1183,13 +1355,15 @@ int main(int argc, char **argv)
     require(dispatch.memory(03273) == Word48(065627),
             "02750 extracts the closure environment");
 
-    Machine direct_dispatch;
+    auto direct_dispatch_storage = std::make_unique<Machine>();
+    Machine &direct_dispatch = *direct_dispatch_storage;
     install_dispatch_constants(direct_dispatch);
     direct_dispatch.accumulator() = Word48(06600000000007667ULL);
     require(direct_dispatch.p02750_dispatch() == 03261,
             "02750 sends an environment-free function to 03261");
 
-    Machine special_dispatch;
+    auto special_dispatch_storage = std::make_unique<Machine>();
+    Machine &special_dispatch = *special_dispatch_storage;
     install_dispatch_constants(special_dispatch);
     special_dispatch.accumulator() = Word48(06640000000015765ULL);
     require(special_dispatch.p02750_dispatch() == 015765,
@@ -7392,7 +7566,8 @@ int main(int argc, char **argv)
                 && untagged_byte->reg(013) == 072,
             "16421 rejects an untagged value before selecting a field");
 
-    Machine invalid_dispatch;
+    auto invalid_dispatch_storage = std::make_unique<Machine>();
+    Machine &invalid_dispatch = *invalid_dispatch_storage;
     install_dispatch_constants(invalid_dispatch);
     invalid_dispatch.accumulator() = Word48(06400000000000001ULL);
     require(invalid_dispatch.p02750_dispatch() == 03014,
@@ -7405,7 +7580,8 @@ int main(int argc, char **argv)
 
     // Syntax error from tests/inputs/syntax-error.pop2. The trace reaches
     // 03014 from 03615 with r16=04020 and source object 7200000000016750.
-    Machine syntax_error;
+    auto syntax_error_storage = std::make_unique<Machine>();
+    Machine &syntax_error = *syntax_error_storage;
     install_dispatch_constants(syntax_error);
     syntax_error.memory(03153) = Word48(0000000000010000ULL);
     syntax_error.memory(03154) = Word48(1);
@@ -7509,7 +7685,8 @@ int main(int argc, char **argv)
             "21255 enters 21275 with the traced accumulator and link");
 
     // Traced output conversion for the first diagnostic heading character.
-    Machine character_output;
+    auto character_output_storage = std::make_unique<Machine>();
+    Machine &character_output = *character_output_storage;
     install_character_converter(character_output);
     character_output.accumulator() =
         Word48(06400000000000052ULL);
@@ -7545,7 +7722,8 @@ int main(int argc, char **argv)
         {060, 000},
     };
     for (const CharacterMapping mapping : output_mappings) {
-        Machine converter;
+        auto converter_storage = std::make_unique<Machine>();
+        Machine &converter = *converter_storage;
         install_character_converter(converter);
         converter.accumulator() = Word48(
             06400000000000000ULL | mapping.source);
@@ -7561,7 +7739,8 @@ int main(int argc, char **argv)
         {001, 061},
     };
     for (const CharacterMapping mapping : input_mappings) {
-        Machine converter;
+        auto converter_storage = std::make_unique<Machine>();
+        Machine &converter = *converter_storage;
         install_character_converter(converter);
         converter.accumulator() = Word48(mapping.source);
         converter.reg(015) = 05670;
@@ -7571,7 +7750,8 @@ int main(int argc, char **argv)
                 "21274 reproduces a traced input mapping");
     }
 
-    Machine character_return;
+    auto character_return_storage = std::make_unique<Machine>();
+    Machine &character_return = *character_return_storage;
     install_character_converter(character_return);
     character_return.accumulator() =
         Word48(06400000000000052ULL);
@@ -7593,7 +7773,8 @@ int main(int argc, char **argv)
             "21261 balances r17 while returning through 03235");
 
     // Complete trace-backed output of 052 -> 031 through 25346 and 21443.
-    Machine buffered_character;
+    auto buffered_character_storage = std::make_unique<Machine>();
+    Machine &buffered_character = *buffered_character_storage;
     install_character_converter(buffered_character);
     install_character_output(buffered_character);
     buffered_character.accumulator() =
@@ -7638,7 +7819,8 @@ int main(int argc, char **argv)
 
     // The first diagnostic conversion, 012 -> 377, takes the traced 20245
     // continuation branch and resumes at 25361.
-    Machine terminated_output;
+    auto terminated_output_storage = std::make_unique<Machine>();
+    Machine &terminated_output = *terminated_output_storage;
     install_character_converter(terminated_output);
     install_character_output(terminated_output);
     install_input_continue(terminated_output);
@@ -7680,7 +7862,8 @@ int main(int argc, char **argv)
                 && terminated_output.reg(017) == 066023,
             "the resumed 0377 path restores the original caller");
 
-    Machine descriptor_wrap;
+    auto descriptor_wrap_storage = std::make_unique<Machine>();
+    Machine &descriptor_wrap = *descriptor_wrap_storage;
     install_character_output(descriptor_wrap);
     descriptor_wrap.reg(015) = 07654;
     descriptor_wrap.reg(016) = 025417;
@@ -7700,7 +7883,8 @@ int main(int argc, char **argv)
                 && descriptor_wrap.reg(017) == 060000,
             "21443 replaces the low byte and wraps to the next packed word");
 
-    Machine output_limit;
+    auto output_limit_storage = std::make_unique<Machine>();
+    Machine &output_limit = *output_limit_storage;
     install_character_converter(output_limit);
     install_character_output(output_limit);
     output_limit.memory(025412) = Word48(0116);
@@ -7727,7 +7911,8 @@ int main(int argc, char **argv)
 
     // Trace at the first diagnostic 0377: no pending input/status word, so
     // 20245 proceeds directly to the Э71 0177 boundary at 20256.
-    Machine input_continue;
+    auto input_continue_storage = std::make_unique<Machine>();
+    Machine &input_continue = *input_continue_storage;
     install_input_continue(input_continue);
     input_continue.memory(020440) =
         Word48(std::uint64_t{0377} << 40);
@@ -7748,7 +7933,8 @@ int main(int argc, char **argv)
 
     // On later calls, state 20362 selects Э71 0146 first. Its traced result
     // packs to 4000000000000000 and falls through to Э71 0177.
-    Machine input_status;
+    auto input_status_storage = std::make_unique<Machine>();
+    Machine &input_status = *input_status_storage;
     install_input_continue(input_status);
     input_status.memory(020362) = Word48(1);
     input_status.reg(015) = 025361;
@@ -7806,20 +7992,23 @@ int main(int argc, char **argv)
     require(e71_probe->accumulator() == Word48(),
             "E71 zero-address probe reports an unavailable terminal");
 
-    Machine unavailable_console;
+    auto unavailable_console_storage = std::make_unique<Machine>();
+    Machine &unavailable_console = *unavailable_console_storage;
     install_input_continue(unavailable_console);
     unavailable_console.memory(020377) = Word48();
     require(unavailable_console.p20245_begin_input_continue() == 020321,
             "20245 preserves the zero-console Э74 boundary");
 
-    Machine output_status;
+    auto output_status_storage = std::make_unique<Machine>();
+    Machine &output_status = *output_status_storage;
     install_input_continue(output_status);
     output_status.memory(020375) = Word48(2);
     require(output_status.p20245_begin_input_continue() == 020250
                 && output_status.accumulator() == Word48(2),
             "20245 preserves the nonzero-status Э64 boundary");
 
-    Machine status_branches;
+    auto status_branches_storage = std::make_unique<Machine>();
+    Machine &status_branches = *status_branches_storage;
     install_input_continue(status_branches);
     status_branches.memory(020365) = Word48(Word48::mask);
     status_branches.accumulator() =
@@ -7835,7 +8024,8 @@ int main(int argc, char **argv)
 
     // Snapshot at 03072 after CUCHIN and BIND_ENVIRONMENT return. This closes
     // the first formatter call and enters the packed-character sequence.
-    Machine formatter_return;
+    auto formatter_return_storage = std::make_unique<Machine>();
+    Machine &formatter_return = *formatter_return_storage;
     formatter_return.reg(001) = 03014;
     formatter_return.reg(002) = 01200;
     formatter_return.reg(017) = 066022;
@@ -7905,7 +8095,8 @@ int main(int argc, char **argv)
                 && formatter_return.reg(017) == 066023,
             "21431 preserves its source pointer and balances r17");
 
-    Machine cursor_wrap;
+    auto cursor_wrap_storage = std::make_unique<Machine>();
+    Machine &cursor_wrap = *cursor_wrap_storage;
     cursor_wrap.reg(014) = 0777;
     cursor_wrap.reg(015) = 01234;
     cursor_wrap.reg(016) = 01000;
@@ -7954,7 +8145,8 @@ int main(int argc, char **argv)
                 && formatter_return.reg(006) == 070000,
             "07475 forwards character 052 without changing its tag");
 
-    Machine sequence_continue;
+    auto sequence_continue_storage = std::make_unique<Machine>();
+    Machine &sequence_continue = *sequence_continue_storage;
     sequence_continue.reg(001) = 016313;
     sequence_continue.reg(002) = 013;
     sequence_continue.reg(015) = 016325;
@@ -7984,7 +8176,8 @@ int main(int argc, char **argv)
 
     // 03261 and the zero-environment path through 03235 are a matched
     // entry/return pair in the original evaluator.
-    Machine direct;
+    auto direct_storage = std::make_unique<Machine>();
+    Machine &direct = *direct_storage;
     direct.reg(017) = 04000;
     direct.reg(015) = 01234;
     direct.memory(03274) = Word48(06600000000007773ULL);
@@ -8003,7 +8196,8 @@ int main(int argc, char **argv)
             "03235 restores the previous current function");
 
     // The same zero-environment fast path through the full 03206 entry.
-    Machine ordinary;
+    auto ordinary_storage = std::make_unique<Machine>();
+    Machine &ordinary = *ordinary_storage;
     ordinary.reg(017) = 04100;
     ordinary.reg(015) = 02345;
     ordinary.memory(03274) = Word48(06600000000007773ULL);
@@ -8046,7 +8240,8 @@ int main(int argc, char **argv)
     // Reduced arity-3 Man-or-Boy baseline from the traced generated object.
     // The B descriptor always selects entry 65576 through environment 65627,
     // whose +3 record has a zero address. No older K is rebound at 65763.
-    Machine man_or_boy;
+    auto man_or_boy_storage = std::make_unique<Machine>();
+    Machine &man_or_boy = *man_or_boy_storage;
     const Word48 b_descriptor(06606562700065576ULL);
     man_or_boy.memory(03272) = b_descriptor;
     man_or_boy.memory(03273) = Word48(065627);
@@ -8083,7 +8278,8 @@ int main(int argc, char **argv)
 
     // Synthetic one-slot environment exercising the literal 03242..03256
     // rebinding sequence.
-    Machine binding;
+    auto binding_storage = std::make_unique<Machine>();
+    Machine &binding = *binding_storage;
     binding.memory(03267) = Word48(0000000100000000ULL);
     binding.memory(03270) = Word48(0177777777777777ULL);
     binding.memory(03274) = Word48(06600100000005000ULL);
@@ -8109,7 +8305,8 @@ int main(int argc, char **argv)
             "03235 consumes one capture pair and its saved return pair");
 
     // Trace snapshot at 20124 from generated entry 65576 (one argument).
-    Machine activation;
+    auto activation_storage = std::make_unique<Machine>();
+    Machine &activation = *activation_storage;
     activation.memory(020142) = Word48(077777);
     activation.memory(020143) = Word48(1);
     activation.reg(017) = 066013;
@@ -8134,7 +8331,8 @@ int main(int argc, char **argv)
     require(activation.memory(020141) == Word48(0166017),
             "20124 reproduces the traced activation-end scratch word");
 
-    Machine no_arguments;
+    auto no_arguments_storage = std::make_unique<Machine>();
+    Machine &no_arguments = *no_arguments_storage;
     no_arguments.reg(015) = 04567;
     no_arguments.reg(016) = 0;
     no_arguments.reg(017) = 05000;
@@ -8145,7 +8343,8 @@ int main(int argc, char **argv)
                 && no_arguments.accumulator() == Word48(012345),
             "20110 zero-argument return leaves machine state intact");
 
-    Machine one_argument;
+    auto one_argument_storage = std::make_unique<Machine>();
+    Machine &one_argument = *one_argument_storage;
     one_argument.reg(006) = 067777;
     one_argument.reg(015) = 05670;
     one_argument.reg(016) = 1;
@@ -8163,7 +8362,8 @@ int main(int argc, char **argv)
 
     // Three arguments exercise both 20124's transfer loop and 20110's
     // activation layout.
-    Machine arguments;
+    auto arguments_storage = std::make_unique<Machine>();
+    Machine &arguments = *arguments_storage;
     arguments.memory(020142) = Word48(077777);
     arguments.memory(020143) = Word48(1);
     arguments.reg(017) = 066013;

@@ -17,6 +17,17 @@ if ! command -v "$runner" >/dev/null 2>&1; then
     exit 1
 fi
 
+"$root/tools/show-poplib-catalog.py" "$root/poplib.bin" \
+    > "$temporary/poplib-catalog.out"
+grep -F 'POPLIB  FOURS   0007  0010  9172' \
+    "$temporary/poplib-catalog.out" >/dev/null
+grep -F 'POPLIB  DEBUG   0011  0011  1168' \
+    "$temporary/poplib-catalog.out" >/dev/null
+grep -F 'POPLIB  MEMOFN  0012  0012  2115' \
+    "$temporary/poplib-catalog.out" >/dev/null
+grep -F 'POPLIB  EXAMPL  0013  0013  1727' \
+    "$temporary/poplib-catalog.out" >/dev/null
+
 run_poplan < /dev/null > "$temporary/startup.out"
 grep -F "ПОПЛАН 2.1" "$temporary/startup.out" >/dev/null
 

@@ -36,4 +36,11 @@ if(BUILD_TESTING)
     add_executable(poplan_console_tests tests/cpp/console_test.cpp)
     target_link_libraries(poplan_console_tests PRIVATE poplan_core)
     add_test(NAME poplan-console-tests COMMAND poplan_console_tests)
+    add_test(
+        NAME poplan-native-library
+        COMMAND ${CMAKE_SOURCE_DIR}/tests/native-library.sh
+                $<TARGET_FILE:poplan>
+                ${CMAKE_SOURCE_DIR}/build/poplan.bin
+                ${CMAKE_SOURCE_DIR}
+    )
 endif()

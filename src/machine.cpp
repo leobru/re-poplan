@@ -6,7 +6,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <iomanip>
+#include <limits>
 #include <locale>
 #include <sstream>
 #include <utility>
@@ -14252,6 +14254,156 @@ std::uint16_t Machine::p21636()
     sti(001);
     registers_[017] = address_add(registers_[017], -1);
     return registers_[015];
+}
+
+std::uint16_t Machine::p14662()
+{
+    constexpr std::size_t words_per_zone = 02000;
+    constexpr std::size_t bytes_per_word = 6;
+    constexpr std::uint64_t header_mask = 07777777777774000ULL;
+    constexpr std::uint64_t header_value = 01303100000000000ULL;
+    constexpr std::uint64_t native_magic = 02445011615233400ULL; // "RPN57\0"
+    constexpr std::uint64_t flat_version = 1;
+    constexpr std::uint64_t internal_character_version = 2;
+    constexpr std::size_t directory_words = 4;
+    constexpr std::size_t record_words = 4;
+    constexpr std::size_t maximum_records =
+        (words_per_zone - directory_words) / record_words;
+    constexpr std::uint64_t maximum_source_bytes = 64 * 1024 * 1024;
+
+    const auto raw_continuation = [&]() {
+        // 14662L is NTR 3 and 14662R is VJM 14723(16).  Preserve that
+        // exact path when the disk is not an emulator-native source image.
+        alu_mode_ = 3;
+        registers_[016] = 014663;
+        return static_cast<std::uint16_t>(014723);
+    };
+    std::array<Word48, words_per_zone> directory{};
+    if (!read_poplib_zone(0, directory)) {
+        return raw_continuation();
+    }
+    const std::uint64_t header = directory[0].raw();
+    const std::uint64_t magic = directory[1].raw();
+    const std::uint64_t version = directory[2].raw();
+    const std::uint64_t record_count = directory[3].raw();
+    if ((header & header_mask) != header_value
+        || magic != native_magic
+        || (version != flat_version
+            && version != internal_character_version)
+        || record_count > maximum_records
+        || (header & 03777)
+            != directory_words + record_words * record_count) {
+        return raw_continuation();
+    }
+
+    const std::uint64_t requested_user = memory_[014216].raw();
+    const std::uint64_t requested_file = memory_[014217].raw();
+    std::uint64_t source_zone = 0;
+    std::uint64_t source_size = 0;
+    bool found = false;
+    for (std::uint64_t record = 0; record != record_count; ++record) {
+        const std::size_t offset = directory_words + record_words * record;
+        const std::uint64_t user = directory[offset].raw();
+        const std::uint64_t file = directory[offset + 1].raw();
+        const std::uint64_t zone = directory[offset + 2].raw();
+        const std::uint64_t size = directory[offset + 3].raw();
+        if (!found && user == requested_user && file == requested_file) {
+            source_zone = zone;
+            source_size = size;
+            found = true;
+        }
+    }
+    if (!found || source_size > maximum_source_bytes
+        || source_zone > 07777) {
+        return raw_continuation();
+    }
+
+    std::string source;
+    source.reserve(static_cast<std::size_t>(source_size));
+    std::uint64_t remaining = source_size;
+    for (std::uint64_t zone = source_zone; remaining != 0; ++zone) {
+        if (zone > 07777) {
+            return raw_continuation();
+        }
+        std::array<Word48, words_per_zone> payload{};
+        if (!read_poplib_zone(static_cast<std::uint16_t>(zone), payload)) {
+            return raw_continuation();
+        }
+        for (const Word48 word : payload) {
+            for (unsigned byte = 0; byte != bytes_per_word; ++byte) {
+                if (remaining == 0) {
+                    break;
+                }
+                const unsigned shift = (bytes_per_word - byte - 1) * 8;
+                source.push_back(static_cast<char>((word.raw() >> shift) & 0377));
+                --remaining;
+            }
+            if (remaining == 0) {
+                break;
+            }
+        }
+    }
+    std::vector<std::vector<std::uint8_t>> lines;
+    if (version == internal_character_version) {
+        // The source zones already contain the values produced by 21274.
+        // Convert them back to terminal GOST through the original 21275 table
+        // arithmetic, preserving all architectural state used by LIBRARY.
+        const Word48 saved_accumulator = accumulator_;
+        const Word48 saved_remainder = remainder_;
+        const unsigned saved_alu_mode = alu_mode_;
+        const auto saved_registers = registers_;
+        const Word48 saved_converter_scratch = memory_[021430];
+
+        std::vector<std::uint8_t> line;
+        for (const unsigned char character : source) {
+            if (character == 012) {
+                lines.push_back(std::move(line));
+                line.clear();
+                continue;
+            }
+            accumulator_ = Word48(character);
+            p21275_encode_character();
+            line.push_back(static_cast<std::uint8_t>(accumulator_.raw()));
+        }
+        if (!source.empty()
+            && static_cast<unsigned char>(source.back()) != 012) {
+            lines.push_back(std::move(line));
+        }
+
+        accumulator_ = saved_accumulator;
+        remainder_ = saved_remainder;
+        alu_mode_ = saved_alu_mode;
+        registers_ = saved_registers;
+        memory_[021430] = saved_converter_scratch;
+    } else {
+        std::size_t begin = 0;
+        while (begin < source.size()) {
+            const std::size_t newline = source.find('\n', begin);
+            const std::size_t end = newline == std::string::npos
+                ? source.size() : newline;
+            std::string_view line(source.data() + begin, end - begin);
+            if (!line.empty() && line.back() == '\r') {
+                line.remove_suffix(1);
+            }
+            lines.push_back(encode_gost_text(line));
+            if (newline == std::string::npos) {
+                break;
+            }
+            begin = newline + 1;
+        }
+    }
+    if (lines.empty()) {
+        lines.emplace_back();
+    }
+    for (auto line = lines.rbegin(); line != lines.rend(); ++line) {
+        console_input_.push_front(std::move(*line));
+    }
+
+    // 14677 is the original result-push and three-register epilogue.  CHARIN
+    // supplies the queued source lines through the existing POPLAN character
+    // path, so COMPILE sees precisely the ordinary supplier interface.
+    memory_[address_add(registers_[001], 077105)] = memory_[01513];
+    return 014677;
 }
 
 std::uint16_t Machine::p11053()

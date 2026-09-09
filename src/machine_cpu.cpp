@@ -21,8 +21,12 @@
 
 #include "poplan/machine.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <istream>
 #include <sstream>
 
@@ -109,6 +113,113 @@ std::uint64_t jiffies_since_midnight()
 }
 
 } // namespace
+
+bool Machine::read_poplib_zone(
+    std::uint16_t zone, std::array<Word48, 02000> &data) const
+{
+    constexpr std::streamoff flat_word_bytes = 6;
+    constexpr std::streamoff flat_zone_bytes = 02000 * flat_word_bytes;
+    constexpr std::streamoff physical_control_bytes = 8 * 8;
+    constexpr std::streamoff physical_zone_bytes = (8 + 02000) * 8;
+    constexpr std::streamoff physical_prefix_zones = 4;
+    constexpr std::uint64_t word_mask = 07777777777777777ULL;
+
+    std::ifstream input(poplib_path_, std::ios::binary);
+    if (!input) {
+        return false;
+    }
+    input.seekg(0, std::ios::end);
+    const std::streamoff size = input.tellg();
+    const bool physical = size >=
+            (physical_prefix_zones + 1) * physical_zone_bytes
+        && size % physical_zone_bytes == 0;
+    const std::streamoff offset = physical
+        ? (physical_prefix_zones + zone) * physical_zone_bytes
+            + physical_control_bytes
+        : static_cast<std::streamoff>(zone) * flat_zone_bytes;
+    const std::streamoff required = physical
+        ? static_cast<std::streamoff>(data.size() * 8)
+        : static_cast<std::streamoff>(data.size()) * flat_word_bytes;
+    if (offset < 0 || offset > size || size - offset < required) {
+        return false;
+    }
+    input.seekg(offset);
+    if (!input) {
+        return false;
+    }
+
+    for (Word48 &word : data) {
+        std::uint64_t value = 0;
+        if (physical) {
+            unsigned char bytes[8]{};
+            input.read(reinterpret_cast<char *>(bytes), sizeof(bytes));
+            if (!input) {
+                return false;
+            }
+            for (unsigned index = 0; index != sizeof(bytes); ++index) {
+                value |= static_cast<std::uint64_t>(bytes[index])
+                    << (8 * index);
+            }
+            value &= word_mask;
+        } else {
+            for (unsigned index = 0; index != flat_word_bytes; ++index) {
+                const int byte = input.get();
+                if (byte == std::char_traits<char>::eof()) {
+                    return false;
+                }
+                value = (value << 8) | static_cast<unsigned char>(byte);
+            }
+        }
+        word = Word48(value);
+    }
+    return true;
+}
+
+void Machine::emulate_e70(std::uint16_t control_address)
+{
+    constexpr std::uint16_t poplib_unit = 057;
+    constexpr std::size_t words_per_zone = 02000;
+
+    const Word48 control = control_address == 0
+        ? accumulator_ : memory_[control_address];
+    const std::uint64_t raw = control.raw();
+    const std::uint16_t zone = static_cast<std::uint16_t>(raw & 07777);
+    const std::uint16_t unit = static_cast<std::uint16_t>(
+        (raw >> 12) & 077);
+    const std::uint16_t page = static_cast<std::uint16_t>(
+        (raw >> 30) & 037);
+    const bool read_operation = ((raw >> 39) & 1) != 0;
+    const bool seek_operation = ((raw >> 40) & 1) != 0;
+
+    if (std::getenv("POPLAN_E70_TRACE") != nullptr) {
+        std::fprintf(stderr,
+            "E70 control_address=%05o control=%016lo unit=%02o zone=%04o "
+            "page=%02o read=%u seek=%u\n",
+            control_address, raw, unit, zone, page,
+            read_operation ? 1U : 0U, seek_operation ? 1U : 0U);
+    }
+
+    // Other logical devices retain the old no-op behavior until their actual
+    // POPLAN use is established.  A speculative disk operation transfers no
+    // data.
+    if (unit != poplib_unit || seek_operation) {
+        return;
+    }
+    if (!read_operation) {
+        throw MachineError("E70: writing logical unit 57 is unsupported");
+    }
+
+    std::array<Word48, words_per_zone> data{};
+    if (!read_poplib_zone(zone, data)) {
+        std::ostringstream message;
+        message << "E70: logical unit 57 file '" << poplib_path_
+                << "' has no complete zone " << std::oct << zone;
+        throw MachineError(message.str());
+    }
+
+    const std::uint16_t destination = static_cast<std::uint16_t>(page << 10);
+    std::copy(data.begin(), data.end(), memory_.begin() + destination);
+}
 
 void Machine::load_image(std::istream &input)
 {
@@ -197,6 +308,24 @@ ExecutionStatus Machine::step()
         return address_add(instruction.address,
                            register_value(instruction.reg));
     };
+
+    if (std::getenv("POPLAN_CPU_DETAIL_TRACE") != nullptr) {
+        std::uint16_t operand_address = effective_address();
+        if (instruction.address == 0 && instruction.reg == 017
+            && instruction.opcode >= 004 && instruction.opcode <= 027) {
+            operand_address = address_add(operand_address, -1);
+        }
+        std::fprintf(stderr,
+            "CPU %05o%c opcode=%03o reg=%02o address=%05o ea=%05o "
+            "acc=%016lo operand=%016lo",
+            old_pc, old_right ? 'R' : 'L', instruction.opcode,
+            instruction.reg, instruction.address, operand_address,
+            accumulator_.raw(), memory_[operand_address].raw());
+        for (std::size_t index = 1; index != registers_.size(); ++index) {
+            std::fprintf(stderr, " r%02zo=%05o", index, registers_[index]);
+        }
+        std::fputc('\n', stderr);
+    }
     const auto stack_operand = [&]() {
         if (instruction.address == 0 && instruction.reg == 017) {
             registers_[017] = address_add(registers_[017], -1);
@@ -439,6 +568,9 @@ ExecutionStatus Machine::step()
             case 071:
                 emulate_e71(address);
                 break;
+            case 070:
+                emulate_e70(address);
+                break;
             case 067: {
                 const std::uint16_t continuation =
                     static_cast<std::uint16_t>(
@@ -450,7 +582,6 @@ ExecutionStatus Machine::step()
                 branch(continuation);
                 break;
             }
-            case 070:
             case 072:
             case 064:
                 // POPLAN only uses this formatted-output extracode as an
@@ -1677,6 +1808,7 @@ bool Machine::dispatch_translated_routine()
     case 021631: continuation = p21631(); break;
     case 021634: continuation = p21634(); break;
     case 021636: continuation = p21636(); break;
+    case 014662: continuation = p14662(); break;
     case 025223: continuation = p25223(); break;
     case 025225: continuation = p25225(); break;
     case 025226: continuation = p25226(); break;

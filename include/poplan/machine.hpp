@@ -9,6 +9,7 @@
 #include <deque>
 #include <iosfwd>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -76,6 +77,11 @@ public:
     // In-memory emulation of extracode 071. The control word/program is read
     // from BESM memory, and terminal data remains in GOST/KOI-7 byte form.
     void emulate_e71(std::uint16_t control_address);
+
+    // POPLAN's library supplier reads logical disk 057 through extracode 070.
+    // By default this is a flat six-byte-per-word image named "poplib.bin".
+    void emulate_e70(std::uint16_t control_address);
+    void set_poplib_path(std::string_view path) { poplib_path_ = path; }
 
     // Raw BESM execution used to run the extracted POPLAN image. Image words
     // are six-byte big-endian values mapped at addresses 00000..35777.
@@ -725,6 +731,7 @@ private:
     std::uint16_t p12271();
     std::uint16_t p21634();
     std::uint16_t p21636();
+    std::uint16_t p14662();
     std::uint16_t p06414();
     std::uint16_t p06415();
     std::uint16_t p06417();
@@ -1129,6 +1136,9 @@ private:
                              std::size_t byte_index) const;
     void set_memory_byte(std::uint16_t address, std::size_t byte_index,
                          std::uint8_t value);
+    bool read_poplib_zone(
+        std::uint16_t zone,
+        std::array<Word48, 02000> &data) const;
     bool dispatch_translated_routine();
 
     Word48 accumulator_;
@@ -1139,6 +1149,7 @@ private:
     bool console_available_ = true;
     std::deque<std::vector<std::uint8_t>> console_input_;
     std::vector<std::uint8_t> console_output_;
+    std::string poplib_path_{"poplib.bin"};
     std::uint16_t program_counter_ = 1;
     bool right_half_ = false;
     bool semantic_halted_ = false;
