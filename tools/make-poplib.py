@@ -14,7 +14,6 @@ ZONE_BYTES = WORDS_PER_ZONE * WORD_BYTES
 FIRST_SOURCE_ZONE = 0o7
 OVERLAY_ZONE = 0o6
 HEADER_VALUE = int("1303100000000000", 8)
-MAGIC = b"RPN57\0"
 VERSION = 2
 ASCII_KOI7 = "`abcdefghijklmnopqrstuvwxyz{|}~"
 KOI7_CYRILLIC = "ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧ"
@@ -214,9 +213,9 @@ def build_overlay(entries: list[Entry]) -> list[int]:
         assembler.branch(0o260, setup_label)
         assembler.label(next_label)
 
-    # An unmatched emulator-native record retains CHARIN as a safe supplier.
-    assembler.short(0, 0o10, 0o1513)
-    assembler.branch(0o300, "return_supplier")
+    # The resident loader reports missing libraries and files as error 10300.
+    assembler.long(0o16, 0o240, 0o10300)
+    assembler.long(0, 0o300, 0o3014)
 
     for index, entry in enumerate(entries):
         assembler.label(f"setup_{index}")
@@ -323,11 +322,10 @@ def main() -> None:
         entry.zone = next_zone
         next_zone += max(1, (len(entry.payload) + ZONE_BYTES - 1) // ZONE_BYTES)
 
-    directory_word_count = 4 + 4 * len(entries)
+    directory_word_count = 3 + 4 * len(entries)
     if directory_word_count > WORDS_PER_ZONE:
         raise ValueError("directory does not fit in zone 0")
-    directory = [HEADER_VALUE | directory_word_count,
-                 int.from_bytes(MAGIC, "big"), VERSION, len(entries)]
+    directory = [HEADER_VALUE | directory_word_count, VERSION, len(entries)]
     for entry in entries:
         directory.extend((name_word(entry.user), name_word(entry.name),
                           entry.zone, len(entry.payload)))

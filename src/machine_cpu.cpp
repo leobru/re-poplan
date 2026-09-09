@@ -816,6 +816,7 @@ bool Machine::dispatch_translated_routine()
     case 03051: continuation = p03051_unpack_error(); break;
     case 03057: continuation = p03057_begin_error_format(); break;
     case 03072: continuation = p03072_resume_error_format(); break;
+    case 03106: continuation = p03106_print_error_text(); break;
     case 03206: continuation = p03206_prepare_ordinary_call(); break;
     case 03235: continuation = p03235_bind_environment(); break;
     case 03261: continuation = p03261_enter_function(); break;

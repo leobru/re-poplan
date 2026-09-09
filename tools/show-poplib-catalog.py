@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Show RPN57 compatibility catalogs in a flat POPLIB image."""
+"""Show compatibility catalogs in a flat POPLIB image."""
 
 from __future__ import annotations
 
@@ -14,8 +14,10 @@ ZONE_BYTES = WORDS_PER_ZONE * WORD_BYTES
 WORD_MASK = (1 << 48) - 1
 HEADER_VALUE = int("1303100000000000", 8)
 HEADER_MASK = WORD_MASK ^ 0o3777
-MAGIC_WORD = int.from_bytes(b"RPN57\0", "big")
-DIRECTORY_WORDS = 4
+OVERLAY_ZONE_OFFSET = 0o6
+OVERLAY_SIGNATURE_OFFSET = 0o12
+OVERLAY_SIGNATURE = int("0002704112630442", 8)
+DIRECTORY_WORDS = 3
 RECORD_WORDS = 4
 
 LATIN_GOST = dict(
@@ -88,13 +90,20 @@ def find_catalogs(words: list[int]) -> list[Catalog]:
     for zone in range(zone_count):
         base = zone * WORDS_PER_ZONE
         header = words[base]
-        if ((header & HEADER_MASK) != HEADER_VALUE
-                or words[base + 1] != MAGIC_WORD):
+        if (header & HEADER_MASK) != HEADER_VALUE:
+            continue
+
+        signature_offset = (
+            (zone + OVERLAY_ZONE_OFFSET) * WORDS_PER_ZONE
+            + OVERLAY_SIGNATURE_OFFSET
+        )
+        if (signature_offset >= len(words)
+                or words[signature_offset] != OVERLAY_SIGNATURE):
             continue
 
         directory_size = header & 0o3777
-        version = words[base + 2]
-        record_count = words[base + 3]
+        version = words[base + 1]
+        record_count = words[base + 2]
         expected_size = DIRECTORY_WORDS + RECORD_WORDS * record_count
         if record_count > (WORDS_PER_ZONE - DIRECTORY_WORDS) // RECORD_WORDS:
             raise CatalogError(
@@ -127,7 +136,7 @@ def render(path: Path, image_size: int, catalogs: list[Catalog]) -> str:
     for catalog in catalogs:
         suffix = "entry" if len(catalog.records) == 1 else "entries"
         lines.append(
-            f"catalog zone {catalog.zone:04o}: RPN57 version "
+            f"catalog zone {catalog.zone:04o}: POPLIB version "
             f"{catalog.version}, {len(catalog.records)} {suffix}"
         )
         lines.append("USER    FILE    FIRST LAST  BYTES")
@@ -151,7 +160,7 @@ def main() -> None:
         words, image_size = read_flat_words(args.image)
         catalogs = find_catalogs(words)
         if not catalogs:
-            raise CatalogError(f"{args.image}: no RPN57 catalogs found")
+            raise CatalogError(f"{args.image}: no POPLIB catalogs found")
     except (OSError, CatalogError) as error:
         parser.error(str(error))
     print(render(args.image, image_size, catalogs), end="")

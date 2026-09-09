@@ -28,6 +28,14 @@ grep -F 'POPLIB  MEMOFN  0012  0012  2115' \
 grep -F 'POPLIB  EXAMPL  0013  0013  1727' \
     "$temporary/poplib-catalog.out" >/dev/null
 
+printf '%s\n' '[NOUSER FOURS].LIBRARY.COMPILE;' \
+    | run_poplan > "$temporary/missing-library.out"
+grep -F 'ОШИБКА 10300' "$temporary/missing-library.out" >/dev/null
+
+printf '%s\n' '[POPLIB NOFILE].LIBRARY.COMPILE;' \
+    | run_poplan > "$temporary/missing-file.out"
+grep -F 'ОШИБКА 10300' "$temporary/missing-file.out" >/dev/null
+
 run_poplan < /dev/null > "$temporary/startup.out"
 grep -F "ПОПЛАН 2.1" "$temporary/startup.out" >/dev/null
 

@@ -58,11 +58,10 @@ class ConvertKoi7LowerTests(unittest.TestCase):
 
 class ShowPoplibCatalogTests(unittest.TestCase):
     def test_finds_and_renders_catalog(self):
-        directory_size = 8
-        words = [0] * show_poplib_catalog.WORDS_PER_ZONE
-        words[:8] = [
+        directory_size = 7
+        words = [0] * (7 * show_poplib_catalog.WORDS_PER_ZONE)
+        words[:7] = [
             show_poplib_catalog.HEADER_VALUE | directory_size,
-            show_poplib_catalog.MAGIC_WORD,
             2,
             1,
             int.from_bytes(bytes((0o60, 0o56, 0o60, 0o104, 0o102, 0o42)),
@@ -72,10 +71,13 @@ class ShowPoplibCatalogTests(unittest.TestCase):
             0o7,
             9172,
         ]
+        words[6 * show_poplib_catalog.WORDS_PER_ZONE + 0o12] = (
+            show_poplib_catalog.OVERLAY_SIGNATURE
+        )
 
         catalogs = show_poplib_catalog.find_catalogs(words)
         output = show_poplib_catalog.render(
-            Path("poplib.bin"), show_poplib_catalog.ZONE_BYTES, catalogs
+            Path("poplib.bin"), 7 * show_poplib_catalog.ZONE_BYTES, catalogs
         )
 
         self.assertEqual(len(catalogs), 1)
@@ -84,15 +86,17 @@ class ShowPoplibCatalogTests(unittest.TestCase):
         self.assertIn("POPLIB  FOURS   0007  0010  9172", output)
 
     def test_rejects_inconsistent_directory_size(self):
-        words = [0] * show_poplib_catalog.WORDS_PER_ZONE
-        words[:4] = [
-            show_poplib_catalog.HEADER_VALUE | 4,
-            show_poplib_catalog.MAGIC_WORD,
+        words = [0] * (7 * show_poplib_catalog.WORDS_PER_ZONE)
+        words[:3] = [
+            show_poplib_catalog.HEADER_VALUE | 3,
             2,
             1,
         ]
+        words[6 * show_poplib_catalog.WORDS_PER_ZONE + 0o12] = (
+            show_poplib_catalog.OVERLAY_SIGNATURE
+        )
         with self.assertRaisesRegex(
-                show_poplib_catalog.CatalogError, "records require 8"):
+                show_poplib_catalog.CatalogError, "records require 7"):
             show_poplib_catalog.find_catalogs(words)
 
 

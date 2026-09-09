@@ -84,10 +84,17 @@ The translated path now continues through the first formatting bracket:
 | `p21431_buffer_char()` | Extracts first heading character `052` and advances the cursor to `6000000000003162` |
 | `p16321_dispatch_character()` | Tags `052` as `6400000000000052` and dispatches it through `07475` |
 | `p16325_continue_character_sequence()` | Decrements the sequence count and restores the four-word caller context after the final character |
+| `p03106_print_error_text()` | Applies the original suppression tests, selects the error code in the ordered zone-`01200` catalog, and emits its explanatory text natively |
 
 The C++ regression initializes the trace-observed source object, code,
 registers, and static constants, then checks the scratch words, POP arguments,
 hardware-stack save areas, descriptor dispatches, and packed-text cursor.
+
+The complete 162-entry diagnostic catalog from zone `01200` is retained as
+readable UTF-8 in `src/poplan.cpp`. Its order is significant: duplicated codes
+select the first descriptor, as the original `16254` lookup does. A successful
+native lookup returns to the newline boundary at `03122`; suppression or a
+missing code continues at `03124` without producing an explanatory line.
 
 The nested-diagnostic branch beginning in the right half of `03024` is not yet
 translated. Character forwarding now continues through `25346` and its
@@ -96,6 +103,7 @@ through the `Э71` readiness and terminal-transfer operations at `20252` and
 `20256`. The in-memory console device consumes the original control words and
 keeps input/output in GOST byte form; it does not replace the converted buffer
 with a host character lookup. The alternate boundaries at `20321`, `20250`,
-`20261`, and `20715` remain pending. The later formatting blocks after `03101`
-are still pending. The syntax-error probe takes the normal path documented
-here.
+`20261`, and `20715` remain pending. The numeric heading at `03101..03105` and
+the source-object formatting after `03122` still use their existing paths; the
+zone-`01200` text selection at `03106..03121` is native. The syntax-error probe
+takes the normal path documented here.

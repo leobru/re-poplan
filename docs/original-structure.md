@@ -304,13 +304,13 @@ The host-simulated path consequently dispatches at `14662`, after `14705` has
 placed the decoded user and file words at `14216` and `14217`. A recognized
 native directory queues its source lines and returns the existing `CHARIN`
 supplier through the original `14677..14704` result/restore epilogue. If the
-native marker or requested record is absent, `14662` performs the original
-`NTR 3` effect, sets the `VJM` link to `14663`, and continues at `14723`; the
-historical disk path is not hidden by the semantic implementation.
+zone-zero header or zone-6 object signature is absent, `14662` performs the
+original `NTR 3` effect, sets the `VJM` link to `14663`, and continues at
+`14723`; a missing requested record reports error `10300`.
 
 The compatibility `poplib.bin` remains a flat six-byte-per-word image. Zone 0
-contains its explicit `RPN57` directory, zones 1 through 5 are empty, zone 6
-contains a synthetic loader-compatible overlay, and source payloads begin at
+contains its explicit compatibility directory, zones 1 through 5 are empty,
+zone 6 contains a synthetic loader-compatible overlay, and source payloads begin at
 zone 7. `tools/run-dispak.sh` imports this flat file into physical volume 2157
 with `besmtool write` before running historical dispak. The overlay recognizes
 the same directory records and supplies the source through the resident

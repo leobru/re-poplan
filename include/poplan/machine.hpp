@@ -388,6 +388,7 @@ public:
     std::uint16_t p03051_unpack_error();
     std::uint16_t p03057_begin_error_format();
     std::uint16_t p03072_resume_error_format();
+    std::uint16_t p03106_print_error_text();
 
     // Literal translations of the diagnostic formatter initialization and
     // its shared descriptor probe. Calls remain semantic boundaries.

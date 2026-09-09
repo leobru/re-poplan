@@ -14262,11 +14262,12 @@ std::uint16_t Machine::p14662()
     constexpr std::size_t bytes_per_word = 6;
     constexpr std::uint64_t header_mask = 07777777777774000ULL;
     constexpr std::uint64_t header_value = 01303100000000000ULL;
-    constexpr std::uint64_t native_magic = 02445011615233400ULL; // "RPN57\0"
     constexpr std::uint64_t flat_version = 1;
     constexpr std::uint64_t internal_character_version = 2;
-    constexpr std::size_t directory_words = 4;
+    constexpr std::size_t directory_words = 3;
     constexpr std::size_t record_words = 4;
+    constexpr std::size_t overlay_signature_offset = 012;
+    constexpr std::uint64_t overlay_signature = 0002704112630442ULL;
     constexpr std::size_t maximum_records =
         (words_per_zone - directory_words) / record_words;
     constexpr std::uint64_t maximum_source_bytes = 64 * 1024 * 1024;
@@ -14283,12 +14284,15 @@ std::uint16_t Machine::p14662()
         return raw_continuation();
     }
     const std::uint64_t header = directory[0].raw();
-    const std::uint64_t magic = directory[1].raw();
-    const std::uint64_t version = directory[2].raw();
-    const std::uint64_t record_count = directory[3].raw();
+    std::array<Word48, words_per_zone> overlay{};
     if ((header & header_mask) != header_value
-        || magic != native_magic
-        || (version != flat_version
+        || !read_poplib_zone(06, overlay)
+        || overlay[overlay_signature_offset].raw() != overlay_signature) {
+        return raw_continuation();
+    }
+    const std::uint64_t version = directory[1].raw();
+    const std::uint64_t record_count = directory[2].raw();
+    if ((version != flat_version
             && version != internal_character_version)
         || record_count > maximum_records
         || (header & 03777)
@@ -14313,8 +14317,11 @@ std::uint16_t Machine::p14662()
             found = true;
         }
     }
-    if (!found || source_size > maximum_source_bytes
-        || source_zone > 07777) {
+    if (!found) {
+        registers_[016] = 010300;
+        return 03014;
+    }
+    if (source_size > maximum_source_bytes || source_zone > 07777) {
         return raw_continuation();
     }
 

@@ -386,8 +386,7 @@ int main(int argc, char **argv)
         std::ofstream poplib(native_poplib_path, std::ios::binary);
         require(static_cast<bool>(poplib),
                 "the native-library test can create its NU 57 image");
-        write_word(poplib, 01303100000000010ULL);
-        write_word(poplib, 02445011615233400ULL);
+        write_word(poplib, 01303100000000007ULL);
         write_word(poplib, 1);
         write_word(poplib, 1);
         write_word(poplib, poplib_name);
@@ -398,6 +397,10 @@ int main(int argc, char **argv)
         poplib.write(native_source.data(),
                    static_cast<std::streamsize>(native_source.size()));
         poplib.seekp(2 * 6144 - 1);
+        poplib.put('\0');
+        poplib.seekp(6 * 6144 + 012 * 6);
+        write_word(poplib, 0002704112630442ULL);
+        poplib.seekp(7 * 6144 - 1);
         poplib.put('\0');
         require(static_cast<bool>(poplib),
                 "the native-library test writes its source payload");
@@ -432,6 +435,17 @@ int main(int argc, char **argv)
     require(stored_text(*native_library, 020400, expected_second.size())
                 == expected_second,
             "the native library queues all remaining source lines in order");
+
+    auto missing_library_entry = std::make_unique<Machine>();
+    missing_library_entry->set_poplib_path(native_poplib_path);
+    missing_library_entry->memory(014216) = Word48(poplib_name);
+    missing_library_entry->memory(014217) = Word48(012345);
+    missing_library_entry->start(014662);
+    require(missing_library_entry->step()
+                == poplan::ExecutionStatus::running
+                && missing_library_entry->program_counter() == 03014
+                && missing_library_entry->reg(016) == 010300,
+            "14662 reports a missing library record as error 10300");
     require(std::remove(native_poplib_path.c_str()) == 0,
             "the native-library test removes its NU 57 image");
 
@@ -8173,6 +8187,79 @@ int main(int argc, char **argv)
     require(sequence_continue.reg(017) == 066017
                 && sequence_continue.accumulator() == Word48(),
             "16331 releases the four-word save area and restores accumulator");
+
+    // 03106 normally loads the ordered message catalog from disk zone 01200,
+    // searches it through 16254, and prints the selected packed sequence.
+    // The semantic entry carries the same catalog natively.
+    auto error_text_storage = std::make_unique<Machine>();
+    Machine &error_text = *error_text_storage;
+    install_character_output(error_text);
+    error_text.memory(03203) = Word48();
+    error_text.memory(03205) = Word48();
+    error_text.memory(03200) = Word48(0777);
+    error_text.memory(03174) = Word48(04020);
+    error_text.reg(015) = 03106;
+    error_text.reg(017) = 06000;
+    error_text.start(03106);
+    require(error_text.step() == poplan::ExecutionStatus::running
+                && error_text.program_counter() == 03122
+                && error_text.translated_routine_count() == 1,
+            "03106 diagnostic text is selected by semantic dispatch");
+    const std::vector<std::uint8_t> delimiter_error =
+        poplan::encode_gost_text("НЕТ РАЗДЕЛИТЕЛЯ");
+    require(error_text.accumulator() == Word48(delimiter_error.size())
+                && error_text.reg(015) == 03122
+                && error_text.reg(017) == 06000,
+            "03106 returns the message length and balances r17");
+    require(error_text.memory(03200) == Word48()
+                && error_text.memory(025412)
+                    == Word48(delimiter_error.size()),
+            "03106 preserves the catalog scratch and output count effects");
+    require(stored_text(error_text, 020440, delimiter_error.size())
+                == std::string(delimiter_error.begin(), delimiter_error.end()),
+            "03106 emits the zone-1200 text for diagnostic 04020");
+
+    auto suppressed_error_storage = std::make_unique<Machine>();
+    Machine &suppressed_error = *suppressed_error_storage;
+    install_character_output(suppressed_error);
+    suppressed_error.memory(03203) = Word48();
+    suppressed_error.memory(03205) = Word48(1);
+    suppressed_error.memory(03174) = Word48(04020);
+    suppressed_error.start(03106);
+    require(suppressed_error.step() == poplan::ExecutionStatus::running
+                && suppressed_error.program_counter() == 03124
+                && suppressed_error.memory(025412) == Word48(),
+            "03106 suppresses explanatory text when its second flag is set");
+
+    auto unknown_error_storage = std::make_unique<Machine>();
+    Machine &unknown_error = *unknown_error_storage;
+    install_character_output(unknown_error);
+    unknown_error.memory(03203) = Word48();
+    unknown_error.memory(03205) = Word48();
+    unknown_error.memory(016305) = Word48(012345);
+    unknown_error.memory(03174) = Word48(07777);
+    unknown_error.start(03106);
+    require(unknown_error.step() == poplan::ExecutionStatus::running
+                && unknown_error.program_counter() == 03124
+                && unknown_error.accumulator() == Word48(012345)
+                && unknown_error.memory(025412) == Word48(),
+            "03106 retains the original missing-message continuation");
+
+    auto duplicate_error_storage = std::make_unique<Machine>();
+    Machine &duplicate_error = *duplicate_error_storage;
+    install_character_output(duplicate_error);
+    duplicate_error.memory(03203) = Word48();
+    duplicate_error.memory(03205) = Word48();
+    duplicate_error.memory(03174) = Word48(014130);
+    duplicate_error.start(03106);
+    require(duplicate_error.step() == poplan::ExecutionStatus::running
+                && duplicate_error.program_counter() == 03122,
+            "03106 accepts the duplicated 14130 catalog code");
+    const std::vector<std::uint8_t> first_duplicate =
+        poplan::encode_gost_text("НЕВЕРНЫЕ АРГУМЕНТЫ У СНАRWО");
+    require(stored_text(duplicate_error, 020440, first_duplicate.size())
+                == std::string(first_duplicate.begin(), first_duplicate.end()),
+            "03106 selects the first descriptor for a duplicated code");
 
     // 03261 and the zero-environment path through 03235 are a matched
     // entry/return pair in the original evaluator.

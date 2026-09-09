@@ -19,10 +19,9 @@ besmtool write 2157 --start=0 --from-file=poplib.bin
 | Zone-zero word | Meaning |
 | ---: | --- |
 | `0` | POPLAN header `1303100000000000` with directory word count in its low 11 bits |
-| `1` | six bytes `RPN57\0` |
-| `2` | format version, currently `2` |
-| `3` | record count |
-| `4...` | consecutive four-word records |
+| `1` | format version, currently `2` |
+| `2` | record count |
+| `3...` | consecutive four-word records |
 
 Each record contains the six-byte GOST user identifier, the six-byte GOST file
 identifier, the starting zone, and the exact source byte count. Identifiers
@@ -64,11 +63,15 @@ Semantic dispatch occurs at `14662`, only after the original POPLAN code has
 evaluated the LIBRARY argument and decoded both identifiers. On a match, the
 payload is split into lines, converted back to terminal GOST through the
 original `21275` table arithmetic, queued ahead of terminal input, and exposed
-as the existing `CHARIN`
-supplier. The original `14677..14704` epilogue pushes that function result and
-restores the saved registers. A non-native or unmatched image continues via
-the original `14662` `NTR 3; VJM 14723(16)` path. Under raw dispak execution,
-the zone-6 overlay recognizes the same directory records, reads source zones
-through extracode `070`, and returns a supplier function to the resident
-loader. This is a compatibility format, not a claim about historical DIMON
-media layout.
+as the existing `CHARIN` supplier. The original `14677..14704` epilogue pushes
+that function result and restores the saved registers. A malformed image
+continues via the original `14662` `NTR 3; VJM 14723(16)` path. The semantic
+path recognizes the directory through the same checks as the resident loader:
+the zone-zero header and the object signature at word `0012` of zone 6.
+
+Under raw dispak execution, the zone-6 overlay recognizes the same directory
+records, reads source zones through extracode `070`, and returns a supplier
+function to the resident loader. Missing users or files enter
+`ERROR_DISPATCH` with error `10300`; they do not return an empty supplier.
+This is a compatibility format, not a claim about historical DIMON media
+layout.

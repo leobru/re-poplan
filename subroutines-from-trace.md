@@ -35,6 +35,7 @@ the quine trace is `11673`.
 | `03014` | `ERROR_DISPATCH` | Diagnostic context and POP-argument packager. | The `1+*2;` trace saves code `04020`, pushes source object `7200000000016750` and tagged code `6400000000004020`, then dispatches descriptor `6600000000003051`. |
 | `03051` | `ERROR_UNPACK` | Diagnostic argument unpacker. | Pops the tagged code and source object, restores `r16=04020`, and transfers to `03057`. |
 | `03057` | `ERROR_FORMAT` | Diagnostic formatting and reporting entry. | Saves the object and register context before invoking the runtime message and number-formatting machinery. |
+| `03106` | — | Resident error-message catalog selector and output entry. | Reproduces the suppression and missing-code branches at `03124`, otherwise selects the first matching descriptor from the ordered 162-entry zone-`01200` catalog and emits its readable UTF-8 text through the existing packed terminal buffer before returning at `03122`. |
 | `03206` | `ORDINARY_CALL` | Ordinary function setup and captured-slot preparation. | Installs `03272` as the current descriptor, follows the environment in `03273`, and dispatches generated code through `03235`. |
 | `03235` | `BIND_ENVIRONMENT` | Captured-value binding and caller restoration. | Walks the descriptor environment, rewrites generated capture slots, then restores the saved link and `03274`. |
 | `03261` | `ENTER_FUNCTION` | Function-entry trampoline. | Saves the current descriptor and link on the `r17` stack, installs `03272`, and returns generated code through `03235`. |

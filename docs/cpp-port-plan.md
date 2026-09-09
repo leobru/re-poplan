@@ -33,6 +33,8 @@ The address-preserving machine layer now translates:
 - `03014..03071` normal diagnostic packaging, unpacking, and first formatter
   call;
 - `03072..03100` first formatter-call restoration and heading setup;
+- `03106..03121` zone-`01200` diagnostic-catalog selection, suppression, and
+  native explanatory-text output;
 - `03206..03234` ordinary-call setup and captured-slot preparation;
 - `03235..03260` environment binding and restoration;
 - `03261..03264` function entry;

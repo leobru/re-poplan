@@ -8,6 +8,7 @@ add_library(poplan_core
     src/console.cpp
     src/machine.cpp
     src/machine_cpu.cpp
+    src/poplan.cpp
 )
 target_include_directories(poplan_core PUBLIC include)
 target_compile_features(poplan_core PUBLIC cxx_std_17)
