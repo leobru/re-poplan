@@ -1429,6 +1429,9 @@ bool Machine::dispatch_translated_routine()
     case 012036: continuation = p12036(); break;
     case 012042: continuation = p12042(); break;
     case 012043: continuation = p12043(); break;
+    case 012052: continuation = p12052(); break;
+    case 012053: continuation = p12053(); break;
+    case 012057: continuation = p12057(); break;
     case 012674: continuation = p12674_prreal(); break;
     case 013007: continuation = p13007(); break;
     case 013013: continuation = p13013(); break;

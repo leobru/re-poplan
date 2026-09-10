@@ -76,24 +76,26 @@ make coverage-corpus
 
 ## Historical execution and tracing
 
-Use historical POPLAN through `dispak` as the behavioral reference:
+Use historical POPLAN through `dispak` as the behavioral reference, but always
+invoke it through `tools/run-dispak.sh`. Never run bare `dispak` in this
+repository: the wrapper supplies an isolated writable home and avoids
+contaminating or exhausting the shared DIMIP input queue.
 
 ```sh
-dispak --bootstrap poplan.b6 < input_file > output
-dispak --bootstrap -t -t poplan.b6 < input_file > output 2> trace
+tools/run-dispak.sh --bootstrap poplan.b6 < input_file > output
+tools/run-dispak.sh --bootstrap -t -t poplan.b6 < input_file > output 2> trace
 ```
 
-Prefer `tools/run-dispak.sh` for repository experiments because it supplies a
-controlled writable home directory. Obtain permission for execution outside
-the sandbox when required.
+Obtain permission for execution outside the sandbox when required.
 
-For `poplan.expect`, use `dispak -l`, convert Cyrillic interaction to Latin,
-answer yes to playing first, play `0 0 0` and `1 1 1`, then terminate.
+For `poplan.expect`, use `tools/run-dispak.sh -l`, convert Cyrillic interaction
+to Latin, answer yes to playing first, play `0 0 0` and `1 1 1`, then
+terminate.
 
 Always include the trivial reference checks when validating evaluator work:
 
 ```sh
-echo '2+2=>' | dispak poplan.b6
+echo '2+2=>' | tools/run-dispak.sh poplan.b6
 echo '2+2=>' | build/cpp/poplan
 ```
 

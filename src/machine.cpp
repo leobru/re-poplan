@@ -16027,16 +16027,62 @@ std::uint16_t Machine::p12043()
         return 03014;
     }
 
+    // 12047: the validated operands continue through the operation-specific
+    // code selected by r1.  LOGAND enters with r1=12050, while LOGOR and the
+    // other bit operations use different table continuations.
+    return address_add(registers_[001], 2);
+}
+
+std::uint16_t Machine::p12052()
+{
+    // 12052: LOGAND consumes both operands from the hardware stack.
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[017] = address_add(registers_[017], -1);
     accumulator_ = accumulator_ & memory_[registers_[017]];
     remainder_ = Word48();
     select_alu_group(rau_logical);
+    return 012053;
+}
+
+std::uint16_t Machine::p12053()
+{
+    // 12053: the operation tails share this modifier/link restoration.
     registers_[017] = address_add(registers_[017], -1);
     registers_[001] = memory_[registers_[017]].address();
     registers_[015] = 03235;
     return 03275;
+}
+
+std::uint16_t Machine::p12057()
+{
+    // 12057: LOGOR is expressed by the original (a & b), then two XORs.
+    accumulator_ = memory_[address_add(registers_[017], -1)];
+    select_alu_group(rau_logical);
+    accumulator_ = accumulator_
+        & memory_[address_add(registers_[017], -2)];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    memory_[registers_[017]] = accumulator_;
+    registers_[017] = address_add(registers_[017], 1);
+
+    accumulator_ = memory_[address_add(registers_[017], -2)];
+    select_alu_group(rau_logical);
+    Word48 old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[017], -3)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+    old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[017], -1)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+
+    registers_[017] = address_add(registers_[017], -3);
+    return address_add(registers_[013], 015);
 }
 
 std::uint16_t Machine::p16320()

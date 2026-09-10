@@ -44,4 +44,18 @@ if(BUILD_TESTING)
                 ${CMAKE_SOURCE_DIR}/build/poplan.bin
                 ${CMAKE_SOURCE_DIR}
     )
+    add_test(
+        NAME poplan-language-coverage
+        COMMAND ${CMAKE_SOURCE_DIR}/tests/language-coverage.sh
+                $<TARGET_FILE:poplan>
+                ${CMAKE_SOURCE_DIR}/build/poplan.bin
+                ${CMAKE_SOURCE_DIR}
+    )
+    add_test(
+        NAME poplan-standard-functions-coverage
+        COMMAND ${CMAKE_SOURCE_DIR}/tests/standard-functions-coverage.sh
+                $<TARGET_FILE:poplan>
+                ${CMAKE_SOURCE_DIR}/build/poplan.bin
+                ${CMAKE_SOURCE_DIR}
+    )
 endif()

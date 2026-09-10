@@ -51,6 +51,21 @@ run_poplan < "$root/tests/inputs/primitives.pop2" \
 diff -u "$root/tests/expected/primitives.out" \
     "$temporary/primitives.normalized"
 
+run_poplan < "$root/tests/inputs/language-coverage.pop2" \
+    > "$temporary/language-coverage.out"
+"$root/tools/normalize-output.py" "$temporary/language-coverage.out" \
+    > "$temporary/language-coverage.normalized"
+diff -u "$root/tests/expected/language-coverage.out" \
+    "$temporary/language-coverage.normalized"
+
+run_poplan < "$root/tests/inputs/standard-functions-coverage.pop2" \
+    > "$temporary/standard-functions-coverage.out"
+"$root/tools/normalize-output.py" \
+    "$temporary/standard-functions-coverage.out" \
+    > "$temporary/standard-functions-coverage.normalized"
+diff -u "$root/tests/expected/standard-functions-coverage.out" \
+    "$temporary/standard-functions-coverage.normalized"
+
 run_poplan < "$root/tests/inputs/syntax-error.pop2" \
     > "$temporary/syntax-error.out"
 grep -F "****НЕОПР. ИД-Р +*" "$temporary/syntax-error.out" >/dev/null

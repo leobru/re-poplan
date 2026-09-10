@@ -240,6 +240,12 @@ points.
   startup probe.
 - `tests/inputs/primitives.pop2` isolates arithmetic, string output, list
   access, and conditional execution.
+- `tests/inputs/language-coverage.pop2` exercises the supported surface of the
+  [POP-2 reference language](docs/language-coverage.md) under historical,
+  hybrid, and instruction-only execution.
+- `tests/inputs/standard-functions-coverage.pop2` exercises the deterministic
+  intersection of the [reference standard functions](docs/standard-functions-coverage.md)
+  and POPLAN's resident dictionary in the same three execution modes.
 - `zone1222.pop2`, `zone1223.pop2`, and `zone1224.pop2` are historical library
   and example sources used as compiler/runtime coverage inputs.
 - `poplan.expect` is a legacy interactive driver for the copy of the game
@@ -276,6 +282,10 @@ loader, which reads the main image and transfers to `01000`.
   compiler coverage regions, and the Man-or-Boy storage diagnosis.
 - [docs/diagnostic-path.md](docs/diagnostic-path.md): traced syntax-error
   reporting and its address-preserving C++ translation.
+- [docs/language-coverage.md](docs/language-coverage.md): POP-2 reference
+  syntax and executable language coverage.
+- [docs/standard-functions-coverage.md](docs/standard-functions-coverage.md):
+  reference standard functions compared with POPLAN's resident dictionary.
 - [docs/cpp-port-plan.md](docs/cpp-port-plan.md): address-preserving C++ port
   order, conformance gates, and baseline/fixed closure semantics.
 - [poplan.sym](poplan.sym): labels and code entries consumed by `disbesm6`.

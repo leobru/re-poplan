@@ -307,6 +307,12 @@ three `12036` entries dispatch 56 times each. A fresh combined trace records
 contains no immutable-image fallback; the 665 raw half-instructions below
 `36000` are the generated block at `32535..32566`.
 
+The standard-function conformance trace also reaches this validator from the
+dictionary `LOGOR` entry at `12040`. The common `12043` block validates both
+operands and transfers through `r1+2`; the operation itself begins at `12052`
+for `LOGAND` and `12057` for `LOGOR`. Both tails converge on the translated
+stack/modifier restoration entry at `12053`.
+
 A complete fixed-seed host tic-tac-toe session after this sequence executed
 1,084,185 machine steps: 668,671 semantic routine dispatches and 415,514
 individual BESM instructions. The combined trace also contained 364 input-status

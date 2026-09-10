@@ -260,6 +260,9 @@ public:
     std::uint16_t p12036();
     std::uint16_t p12042();
     std::uint16_t p12043();
+    std::uint16_t p12052();
+    std::uint16_t p12053();
+    std::uint16_t p12057();
     std::uint16_t p16320();
     std::uint16_t p17054();
     std::uint16_t p17056();

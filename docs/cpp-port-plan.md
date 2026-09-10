@@ -265,6 +265,13 @@ game, and exits. With high generated-routine dispatch, its fresh trace contains
 exercises the translated low generated family without exposing another raw
 path.
 
+The reference standard-function fixture later exercised the shared logical
+validator through `LOGOR` as well as `LOGAND`. Entry `12043` now stops at the
+operation-specific continuation selected through `r1` (`12052` for `LOGAND`,
+`12057` for `LOGOR`) instead of absorbing the `LOGAND` tail into the shared
+translation. Both operation tails and their shared return at `12053` are now
+translated boundaries with full-state differential fixtures.
+
 ## Port Order
 
 ### 1. Tagged Machine State

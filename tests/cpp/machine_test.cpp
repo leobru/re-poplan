@@ -2739,7 +2739,7 @@ int main(int argc, char **argv)
         machine.memory(012114) = Word48(06400000000000000ULL);
     };
     compare_static_semantic_entry(
-        012043, 03275,
+        012043, 012052,
         {
             {012043, Word48(instruction_pair(
                 short_instruction(017, 000, 0),
@@ -2767,7 +2767,62 @@ int main(int argc, char **argv)
                 long_instruction(0, 0300, 03275)))},
         },
         initialize_logand_frame,
-        "12043 LOGAND ordinary result");
+        "12043 logical operation continuation");
+
+    compare_static_semantic_entry(
+        012052, 012053,
+        {
+            {012052, Word48(instruction_pair(
+                short_instruction(017, 010, 0),
+                short_instruction(017, 011, 0)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05003;
+            machine.memory(05001) = Word48(06400000000000003ULL);
+            machine.memory(05002) = Word48(06400000000000006ULL);
+        },
+        "12052 LOGAND operation tail");
+
+    compare_static_semantic_entry(
+        012053, 03275,
+        {
+            {012053, Word48(instruction_pair(
+                long_instruction(017, 0230, 0),
+                long_instruction(001, 0240, 0)))},
+            {012054, Word48(instruction_pair(
+                long_instruction(015, 0240, 03235),
+                long_instruction(0, 0300, 03275)))},
+        },
+        [](Machine &machine) {
+            machine.reg(017) = 05001;
+            machine.memory(05000) = Word48(012050);
+        },
+        "12053 logical operation return");
+
+    compare_static_semantic_entry(
+        012057, 012053,
+        {
+            {012057, Word48(instruction_pair(
+                short_instruction(017, 010, 077777),
+                short_instruction(017, 011, 077776)))},
+            {012060, Word48(instruction_pair(
+                short_instruction(017, 000, 0),
+                short_instruction(017, 010, 077776)))},
+            {012061, Word48(instruction_pair(
+                short_instruction(017, 012, 077775),
+                short_instruction(017, 012, 077777)))},
+            {012062, Word48(instruction_pair(
+                long_instruction(017, 0250, 077775),
+                long_instruction(013, 0300, 015)))},
+        },
+        [](Machine &machine) {
+            machine.reg(013) = 012036;
+            machine.reg(017) = 05003;
+            machine.memory(05000) = Word48(012055);
+            machine.memory(05001) = Word48(06400000000000001ULL);
+            machine.memory(05002) = Word48(06400000000000004ULL);
+        },
+        "12057 LOGOR operation tail");
 
     compare_static_semantic_entry(
         012043, 03014,
