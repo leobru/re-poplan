@@ -301,22 +301,28 @@ void flush_console_output(Machine &machine, std::ostream &output,
                           bool unicode = false,
                           bool terminate_record = false)
 {
-    bool ended_with_newline = false;
-    for (const std::uint8_t byte : machine.console_output()) {
-        if (byte == gost_newline || byte == 0175) {
+    const auto flush_range = [&](std::size_t begin, std::size_t end) {
+        for (std::size_t index = begin; index < end; ++index) {
+            const std::uint8_t byte = machine.console_output()[index];
+            if (byte == gost_newline || byte == 0175) {
+                output.put('\n');
+            } else if (unicode) {
+                write_utf8(output, gost_to_unicode(byte));
+            } else {
+                output.put(gost_to_ascii(byte));
+            }
+        }
+    };
+
+    std::size_t begin = 0;
+    if (terminate_record) {
+        for (const std::size_t end : machine.console_output_record_ends()) {
+            flush_range(begin, end);
             output.put('\n');
-            ended_with_newline = true;
-        } else if (unicode) {
-            write_utf8(output, gost_to_unicode(byte));
-            ended_with_newline = false;
-        } else {
-            output.put(gost_to_ascii(byte));
-            ended_with_newline = false;
+            begin = end;
         }
     }
-    if (terminate_record && !ended_with_newline) {
-        output.put('\n');
-    }
+    flush_range(begin, machine.console_output().size());
     machine.clear_console_output();
     output.flush();
 }
@@ -407,7 +413,6 @@ int run_image_shell(Machine &machine, std::istream &input,
             }
         }
     }
-    bool prompt_pending = false;
     std::string line;
     while (machine.instruction_count() < instruction_limit) {
         if (trace_cpu) {
@@ -429,11 +434,8 @@ int run_image_shell(Machine &machine, std::istream &input,
                       << std::setw(5) << entry << " -> "
                       << std::setw(5) << machine.program_counter() << '\n';
         }
-        if (!machine.console_output().empty()) {
-            if (prompt_pending) {
-                output.put('\n');
-                prompt_pending = false;
-            }
+        if (!machine.console_output().empty()
+            || !machine.console_output_record_ends().empty()) {
             flush_console_output(machine, output, true, true);
         }
         if (status == ExecutionStatus::halted) {
@@ -450,7 +452,6 @@ int run_image_shell(Machine &machine, std::istream &input,
 
         output.put(':');
         output.flush();
-        prompt_pending = true;
         if (!std::getline(input, line)) {
             return 0;
         }

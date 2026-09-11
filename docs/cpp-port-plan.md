@@ -207,7 +207,10 @@ image. Before fetching a BESM instruction, the machine dispatches a recognized
 left-half `pXXXXX` entry to its address-preserving semantic implementation;
 untranslated addresses fall back to the instruction interpreter. Its Э71
 adapter supplies prompts, line input, record output, and GOST-10859 UTF-8
-conversion in both directions, including Unicode Cyrillic input. Э75 stores
+conversion in both directions, including Unicode Cyrillic input. Each Э71
+output transfer retains its own physical-record boundary, including an empty
+record; embedded GOST newlines therefore remain additional line advances and
+match the historical redirected-console layout. Э75 stores
 generated instruction words into memory, so the
 historical compiler and evaluator run unchanged inside this machine layer.
 Generated routine entries at `036000` and above now use a memory-driven
@@ -271,6 +274,16 @@ operation-specific continuation selected through `r1` (`12052` for `LOGAND`,
 `12057` for `LOGOR`) instead of absorbing the `LOGAND` tail into the shared
 translation. Both operation tails and their shared return at `12053` are now
 translated boundaries with full-state differential fixtures.
+
+A subsequent audit of every host-side CTest workload converted the remaining
+static paths exposed by the language and standard-function fixtures and by
+native `LIBRARY.COMPILE`. The added entries cover `01030..01065`, executable
+templates at `03315..03410`, `07134..07276`, `10152..12041`, record callbacks
+at `16610..16640`, the restoration loop `17077..17112`, and the native-library
+frame and name-copy path `14651..14721`. Fresh combined CPU/routine traces for
+quine, language coverage, standard-function coverage, and native-library
+loading each contain zero raw instruction steps. This is a corpus result;
+untranslated fallback remains available for other inputs and generated code.
 
 ## Port Order
 

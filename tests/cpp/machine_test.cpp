@@ -8032,8 +8032,20 @@ int main(int argc, char **argv)
             "20256 returns after the E71 output control word");
     require(e71_output->console_output()
                 == std::vector<std::uint8_t>({031, 040})
+                && e71_output->console_output_record_ends()
+                    == std::vector<std::size_t>({2})
                 && e71_output->memory(020362) == Word48(1),
-            "E71 emits GOST bytes up to 0377 and completes the continuation");
+            "E71 emits one bounded GOST output record and completes the "
+            "continuation");
+
+    e71_output->clear_console_output();
+    e71_output->memory(020440) = Word48(
+        std::uint64_t{0377} << 40);
+    require(e71_output->p20256_transfer_console() == 07654
+                && e71_output->console_output().empty()
+                && e71_output->console_output_record_ends()
+                    == std::vector<std::size_t>({0}),
+            "E71 preserves an empty terminal output record");
 
     // The corresponding input control word writes a queued GOST line, its
     // 0377 terminator, and zero padding into the r10-relative input buffer.
@@ -8818,6 +8830,390 @@ int main(int argc, char **argv)
             *semantic, *interpreted, {entry}, label, max_steps);
     };
 
+    require(compare_image_entry(
+                01030,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(06543);
+                },
+                "01030 computed stack return", 4) == 06543,
+            "01030 restores its continuation through r17");
+    require(compare_image_entry(
+                01032,
+                [](Machine &machine) {
+                    machine.reg(003) = 04000;
+                    machine.reg(007) = 01200;
+                    machine.reg(017) = 05000;
+                },
+                "01032 evaluator register frame", 32) == 05215,
+            "01032 preserves the allocation boundary");
+    require(compare_image_entry(
+                01051,
+                [](Machine &machine) {
+                    machine.reg(002) = 01200;
+                    machine.reg(003) = 04000;
+                    machine.reg(007) = 01200;
+                    machine.reg(017) = 05014;
+                    machine.memory(04002) = Word48();
+                    machine.memory(01272) = Word48();
+                },
+                "01051 evaluator register restore", 40) == 03235,
+            "01051 restores the saved evaluator frame");
+    require(compare_image_entry(
+                011102,
+                [](Machine &machine) {
+                    machine.reg(017) = 05000;
+                },
+                "11102 record constructor frame", 16) == 03277,
+            "11102 preserves the first POP_ACC boundary");
+    require(compare_image_entry(
+                011571,
+                [](Machine &machine) {
+                    machine.reg(001) = 011102;
+                    machine.reg(003) = 04000;
+                    machine.reg(017) = 05007;
+                },
+                "11571 generated-builder continuation", 32) != 0,
+            "11571 reaches its instruction-equivalent continuation");
+    require(compare_image_entry(
+                013103, [](Machine &) {},
+                "13103 numeric callback", 4) == 013121,
+            "13103 preserves the numeric callback boundary");
+    require(compare_image_entry(
+                03317,
+                [](Machine &machine) {
+                    machine.reg(017) = 05000;
+                    machine.memory(03453) = Word48();
+                    machine.memory(03454) = Word48();
+                },
+                "03317 executable numeric template", 24) == 03275,
+            "03317 preserves the PUSH_ACC boundary");
+    require(compare_image_entry(
+                07136,
+                [](Machine &machine) {
+                    machine.reg(017) = 05002;
+                    machine.memory(05000) = Word48(012345);
+                },
+                "07136 executable callback template", 8) == 021125,
+            "07136 preserves the 21125 callback boundary");
+    require(compare_image_entry(
+                07265,
+                [](Machine &machine) {
+                    machine.reg(005) = 0;
+                    machine.reg(010) = 07142;
+                    machine.reg(017) = 05000;
+                },
+                "07265 packed-field setup", 32) == 07277,
+            "07265 preserves the packed-field loop boundary");
+    require(compare_image_entry(
+                010153, [](Machine &) {},
+                "10153 executable selector template", 16) != 0,
+            "10153 reaches its instruction-equivalent continuation");
+    require(compare_image_entry(
+                010531,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(04000);
+                },
+                "10531 executable tag template", 16) != 0,
+            "10531 reaches its instruction-equivalent continuation");
+    require(compare_image_entry(
+                010631,
+                [](Machine &machine) {
+                    machine.reg(016) = 04000;
+                },
+                "10631 executable offset template", 8) == 03303,
+            "10631 preserves the STORE_STACK_TOP boundary");
+    require(compare_image_entry(
+                011031,
+                [](Machine &machine) {
+                    machine.reg(017) = 05000;
+                },
+                "11031 function-construction frame", 16) == 05215,
+            "11031 preserves the allocation boundary");
+    require(compare_image_entry(
+                012040,
+                [](Machine &machine) {
+                    machine.reg(001) = 01234;
+                    machine.reg(017) = 05000;
+                },
+                "12040 logical-function frame", 8) == 03277,
+            "12040 preserves the POP_ACC boundary");
+    require(compare_image_entry(
+                016624,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.accumulator() = Word48();
+                    machine.memory(074514) = Word48();
+                },
+                "16624 record selector", 4) == 016625,
+            "16624 preserves the zero-selector continuation");
+    require(compare_image_entry(
+                016610,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(015) = 06000;
+                },
+                "16610 tagged-byte callback", 8) == 016421,
+            "16610 preserves the tagged-byte lookup boundary");
+    require(compare_image_entry(
+                017077,
+                [](Machine &machine) {
+                    machine.reg(001) = 01234;
+                    machine.reg(015) = 06000;
+                    machine.reg(017) = 05000;
+                    machine.memory(03637) = Word48();
+                    machine.memory(017117) = Word48();
+                },
+                "17077 output restoration frame", 24) == 017111,
+            "17077 preserves the stack-restoration boundary");
+    require(compare_image_entry(
+                014651,
+                [](Machine &machine) {
+                    machine.reg(017) = 05000;
+                },
+                "14651 library-loader frame", 16) == 02767,
+            "14651 preserves the indirect evaluator boundary");
+    require(compare_image_entry(
+                014705,
+                [](Machine &machine) {
+                    machine.reg(001) = 015117;
+                    machine.reg(003) = 014216;
+                    machine.memory(014216) = Word48();
+                    machine.memory(015167) = Word48();
+                    machine.memory(015154) = Word48();
+                },
+                "14705 library-name validator", 20) == 014712,
+            "14705 preserves the catalog-copy boundary");
+    require(compare_image_entry(
+                014700,
+                [](Machine &machine) {
+                    machine.reg(001) = 015117;
+                    machine.reg(017) = 05003;
+                    machine.memory(05000) = Word48(01234);
+                    machine.memory(05001) = Word48(02345);
+                    machine.memory(05002) = Word48(03456);
+                },
+                "14700 library-loader epilogue", 24) == 03235,
+            "14700 restores the saved loader frame");
+
+    require(compare_image_entry(
+                02774,
+                [](Machine &machine) {
+                    machine.accumulator() =
+                        Word48(06601175000011755ULL);
+                    machine.memory(011752) =
+                        Word48(0660000000011756ULL);
+                },
+                "02774 indirect-function validator", 24) == 02750,
+            "02774 preserves the ordinary evaluator boundary");
+    require(compare_image_entry(
+                011266,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(003) = 04000;
+                    machine.reg(010) = 03000;
+                    machine.reg(015) = 06000;
+                    machine.reg(017) = 05000;
+                    machine.memory(04004) =
+                        Word48(0765432101234567ULL);
+                },
+                "11266 generated-cell finalizer", 24) == 06000,
+            "11266 balances r17 and returns through r15");
+    require(compare_image_entry(
+                011302,
+                [](Machine &machine) {
+                    machine.reg(001) = 3;
+                    machine.reg(002) = 04000;
+                    machine.memory(04002) =
+                        Word48(06601175000011755ULL);
+                },
+                "11302 function-cell scan", 8) == 02774,
+            "11302 preserves the shared validator boundary");
+    require(compare_image_entry(
+                011304,
+                [](Machine &machine) {
+                    machine.reg(017) = 05003;
+                    machine.memory(05000) =
+                        Word48(06400000000000001ULL);
+                },
+                "11304 scanned result push", 4) == 03275,
+            "11304 preserves the PUSH_ACC boundary");
+    require(compare_image_entry(
+                011305,
+                [](Machine &machine) {
+                    machine.reg(001) = 2;
+                },
+                "11305 scan loop", 2) == 011302,
+            "11305 preserves the next scan iteration");
+    require(compare_image_entry(
+                011343, [](Machine &) {},
+                "11343 generated update frame", 12) == 03277,
+            "11343 preserves the first POP_ACC boundary");
+    require(compare_image_entry(
+                011347,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(002) = 04002;
+                    machine.accumulator() = Word48(5);
+                    machine.memory(0675) = Word48(Word48::mask);
+                    machine.memory(04000) = Word48(5);
+                },
+                "11347 generated update selector", 16) == 03277,
+            "11347 preserves the second POP_ACC boundary");
+    require(compare_image_entry(
+                011353,
+                [](Machine &machine) {
+                    machine.reg(002) = 2;
+                    machine.reg(003) = 04000;
+                    machine.reg(017) = 05004;
+                    machine.memory(05000) = Word48(012345);
+                    machine.memory(05001) = Word48(01111);
+                    machine.memory(05002) = Word48(02222);
+                    machine.memory(05003) = Word48(03333);
+                },
+                "11353 generated update return", 16) == 03235,
+            "11353 restores the saved frame and balances r17");
+    require(compare_image_entry(
+                021226,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(017) = 05000;
+                    machine.accumulator() = Word48(012345);
+                    machine.memory(022) = Word48(Word48::mask);
+                    machine.memory(023) = Word48(012345);
+                },
+                "21226 conversion argument validator", 12) == 025675,
+            "21226 balances its temporary stack word and calls 25675");
+    require(compare_image_entry(
+                012216, [](Machine &) {},
+                "12216 structure-copy call", 4) == 021536,
+            "12216 preserves the 21536 boundary");
+    require(compare_image_entry(
+                021536, [](Machine &) {},
+                "21536 structure-copy frame", 20) == 011464,
+            "21536 preserves the 11464 boundary");
+    require(compare_image_entry(
+                021544,
+                [](Machine &machine) {
+                    machine.reg(001) = 021536;
+                    machine.reg(006) = 05000;
+                    machine.reg(017) = 06001;
+                    machine.memory(06000) = Word48(012345);
+                },
+                "21544 structure-copy continuation", 12) == 02767,
+            "21544 preserves the indirect evaluator boundary");
+    require(compare_image_entry(
+                021560,
+                [](Machine &machine) {
+                    machine.reg(002) = 04000;
+                    machine.reg(016) = 0;
+                },
+                "21560 copy-list termination", 4) == 021564,
+            "21560 preserves the reverse-copy boundary");
+    require(compare_image_entry(
+                021564, [](Machine &) {},
+                "21564 reverse-copy setup", 2) == 021565,
+            "21564 preserves the reverse-copy boundary");
+    require(compare_image_entry(
+                021565,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(003) = 0;
+                    machine.memory(067) = Word48();
+                    machine.memory(070) = Word48();
+                    machine.memory(071) = Word48(04000);
+                    machine.memory(04000) = Word48();
+                },
+                "21565 empty reverse copy", 24) == 02774,
+            "21565 preserves the function validator boundary");
+    require(compare_image_entry(
+                021600,
+                [](Machine &machine) {
+                    machine.reg(001) = 021536;
+                },
+                "21600 copy continuation", 2) == 021603,
+            "21600 preserves the forward-copy boundary");
+    require(compare_image_entry(
+                021602,
+                [](Machine &machine) {
+                    machine.reg(001) = 021536;
+                },
+                "21602 copy continuation", 2) == 021565,
+            "21602 preserves the reverse-copy boundary");
+    require(compare_image_entry(
+                021603,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.memory(067) = Word48();
+                    machine.memory(071) = Word48(04000);
+                    machine.memory(04000) = Word48(012345);
+                },
+                "21603 empty forward copy", 16) == 03506,
+            "21603 preserves the allocation continuation boundary");
+    require(compare_image_entry(
+                021231, [](Machine &) {},
+                "21231 conversion result push", 4) == 03275,
+            "21231 preserves the PUSH_ACC boundary");
+    require(compare_image_entry(
+                021232,
+                [](Machine &machine) {
+                    machine.reg(001) = 021222;
+                    machine.memory(021247) =
+                        Word48(06400000000000003ULL);
+                },
+                "21232 saved conversion result", 4) == 03275,
+            "21232 preserves the second PUSH_ACC boundary");
+    require(compare_image_entry(
+                025675,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(2);
+                    machine.reg(001) = 07000;
+                    machine.reg(002) = 3;
+                    machine.reg(015) = 06000;
+                    machine.reg(017) = 05000;
+                },
+                "25675 numeric conversion frame", 20) == 03277,
+            "25675 preserves the first POP_ACC boundary");
+    require(compare_image_entry(
+                025701,
+                [](Machine &machine) {
+                    machine.reg(002) = 3;
+                },
+                "25701 conversion loop test", 4) == 03277,
+            "25701 preserves the POP_ACC boundary");
+    require(compare_image_entry(
+                025702,
+                [](Machine &machine) {
+                    machine.reg(001) = 025675;
+                    machine.reg(002) = 04000;
+                    machine.accumulator() = Word48(1);
+                    machine.memory(025723) = Word48(Word48::mask);
+                    machine.memory(025722) = Word48();
+                },
+                "25702 invalid conversion value", 8) == 025720,
+            "25702 preserves its diagnostic continuation");
+    require(compare_image_entry(
+                025714,
+                [](Machine &machine) {
+                    machine.reg(001) = 025675;
+                    machine.reg(002) = 2;
+                    machine.reg(015) = 07000;
+                    machine.reg(017) = 05004;
+                    machine.memory(05000) = Word48();
+                    machine.memory(05001) = Word48(06000);
+                    machine.memory(05002) = Word48(025675);
+                    machine.memory(05003) = Word48(2);
+                },
+                "25714 conversion frame return", 16) == 06000,
+            "25714 restores r2, r1, and r15 and balances r17");
+    require(compare_image_entry(
+                025720,
+                [](Machine &machine) {
+                    machine.reg(001) = 025675;
+                },
+                "25720 conversion diagnostic", 6) == 03014,
+            "25720 preserves diagnostic 12101");
+
     {
         const std::vector<std::pair<std::uint16_t, Word48>> generated = {
             {040000, Word48(instruction_pair(
@@ -9595,6 +9991,39 @@ int main(int argc, char **argv)
                 },
                 "16747 zero branch", 2) == 016675,
             "16747 reproduces its r1-relative zero branch");
+    require(compare_image_entry(
+                016672,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(017) = 05007;
+                    machine.memory(05000) =
+                        Word48(0411000000000000ULL);
+                },
+                "16672 record arithmetic setup", 20) == 016605,
+            "16672 preserves the masked record-update boundary");
+    require(compare_image_entry(
+                016677,
+                [](Machine &machine) {
+                    machine.reg(001) = 0;
+                    machine.reg(003) = 04000;
+                    machine.reg(017) = 05007;
+                    machine.memory(04000) =
+                        Word48(0411000000000000ULL);
+                    machine.memory(05000) =
+                        Word48(0411000000000000ULL);
+                },
+                "16677 record arithmetic continuation", 24) == 016742,
+            "16677 preserves the tagged-byte lookup boundary");
+    require(compare_image_entry(
+                016705,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.accumulator() = Word48(1);
+                    machine.alu_mode() = 004;
+                    machine.memory(016777) = Word48();
+                },
+                "16705 record result selector", 8) == 016645,
+            "16705 reproduces its r1-relative selected target");
 
     const std::vector<std::pair<std::uint16_t, Word48>> message_code = {
         {017120, Word48(instruction_pair(
