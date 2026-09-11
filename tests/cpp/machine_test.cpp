@@ -12080,6 +12080,437 @@ int main(int argc, char **argv)
                 == 017575,
             "17606 restores the generated-pair frame and caller");
 
+    require(compare_image_entry(
+                03325, [](Machine &) {},
+                "03325 ISLIST pop", 2) == 03277,
+            "03325 preserves the POP_ACC boundary");
+    require(compare_image_entry(
+                03326, [](Machine &) {},
+                "03326 ISLIST classifier", 2) == 03330,
+            "03326 preserves the 03330 classifier boundary");
+    require(compare_image_entry(
+                03327,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(1);
+                    machine.alu_mode() = 004;
+                    machine.reg(013) = 03310;
+                },
+                "03327 ISLIST true result", 2) == 03313,
+            "03327 selects the nonzero classifier result");
+    require(compare_image_entry(
+                03327,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48();
+                    machine.alu_mode() = 004;
+                    machine.reg(013) = 03310;
+                },
+                "03327 ISLIST false result", 2) == 03315,
+            "03327 selects the zero classifier result");
+
+    require(compare_image_entry(
+                06611, [](Machine &) {},
+                "06611 ISWORD pop", 2) == 03277,
+            "06611 preserves the POP_ACC boundary");
+    require(compare_image_entry(
+                06612,
+                [](Machine &machine) {
+                    machine.accumulator() = machine.memory(06666);
+                },
+                "06612 ISWORD matching tag", 8) == 06616,
+            "06612 selects the matching-tag result");
+    require(compare_image_entry(
+                06612,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48();
+                },
+                "06612 ISWORD mismatching tag", 8) == 06614,
+            "06612 selects the mismatching-tag result");
+
+    require(compare_image_entry(
+                07367, [](Machine &) {},
+                "07367 SAMEDATA first evaluation", 4) == 02767,
+            "07367 preserves the first evaluator boundary");
+    require(compare_image_entry(
+                07370, [](Machine &) {},
+                "07370 SAMEDATA save", 4) == 03303,
+            "07370 preserves the stack-top store boundary");
+    require(compare_image_entry(
+                07371, [](Machine &) {},
+                "07371 SAMEDATA second evaluation", 4) == 02767,
+            "07371 preserves the second evaluator boundary");
+    require(compare_image_entry(
+                07372, [](Machine &) {},
+                "07372 SAMEDATA pop", 2) == 03277,
+            "07372 preserves the POP_ACC boundary");
+    require(compare_image_entry(
+                07373,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(01234567);
+                    machine.memory(07204) = Word48(01234567);
+                },
+                "07373 SAMEDATA equal", 8) == 03301,
+            "07373 selects the equal object and stack boundary");
+    require(compare_image_entry(
+                07373,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(07654321);
+                    machine.memory(07204) = Word48(01234567);
+                },
+                "07373 SAMEDATA unequal", 8) == 03301,
+            "07373 selects the unequal object and stack boundary");
+
+    require(compare_image_entry(
+                010350, [](Machine &) {},
+                "10350 ISLINK pop", 2) == 03277,
+            "10350 preserves the POP_ACC boundary");
+    require(compare_image_entry(
+                010351, [](Machine &) {},
+                "10351 ISLINK classifier", 2) == 010353,
+            "10351 preserves the 10353 classifier boundary");
+    require(compare_image_entry(
+                010352, [](Machine &) {},
+                "10352 ISLINK return", 4) == 03275,
+            "10352 preserves the PUSH_ACC boundary");
+
+    require(compare_image_entry(
+                07433, [](Machine &) {},
+                "07433 BOUNDSLIST frame", 12) == 03277,
+            "07433 preserves the first POP_ACC boundary");
+    require(compare_image_entry(
+                07436,
+                [](Machine &machine) {
+                    machine.reg(002) = 01200;
+                },
+                "07436 BOUNDSLIST first argument", 4) == 03275,
+            "07436 preserves the first PUSH_ACC boundary");
+    require(compare_image_entry(
+                07437,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(07654321);
+                },
+                "07437 BOUNDSLIST second argument", 4) == 03275,
+            "07437 preserves the second PUSH_ACC boundary");
+    require(compare_image_entry(
+                07440,
+                [](Machine &machine) {
+                    machine.reg(002) = 01200;
+                },
+                "07440 BOUNDSLIST evaluator", 4) == 02750,
+            "07440 preserves the evaluator boundary");
+    require(compare_image_entry(
+                07441, [](Machine &) {},
+                "07441 BOUNDSLIST result pop", 4) == 03277,
+            "07441 preserves the final POP_ACC boundary");
+    require(compare_image_entry(
+                07442,
+                [](Machine &machine) {
+                    machine.reg(001) = 07426;
+                    machine.accumulator() =
+                        Word48(06746500200064674ULL);
+                    machine.memory(021245) =
+                        Word48(06746500200000000ULL);
+                },
+                "07442 BOUNDSLIST first cell", 32) == 05215,
+            "07442 preserves the first pair-allocation boundary");
+    require(compare_image_entry(
+                07442,
+                [](Machine &machine) {
+                    machine.reg(001) = 07426;
+                    machine.accumulator() = Word48();
+                },
+                "07442 BOUNDSLIST invalid object", 16) == 07463,
+            "07442 preserves the invalid-object continuation");
+    require(compare_image_entry(
+                07453,
+                [](Machine &machine) {
+                    machine.reg(001) = 07426;
+                    machine.reg(002) = 04000;
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(01234567);
+                },
+                "07453 BOUNDSLIST second cell", 8) == 05215,
+            "07453 preserves the second pair-allocation boundary");
+    require(compare_image_entry(
+                07455,
+                [](Machine &machine) {
+                    machine.reg(001) = 07426;
+                    machine.reg(002) = 04000;
+                    machine.memory(04003) = Word48();
+                },
+                "07455 BOUNDSLIST finish loop", 16) == 03275,
+            "07455 preserves the completed-list PUSH_ACC boundary");
+    require(compare_image_entry(
+                07460,
+                [](Machine &machine) {
+                    machine.reg(001) = 07426;
+                    machine.reg(017) = 05002;
+                    machine.memory(05000) = Word48(0123);
+                    machine.memory(05001) = Word48(0456);
+                },
+                "07460 BOUNDSLIST restoration", 12) == 03235,
+            "07460 restores r1, r2, and the hardware stack");
+    require(compare_image_entry(
+                07463,
+                [](Machine &machine) {
+                    machine.reg(001) = 07426;
+                    machine.memory(07470) = Word48(07654321);
+                },
+                "07463 BOUNDSLIST diagnostic", 8) == 03014,
+            "07463 preserves diagnostic 12100");
+
+    require(compare_image_entry(
+                010402,
+                [](Machine &machine) {
+                    machine.memory(05502) = Word48(04000);
+                    machine.memory(04000) =
+                        Word48((std::uint64_t{3} << 24) | 04001);
+                    machine.memory(04001) =
+                        Word48((std::uint64_t{5} << 24));
+                },
+                "10402 COREUSED free-list scan", 64) == 03275,
+            "10402 preserves the first result PUSH_ACC boundary");
+    require(compare_image_entry(
+                010415,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(06400000000000123ULL);
+                },
+                "10415 COREUSED second result", 4) == 010352,
+            "10415 preserves the shared return boundary");
+    require(compare_image_entry(
+                010416, [](Machine &) {},
+                "10416 appendix evaluator", 4) == 02767,
+            "10416 preserves the first appendix evaluator boundary");
+    require(compare_image_entry(
+                010417, [](Machine &) {},
+                "10417 appendix evaluator", 4) == 02767,
+            "10417 preserves the second appendix evaluator boundary");
+    require(compare_image_entry(
+                010420, [](Machine &) {},
+                "10420 evaluator wrapper", 2) == 02767,
+            "10420 preserves its evaluator boundary");
+
+    require(compare_image_entry(
+                010421, [](Machine &) {},
+                "10421 FNCOMP frame", 8) == 03277,
+            "10421 preserves the first POP_ACC boundary");
+    require(compare_image_entry(
+                010423,
+                [](Machine &machine) {
+                    machine.accumulator() = machine.memory(010454);
+                },
+                "10423 FNCOMP first function", 12) == 03277,
+            "10423 preserves the second POP_ACC boundary");
+    require(compare_image_entry(
+                010423,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48();
+                },
+                "10423 FNCOMP invalid first function", 12) == 010443,
+            "10423 preserves the diagnostic continuation");
+    require(compare_image_entry(
+                010426,
+                [](Machine &machine) {
+                    machine.reg(002) = 010421;
+                    machine.accumulator() = machine.memory(010454);
+                },
+                "10426 FNCOMP second function", 12) == 05430,
+            "10426 preserves the five-word allocation boundary");
+    require(compare_image_entry(
+                010431,
+                [](Machine &machine) {
+                    machine.reg(002) = 010421;
+                    machine.reg(016) = 04000;
+                },
+                "10431 FNCOMP descriptor", 24) == 03275,
+            "10431 preserves the composition PUSH_ACC boundary");
+    require(compare_image_entry(
+                010436,
+                [](Machine &machine) {
+                    machine.reg(002) = 010421;
+                },
+                "10436 FNCOMP helper allocation", 4) == 011464,
+            "10436 preserves the 11464 allocation boundary");
+    require(compare_image_entry(
+                010437,
+                [](Machine &machine) {
+                    machine.reg(001) = 04000;
+                    machine.reg(017) = 05004;
+                    machine.memory(05000) = Word48(0123);
+                    machine.memory(05001) = Word48(0456);
+                    machine.memory(05002) = Word48(06600000000001234ULL);
+                    machine.memory(05003) = Word48(06600000000005670ULL);
+                    machine.accumulator() = Word48(07040000000006000ULL);
+                },
+                "10437 FNCOMP restoration", 24) == 03235,
+            "10437 installs the functions and restores r1 and r2");
+    require(compare_image_entry(
+                010443,
+                [](Machine &machine) {
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(07654321);
+                },
+                "10443 FNCOMP diagnostic", 8) == 03014,
+            "10443 preserves diagnostic 10210");
+
+    require(compare_image_entry(
+                010604, [](Machine &) {},
+                "10604 FNPART validation", 4) == 010672,
+            "10604 preserves the 10672 function-validation boundary");
+    require(compare_image_entry(
+                010605,
+                [](Machine &machine) {
+                    machine.reg(016) = 04000;
+                    machine.memory(04003) = Word48(06600000000006702ULL);
+                },
+                "10605 FNPART field load", 4) == 010606,
+            "10605 loads function field three and preserves 10606");
+    require(compare_image_entry(
+                010606, [](Machine &) {},
+                "10606 FNPART result push", 2) == 03275,
+            "10606 preserves the PUSH_ACC boundary");
+
+    require(compare_image_entry(
+                015712, [](Machine &) {},
+                "15712 CODIPS conversion selection", 4) == 015714,
+            "15712 selects the 21275 character converter");
+    require(compare_image_entry(
+                015713, [](Machine &) {},
+                "15713 CODPIS conversion selection", 4) == 015714,
+            "15713 selects the 21274 character converter");
+    require(compare_image_entry(
+                015714,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.reg(013) = 021275;
+                    machine.memory(06000) = Word48(
+                        (std::uint64_t{0162} << 41) | 04000);
+                    machine.memory(06001) = Word48(
+                        (std::uint64_t{0162} << 41) | 04100);
+                    machine.memory(04000) =
+                        Word48(std::uint64_t{3} << 24);
+                    machine.memory(04100) =
+                        Word48(std::uint64_t{5} << 24);
+                },
+                "15714 CODIPS descriptor setup", 48) == 015741,
+            "15714 forms descriptors and selects the shorter source");
+    require(compare_image_entry(
+                015714,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.reg(013) = 021274;
+                    machine.memory(06000) = Word48(
+                        (std::uint64_t{0162} << 41) | 04000);
+                    machine.memory(06001) = Word48(
+                        (std::uint64_t{0162} << 41) | 04100);
+                    machine.memory(04000) =
+                        Word48(std::uint64_t{5} << 24);
+                    machine.memory(04100) =
+                        Word48(std::uint64_t{2} << 24);
+                },
+                "15714 CODPIS shorter destination", 48) == 015741,
+            "15714 truncates conversion to the destination length");
+    require(compare_image_entry(
+                015714,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.reg(013) = 021275;
+                    machine.memory(06000) = Word48(04000);
+                },
+                "15714 invalid string object", 24) == 015750,
+            "15714 preserves its invalid-object continuation");
+    require(compare_image_entry(
+                015714,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.reg(013) = 021275;
+                    machine.memory(06000) = Word48(
+                        (std::uint64_t{0162} << 41) | 04000);
+                    machine.memory(06001) = Word48(
+                        (std::uint64_t{0162} << 41) | 04100);
+                    machine.memory(04000) = Word48();
+                    machine.memory(04100) =
+                        Word48(std::uint64_t{2} << 24);
+                },
+                "15714 empty string", 40) == 015745,
+            "15714 skips conversion when either string is empty");
+    require(compare_image_entry(
+                015741, [](Machine &) {},
+                "15741 packed source traversal", 4) == 021431,
+            "15741 preserves the 21431 boundary");
+    require(compare_image_entry(
+                015742,
+                [](Machine &machine) {
+                    machine.reg(004) = 021275;
+                },
+                "15742 selected character converter", 4) == 021275,
+            "15742 calls the selected character converter through r4");
+    require(compare_image_entry(
+                015743, [](Machine &) {},
+                "15743 packed destination traversal", 4) == 021443,
+            "15743 preserves the 21443 boundary");
+    require(compare_image_entry(
+                015744,
+                [](Machine &machine) {
+                    machine.reg(001) = 2;
+                },
+                "15744 conversion loop", 4) == 015741,
+            "15744 loops while converted characters remain");
+    require(compare_image_entry(
+                015744,
+                [](Machine &machine) {
+                    machine.reg(001) = 1;
+                },
+                "15744 conversion completion", 4) == 015745,
+            "15744 selects frame restoration after the last character");
+    require(compare_image_entry(
+                015745,
+                [](Machine &machine) {
+                    machine.reg(017) = 05003;
+                    machine.memory(05000) = Word48(0123);
+                    machine.memory(05001) = Word48(0456);
+                    machine.memory(05002) = Word48(06700);
+                },
+                "15745 conversion frame restoration", 12) == 06700,
+            "15745 restores r1, r4, r15, and the hardware stack");
+    require(compare_image_entry(
+                015750,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.memory(06000) = Word48(07654321);
+                },
+                "15750 conversion diagnostic", 4) == 03014,
+            "15750 preserves diagnostic 11700");
+    require(compare_image_entry(
+                015754, [](Machine &) {},
+                "15754 CODIPC conversion selection", 4) == 015756,
+            "15754 selects the 21275 character converter");
+    require(compare_image_entry(
+                015755, [](Machine &) {},
+                "15755 CODPIC conversion selection", 4) == 015756,
+            "15755 selects the 21274 character converter");
+    require(compare_image_entry(
+                015756,
+                [](Machine &machine) {
+                    machine.reg(006) = 06000;
+                    machine.reg(011) = 021275;
+                    machine.reg(015) = 06700;
+                    machine.memory(06000) = Word48(06400000000000052ULL);
+                },
+                "15756 scalar character conversion", 8) == 021275,
+            "15756 preserves its selected character-converter boundary");
+    require(compare_image_entry(
+                015760,
+                [](Machine &machine) {
+                    machine.accumulator() = Word48(052);
+                    machine.reg(006) = 06000;
+                    machine.reg(017) = 05001;
+                    machine.memory(05000) = Word48(06700);
+                },
+                "15760 scalar character return", 8) == 06700,
+            "15760 tags the converted character and restores its caller");
+
     const std::pair<std::uint16_t, Word48> classifier_code[] = {
         {017472, Word48(0x02200d023001ULL)},
         {017473, Word48(0xf000000987a1ULL)},

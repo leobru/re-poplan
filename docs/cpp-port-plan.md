@@ -285,6 +285,41 @@ quine, language coverage, standard-function coverage, and native-library
 loading each contain zero raw instruction steps. This is a corpus result;
 untranslated fallback remains available for other inputs and generated code.
 
+A follow-up audit used words ending in the padded right-half `UTC 0` encoding
+as code-discovery clues. New standard-function probes execute the resident
+entries and continuations at `03325..03326`, `06611`, `07372`, `07445`,
+`10350..10351`, `10420`, `10435`, `10606`, and `15713..15762`. Historical
+`[POPLIB FOURS].LIBRARY.COMPILE;` execution through `tools/run-dispak.sh`
+additionally reaches the original raw library path rooted at `22366`,
+`23773`, and `26126`, including computed entries in `24010..24243`. Those
+trace-established roots and padded instruction words are code seeds in
+`poplan.sym`. Other matching words remain data until a control-flow path or
+trace establishes that their static addresses are executable; many are
+instruction templates copied elsewhere and must not be promoted solely by
+their bit pattern. The expanded standard-function fixture deliberately opens
+the next semantic-port frontier. Its initial hybrid profile had 362 raw steps
+at 113 immutable-image words, concentrated in these newly exercised routines.
+The first predicate conversion set adds `ISLIST` at `03325..03327`, `ISWORD`
+at `06611..06613`, `SAMEDATA` at `07367..07376`, and `ISLINK` at
+`10350..10352`, while retaining the established evaluator, stack, classifier,
+and environment boundaries. A fresh profile has 305 raw steps at 96
+immutable-image words, with no fallback remaining in those four regions. The
+next conversion adds `BOUNDSLIST` at `07433..07464`, `COREUSED` at
+`10402..10415`, the adjacent evaluator wrappers at `10416..10420`, and
+`FNCOMP` at `10421..10443`. It preserves both `05215` list allocations, the
+`05430` and `11464` descriptor allocations, every POP/evaluator call, and the
+invalid-tag continuations. The expanded fixture now has 191 raw steps at 39
+immutable-image words, with no fallback in either converted cluster. The
+next conversion implements the complete packed-string and scalar character
+conversion family at `15712..15762`, retaining the `21431`, `21274`, `21275`,
+and `21443` boundaries and both restoration paths. The same fixture now has
+five raw steps at three immutable-image words, all at `10604..10606`, and no
+fallback in `15712..15762`. Translating the `FNPART` getter at
+`10604..10606`, while retaining its `10672` validation and `03275` result
+boundaries, removes those final five steps. The expanded standard-function
+fixture now has zero immutable-image fallback. The earlier zero-fallback
+statement applies to the pre-expansion fixture.
+
 ## Port Order
 
 ### 1. Tagged Machine State

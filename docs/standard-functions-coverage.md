@@ -112,6 +112,12 @@ reference explicitly makes its file/device contract operating-system
 dependent. The executable output is required to match historical `dispak`,
 hybrid C++ execution, and instruction-only C++ execution.
 
+The executable fixture now explicitly distinguishes lists, words, and links
+with `ISLIST`, `ISWORD`, and `ISLINK`, checks `SAMEDATA`, reads array bounds,
+and exercises the getter side of `FNPART`. It also covers the POPLAN appendix
+facilities `CODIPC`, `CODPIC`, `CODIPS`, `CODPIS`, `COREUSED`, and `FNCOMP`;
+the two string-code conversions are checked by a three-character round trip.
+
 The test also exposed a semantic-dispatch error in the shared `12043` logical
 operation validator: it had absorbed the `LOGAND` continuation and therefore
 implemented `LOGOR(4,1)` as zero. The translated routine now stops at the
@@ -127,3 +133,30 @@ reached by this fixture, including `01030..01065`, executable templates in
 The profile fell from 1,388 raw instruction steps to zero with unchanged
 normalized output. Full-state semantic-versus-interpreter tests cover
 representative entries from each cluster.
+
+The later appendix expansion opens additional paths that were not part of
+that zero-fallback measurement. Its first conversion set translates the
+complete observed `ISLIST`, `ISWORD`, `SAMEDATA`, and `ISLINK` regions. The
+expanded fixture's fallback count falls from 362 steps at 113 resident words
+to 305 steps at 96 resident words; all four converted regions have zero raw
+steps, and focused tests compare complete machine state and memory with the
+instruction-only path at every preserved continuation.
+
+The next conversion translates `BOUNDSLIST`, `COREUSED`, the two adjacent
+appendix evaluator wrappers, and `FNCOMP`. It retains the list and descriptor
+allocation calls and both invalid-object paths rather than replacing the
+operations with host containers. The expanded fixture now executes 191 raw
+steps at 39 resident words, with zero fallback in `07433..07464` and
+`10402..10443`.
+
+The following conversion implements the packed-string `CODIPS`/`CODPIS` and
+single-character `CODIPC`/`CODPIC` family at `15712..15762`. It preserves the
+shared packed traversal and character-conversion calls instead of folding
+them into a host lookup. The expanded fixture now executes five raw steps at
+three resident words, all at `10604..10606`; `15712..15762` has no remaining
+instruction-interpreter steps. Focused tests compare complete machine state
+and memory at every translated entry and continuation.
+
+The final follow-up converts the `FNPART` getter at `10604..10606`, preserving
+the `10672` validator and `03275` POP-stack boundary. A fresh trace of the
+expanded fixture has zero raw instruction steps at immutable-image addresses.
