@@ -5753,6 +5753,19 @@ std::uint16_t Machine::p01122_shared(bool native_identifier_lookup)
     registers_[004] = registers_[016];
     registers_[016] = accumulator_.address();
 
+    if (native_identifier_lookup) {
+        // Static names are immutable and live in the native descriptor
+        // snapshot.  The original record address remains the returned POPLAN
+        // object, so mutable properties and values stay in BESM memory.
+        const std::uint16_t keyword = find_static_keyword(
+            memory_[registers_[004]]);
+        if (keyword != 0) {
+            registers_[003] = keyword;
+            registers_[016] = keyword;
+            return p01160_finish();
+        }
+    }
+
     if (registers_[016] == 0) {
         registers_[016] = registers_[012];
         registers_[015] = 01140;
@@ -5760,12 +5773,9 @@ std::uint16_t Machine::p01122_shared(bool native_identifier_lookup)
     }
 
     if (native_identifier_lookup) {
-        // 01107 searches four-word identifier records.  The bucket word
-        // selects one of its two collision chains above; word +2 in each
-        // record links to the next record.  Compare the packed identifiers
-        // directly on the host instead of replaying 01144..01147 for every
-        // keyword.  The image remains the dictionary: no identifier words or
-        // record addresses are duplicated in C++.
+        // A name absent from the static descriptor array may already have
+        // been interned dynamically.  Follow the live word-+2 links before
+        // retaining the original allocation boundary for a genuine miss.
         const Word48 identifier = memory_[registers_[004]];
         for (;;) {
             registers_[003] = registers_[016];

@@ -957,6 +957,7 @@ private:
     void sti(std::size_t index);
     void stx(std::uint16_t address);
     bool execute_generated_routine(std::uint16_t &continuation);
+    std::uint16_t find_static_keyword(Word48 identifier) const;
     bool native_character_output_active() const;
     void append_native_output_byte(std::uint8_t character);
     void output_native_character(std::uint8_t character);

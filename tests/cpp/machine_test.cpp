@@ -145,20 +145,6 @@ constexpr std::uint64_t instruction_pair(std::uint32_t left,
     return (static_cast<std::uint64_t>(left) << 24) | right;
 }
 
-poplan::Word48 packed_identifier(std::string_view identifier)
-{
-    require(identifier.size() <= 6,
-            "a POPLAN dictionary identifier occupies at most six bytes");
-    std::uint64_t word = 0;
-    for (std::size_t index = 0; index != 6; ++index) {
-        word <<= 8;
-        if (index < identifier.size()) {
-            word |= static_cast<unsigned char>(identifier[index]);
-        }
-    }
-    return poplan::Word48(word);
-}
-
 void write_word(std::ostream &output, std::uint64_t word)
 {
     for (int shift = 40; shift >= 0; shift -= 8) {
@@ -176,6 +162,13 @@ int main(int argc, char **argv)
     using poplan::Word48;
 
     require(argc == 2, "the extracted POPLAN image path is supplied");
+
+    static_assert(Word48("") == Word48(),
+                  "an empty ASCII string packs as zero");
+    static_assert(Word48("<") == Word48(01700000000000000ULL),
+                  "a short ASCII string is left-aligned and zero-padded");
+    static_assert(Word48("CHARWO") == Word48(02064410124453517ULL),
+                  "a six-character ASCII string fills a word");
 
     require(Word48(077777777777777777ULL).raw() == Word48::mask,
             "Word48 masks values to 48 bits");
@@ -1941,7 +1934,7 @@ int main(int argc, char **argv)
     // later dynamic record matches.  Keep a tagged zero-address link so the
     // test also checks that ACC retains the complete link word.
     auto absent_interned_record = std::make_unique<Machine>();
-    constexpr Word48 absent_identifier(02125110124642400ULL);
+    constexpr Word48 absent_identifier(02125110124642401ULL);
     constexpr Word48 last_record_identifier(02064751624650101ULL);
     constexpr Word48 tagged_null_link(04000000000000000ULL);
     absent_interned_record->accumulator() = absent_identifier;
@@ -1961,8 +1954,10 @@ int main(int argc, char **argv)
         = Word48(06500000000000000ULL);
     absent_interned_record->memory(01177)
         = Word48(06440000000000000ULL);
-    absent_interned_record->memory(01354)
-        = Word48(0000153400001660ULL);
+    for (std::uint16_t bucket = 01200; bucket != 01400; ++bucket) {
+        absent_interned_record->memory(bucket)
+            = Word48(0000153400001534ULL);
+    }
     absent_interned_record->memory(01534)
         = Word48(02064751624650101ULL);
     absent_interned_record->memory(01536)
@@ -1982,55 +1977,6 @@ int main(int argc, char **argv)
                               ^ absent_identifier.raw())
                 && absent_interned_record->alu_mode() == 004,
             "01107 preserves the final failed comparison and link load");
-
-    struct KnownKeyword {
-        std::uint16_t record;
-        std::string_view spelling;
-    };
-    // These static dictionary records were absent from both the zone1224 and
-    // fixed-seed tic-tac-toe 01107 traces.  Spellings are the exact six-byte
-    // name words with trailing zero bytes omitted; ClYv retains its historical
-    // mixed KOI-7 byte spelling rather than assigning a guessed name.
-    static constexpr KnownKeyword uncovered_keywords[] = {
-        {01474, "BOOLAN"}, {01500, "BOOLOR"}, {01504, "BOUNDS"},
-        {01510, "CHARIN"}, {01520, "CHARWO"}, {01530, "CONS"},
-        {01534, "CONSPA"}, {01540, "CONSRE"}, {01544, "CONSWO"},
-        {01550, "CONT"},   {01554, "COPY"},   {01560, "CUCHIN"},
-        {01574, "DATALI"}, {01600, "DATAWO"}, {01604, "DEST"},
-        {01610, "DESTPA"}, {01614, "DESTRE"}, {01620, "DESTWO"},
-        {01630, "ERRFUN"}, {01634, "FALSE"},  {01640, "FNPART"},
-        {01644, "FNPROP"}, {01650, "FNTOLI"}, {01660, "FRONT"},
-        {01664, "FROZVA"}, {01670, "GENOUT"}, {01700, "IDENTF"},
-        {01704, "IDENTP"}, {01710, "INCHAR"}, {01720, "INITC"},
-        {01734, "ISFUNC"}, {01740, "ISINTE"}, {01744, "ISLINK"},
-        {01750, "ISLIST"}, {01754, "ISREAL"}, {01760, "ISWORD"},
-        {01770, "JUMPOU"}, {02000, "LOGNOT"}, {02004, "LOGOR"},
-        {02010, "LOGSHI"}, {02024, "MEANIN"}, {02030, "NEWANY"},
-        {02034, "NEWARR"}, {02040, "NEXTCH"}, {02064, "PARTAP"},
-        {02070, "POPMES"}, {02074, "POPVAL"}, {02104, "PRINT"},
-        {02110, "PRREAL"}, {02114, "PROGLI"}, {02124, "REALOF"},
-        {02130, "RECORD"}, {02134, "SAMEDA"}, {02140, "SETPOP"},
-        {02144, "SIGN"},   {02154, "STACKL"}, {02160, "STRIPF"},
-        {02174, "TERMIN"}, {02204, "TRUE"},   {02210, "UNDEF"},
-        {02214, "UPDATE"}, {02310, "&"},      {02320, "CANCEL"},
-        {02344, "ENDSEC"}, {02360, "GOON"},   {02374, "LAMBDA"},
-        {02430, "RETURN"}, {02434, "SECTIO"}, {02440, "SWITCH"},
-        {02474, "APPLY"},  {02500, "ARCTAN"}, {02504, "CARRYO"},
-        {02510, "COPYLI"}, {02514, "COREUS"}, {02520, "COS"},
-        {02524, "EQUAL"},  {02534, "FNCOMP"}, {02544, "LIBRAR"},
-        {02550, "LISTRE"}, {02560, "NUMBER"}, {02564, "POPTIM"},
-        {02570, "PRBIN"},  {02574, "PROCT"},  {02600, "REV"},
-        {02614, "TAN"},    {02620, "VALOF"},  {02624, "SYNTAX"},
-        {02630, "REAL"},   {02634, "INTEGE"}, {02640, "WORD"},
-        {02644, "STRIP"},  {02650, "CSTRIP"}, {02654, "PAIR"},
-        {02660, "REF"},    {02664, "ClYv"},   {02674, "REFOF"},
-        {02700, "NTERM"},  {02704, "NUMERR"}, {02710, "INDEC"},
-        {02714, "POPDAT"}, {02720, "CODIPC"}, {02724, "CODPIC"},
-        {02730, "CODIPS"}, {02734, "CODPIS"},
-    };
-    static_assert(
-        sizeof(uncovered_keywords) / sizeof(uncovered_keywords[0]) == 104,
-        "every dictionary record absent from both application traces is covered");
 
     std::ifstream image_file(argv[1], std::ios::binary);
     require(static_cast<bool>(image_file),
@@ -2085,32 +2031,65 @@ int main(int argc, char **argv)
                     + std::string(test.spelling));
     }
 
-    for (const KnownKeyword &keyword : uncovered_keywords) {
-        const Word48 identifier = packed_identifier(keyword.spelling);
+    const auto prepare_keyword_lookup = [](Machine &machine,
+                                            Word48 identifier) {
+        machine.memory(0) = Word48();
+        machine.accumulator() = identifier;
+        machine.reg(001) = 022261;
+        machine.reg(003) = 020670;
+        machine.reg(004) = 077777;
+        machine.reg(005) = 00100;
+        machine.reg(007) = 01200;
+        machine.reg(015) = 016420;
+        machine.reg(016) = 021301;
+        machine.reg(017) = 066033;
+        machine.start(01107);
+    };
+
+    // Prove that static recognition comes from the C++ snapshot: remove all
+    // image-resident name words, then resolve every original packed name.
+    auto native_keyword_snapshot = std::make_unique<Machine>();
+    {
+        std::istringstream image_stream(image_bytes);
+        native_keyword_snapshot->load_image(image_stream);
+    }
+    std::array<Word48, 0270> static_keyword_names{};
+    for (std::size_t index = 0; index != static_keyword_names.size(); ++index) {
+        const std::uint16_t record = static_cast<std::uint16_t>(
+            01400 + index * 4);
+        static_keyword_names[index] = native_keyword_snapshot->memory(record);
+        native_keyword_snapshot->memory(record) = Word48();
+    }
+    for (std::size_t index = 0; index != static_keyword_names.size(); ++index) {
+        const std::uint16_t record = static_cast<std::uint16_t>(
+            01400 + index * 4);
+        prepare_keyword_lookup(
+            *native_keyword_snapshot, static_keyword_names[index]);
+        require(native_keyword_snapshot->step()
+                    == poplan::ExecutionStatus::running
+                    && native_keyword_snapshot->program_counter() == 016420
+                    && native_keyword_snapshot->reg(016) == record
+                    && native_keyword_snapshot->memory(record) == Word48(),
+                "01107 recognizes every static name from the C++ array");
+    }
+
+    // Every four-word resident descriptor is recognized through the native
+    // table, while the instruction-only path remains the full-state oracle.
+    for (std::uint16_t record = 01400; record != 02740;
+         record = static_cast<std::uint16_t>(record + 4)) {
         auto semantic = std::make_unique<Machine>();
         auto interpreted = std::make_unique<Machine>();
         for (Machine *machine : {semantic.get(), interpreted.get()}) {
             std::istringstream image_stream(image_bytes);
             machine->load_image(image_stream);
-            machine->memory(0) = Word48();
-            require(machine->memory(keyword.record) == identifier,
-                    "the image spelling matches dictionary record "
-                        + std::string(keyword.spelling));
-            machine->accumulator() = identifier;
-            machine->reg(001) = 022261;
-            machine->reg(003) = 020670;
-            machine->reg(004) = 077777;
-            machine->reg(005) = 00100;
-            machine->reg(007) = 01200;
-            machine->reg(015) = 016420;
-            machine->reg(016) = 021301;
-            machine->reg(017) = 066033;
-            machine->start(01107);
+            require(machine->memory(static_cast<std::uint16_t>(record + 1))
+                        == Word48(06500000000000000ULL),
+                    "the image record has the static keyword class");
+            prepare_keyword_lookup(*machine, machine->memory(record));
         }
 
         require(semantic->step() == poplan::ExecutionStatus::running,
-                "native 01107 keeps running for "
-                    + std::string(keyword.spelling));
+                "native 01107 keeps running for every static descriptor");
         interpreted->set_translated_routines_enabled(false);
         unsigned instruction_steps = 0;
         while ((interpreted->program_counter() != 016420
@@ -2118,22 +2097,23 @@ int main(int argc, char **argv)
                && instruction_steps != 512) {
             require(interpreted->step()
                         == poplan::ExecutionStatus::running,
-                    "instruction 01107 keeps running for "
-                        + std::string(keyword.spelling));
+                    "instruction 01107 keeps running for every descriptor");
             ++instruction_steps;
         }
 
-        const std::string label = "01107 resolves known dictionary record "
-            + std::string(keyword.spelling);
+        std::ostringstream label_stream;
+        label_stream << "01107 resolves static descriptor "
+                     << std::oct << record;
+        const std::string label = label_stream.str();
         require(semantic->program_counter() == 016420
                     && !semantic->right_half()
                     && interpreted->program_counter() == 016420
                     && !interpreted->right_half()
-                    && semantic->reg(016) == keyword.record
-                    && semantic->remainder() == Word48(keyword.record)
+                    && semantic->reg(016) == record
+                    && semantic->remainder() == Word48(record)
                     && semantic->accumulator()
                         == Word48(06440000000000000ULL
-                                  ^ keyword.record)
+                                  ^ record)
                     && semantic->reg(017) == 066033,
                 label + " through the real collision chain");
         require(semantic->accumulator() == interpreted->accumulator()
@@ -2151,6 +2131,65 @@ int main(int argc, char **argv)
                             static_cast<std::uint16_t>(address)),
                     label + " preserves complete BESM memory state");
         }
+    }
+
+    // A C++-table miss must still follow live links to a dynamically interned
+    // four-word record rather than allocating a duplicate identifier.
+    auto semantic_dynamic_keyword = std::make_unique<Machine>();
+    auto interpreted_dynamic_keyword = std::make_unique<Machine>();
+    constexpr Word48 dynamic_identifier(02125110124642401ULL);
+    for (Machine *machine : {
+             semantic_dynamic_keyword.get(),
+             interpreted_dynamic_keyword.get()}) {
+        std::istringstream image_stream(image_bytes);
+        machine->load_image(image_stream);
+        for (std::uint16_t bucket = 01200; bucket != 01400; ++bucket) {
+            machine->memory(bucket) = Word48(0000153400001534ULL);
+        }
+        machine->memory(01536) = Word48(04000000000001624ULL);
+        machine->memory(01626) = Word48(04000000000003000ULL);
+        machine->memory(03000) = dynamic_identifier;
+        machine->memory(03002) = Word48(04000000000000000ULL);
+        prepare_keyword_lookup(*machine, dynamic_identifier);
+    }
+    require(semantic_dynamic_keyword->step()
+                == poplan::ExecutionStatus::running,
+            "native 01107 keeps running for a dynamic identifier");
+    interpreted_dynamic_keyword->set_translated_routines_enabled(false);
+    for (unsigned steps = 0;
+         (interpreted_dynamic_keyword->program_counter() != 016420
+          || interpreted_dynamic_keyword->right_half())
+             && steps != 512;
+         ++steps) {
+        require(interpreted_dynamic_keyword->step()
+                    == poplan::ExecutionStatus::running,
+                "instruction 01107 keeps running for a dynamic identifier");
+    }
+    require(semantic_dynamic_keyword->program_counter() == 016420
+                && interpreted_dynamic_keyword->program_counter() == 016420
+                && semantic_dynamic_keyword->reg(016) == 03000
+                && semantic_dynamic_keyword->accumulator()
+                    == Word48(06440000000003000ULL)
+                && semantic_dynamic_keyword->remainder() == Word48(03000),
+            "01107 recognizes an existing dynamic identifier");
+    require(semantic_dynamic_keyword->accumulator()
+                == interpreted_dynamic_keyword->accumulator()
+                && semantic_dynamic_keyword->remainder()
+                    == interpreted_dynamic_keyword->remainder()
+                && semantic_dynamic_keyword->alu_mode()
+                    == interpreted_dynamic_keyword->alu_mode(),
+            "dynamic keyword recognition preserves BESM ALU state");
+    for (std::size_t index = 0; index != 020; ++index) {
+        require(semantic_dynamic_keyword->reg(index)
+                    == interpreted_dynamic_keyword->reg(index),
+                "dynamic keyword recognition preserves all registers");
+    }
+    for (std::size_t address = 0; address != Machine::core_words; ++address) {
+        require(semantic_dynamic_keyword->memory(
+                    static_cast<std::uint16_t>(address))
+                    == interpreted_dynamic_keyword->memory(
+                        static_cast<std::uint16_t>(address)),
+                "dynamic keyword recognition preserves complete memory");
     }
 
     auto generated_compare = std::make_unique<Machine>();
