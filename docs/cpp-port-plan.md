@@ -235,6 +235,16 @@ The startup and session-end owners at `20456` and `20475` now construct their
 complete GOST text natively. Their former `25641`/`25660` digit-building calls
 are bypassed, while semantic `20674` still performs the actual `Э71` transfer.
 
+The real-literal scanner occupies `16672..16735` and publishes its result
+through `16645`. That exit now parses the retained packed spelling natively in
+`src/poplan.cpp`. It reads the decimal constants from the image and reuses the
+BESM arithmetic helpers, retaining results such as `3.14` =
+`4114436560507533` and `3.14$-3` = `3414671035247465` rather than accepting the
+one-or-two-bit differences produced by direct host binary64 conversion. The
+fractional and `$`-exponent scanner continuations in `16672..16735` are also
+semantic entries; the record-shift and tagged-byte helpers remain explicit
+call boundaries.
+
 The final quine-static pass converts `01000..01002`, `03461..03475`,
 `07761..07772`, `11514`, `11746..11747`, `16145..16150`, `16513..16521`,
 `16530`, `16616..16623`, `16745..16747`, `17120..17121`, `17131`, the primary

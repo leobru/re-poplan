@@ -80,6 +80,22 @@ std::string stored_text(const poplan::Machine &machine,
     return result;
 }
 
+void store_text(poplan::Machine &machine, std::uint16_t address,
+                std::string_view text)
+{
+    for (std::size_t index = 0; index != text.size(); ++index) {
+        const std::uint16_t word_address = static_cast<std::uint16_t>(
+            address + index / 6);
+        const unsigned shift = static_cast<unsigned>(5 - index % 6) * 8;
+        const std::uint64_t mask = std::uint64_t{0377} << shift;
+        machine.memory(word_address) = poplan::Word48(
+            (machine.memory(word_address).raw() & ~mask)
+            | (static_cast<std::uint64_t>(
+                   static_cast<unsigned char>(text[index]))
+               << shift));
+    }
+}
+
 std::vector<std::uint8_t> stored_message(const poplan::Machine &machine,
                                          std::uint16_t address,
                                          std::size_t words)
@@ -2022,6 +2038,52 @@ int main(int argc, char **argv)
     const std::string image_bytes{
         std::istreambuf_iterator<char>(image_file),
         std::istreambuf_iterator<char>()};
+
+    struct RealLiteralCase {
+        std::string_view spelling;
+        Word48 expected;
+    };
+    const RealLiteralCase real_literal_cases[] = {
+        {"3.14", Word48(04114436560507533ULL)},
+        {".5", Word48(04010000000000000ULL)},
+        {"3.14$-3", Word48(03414671035247465ULL)},
+        {"3.14$+2", Word48(04451637777777776ULL)},
+        {".5$2", Word48(04314400000000000ULL)},
+        {"0.0", Word48()},
+        {"123456789.25", Word48(05556557150523777ULL)},
+        {"1.234567890123", Word48(04051700624412133ULL)},
+    };
+    for (const RealLiteralCase &test : real_literal_cases) {
+        auto machine = std::make_unique<Machine>();
+        std::istringstream image_stream(image_bytes);
+        machine->load_image(image_stream);
+        machine->reg(001) = 022261;
+        machine->reg(017) = 06000;
+        machine->memory(0) = Word48();
+        machine->remainder() = Word48(0765432107654321ULL);
+        machine->alu_mode() = 025;
+        machine->memory(05771) = Word48(0123456701234567ULL);
+        machine->memory(016556) = Word48(
+            static_cast<std::uint64_t>(test.spelling.size()) << 24);
+        store_text(*machine, 016557, test.spelling);
+
+        require(machine->p16645() == 03275
+                    && machine->reg(015) == 016376,
+                "16645 preserves the real scanner return boundary for "
+                    + std::string(test.spelling));
+        require(machine->accumulator() == test.expected,
+                "16645 parses the retained real spelling "
+                    + std::string(test.spelling));
+        require(machine->memory(05771)
+                    == Word48(0123456701234567ULL),
+                "16645 does not depend on the scanner's arithmetic result for "
+                    + std::string(test.spelling));
+        require(machine->remainder()
+                    == Word48(0765432107654321ULL)
+                    && machine->alu_mode() == 005,
+                "16645 retains RMR and selects the logical ALU group for "
+                    + std::string(test.spelling));
+    }
 
     for (const KnownKeyword &keyword : uncovered_keywords) {
         const Word48 identifier = packed_identifier(keyword.spelling);
@@ -8829,6 +8891,93 @@ int main(int argc, char **argv)
         return compare_one_semantic_step(
             *semantic, *interpreted, {entry}, label, max_steps);
     };
+
+    require(compare_image_entry(
+                016645,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.reg(017) = 06000;
+                    machine.memory(05771) =
+                        Word48(03414671035247465ULL);
+                    machine.memory(016556) = Word48(
+                        std::uint64_t{7} << 24);
+                    store_text(machine, 016557, "3.14$-3");
+                },
+                "16645 native real parser return", 4) == 03275,
+            "16645 native parsing matches the instruction return state");
+
+    require(compare_image_entry(
+                016675,
+                [](Machine &machine) { machine.reg(001) = 022261; },
+                "16675 fractional multiplier setup", 8) == 016605,
+            "16675 preserves the record-shift boundary");
+    require(compare_image_entry(
+                016676,
+                [](Machine &machine) { machine.reg(001) = 022261; },
+                "16676 fractional digit continuation", 4) == 016605,
+            "16676 preserves the record-shift boundary");
+    require(compare_image_entry(
+                016710,
+                [](Machine &machine) { machine.reg(001) = 022261; },
+                "16710 exponent character lookup", 4) == 016742,
+            "16710 preserves the tagged-byte lookup boundary");
+    require(compare_image_entry(
+                016711,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.reg(003) = 04000;
+                    machine.accumulator() = Word48(1);
+                    machine.alu_mode() = 004;
+                    machine.memory(04001) = machine.memory(017000);
+                },
+                "16711 positive exponent sign", 12) == 016715,
+            "16711 recognizes the positive exponent sign");
+    require(compare_image_entry(
+                016717,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.accumulator() = Word48();
+                    machine.alu_mode() = 004;
+                },
+                "16717 first exponent digit", 4) == 016720,
+            "16717 preserves the exponent initialization boundary");
+    require(compare_image_entry(
+                016720,
+                [](Machine &machine) { machine.reg(001) = 022261; },
+                "16720 exponent initialization", 8) == 016605,
+            "16720 preserves the record-shift boundary");
+    require(compare_image_entry(
+                016722,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.reg(003) = 04000;
+                    machine.memory(04000) = Word48(3);
+                    machine.memory(016740) = Word48(2);
+                },
+                "16722 decimal exponent accumulation", 12) == 016742,
+            "16722 preserves the tagged-byte lookup boundary");
+    require(compare_image_entry(
+                016726,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.accumulator() = Word48(1);
+                    machine.alu_mode() = 004;
+                    machine.memory(016740) = Word48(3);
+                },
+                "16726 exponent range check", 12) == 016731,
+            "16726 accepts an in-range decimal exponent");
+    require(compare_image_entry(
+                016731,
+                [](Machine &machine) {
+                    machine.reg(001) = 022261;
+                    machine.reg(002) = 3;
+                    machine.reg(005) = 016737;
+                    machine.reg(017) = 06000;
+                    machine.memory(05771) =
+                        Word48(04114436560507533ULL);
+                },
+                "16731 negative exponent application", 40) == 016645,
+            "16731 applies the exponent with BESM arithmetic");
 
     require(compare_image_entry(
                 01030,

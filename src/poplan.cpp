@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -13,6 +15,7 @@ namespace poplan {
 namespace {
 
 constexpr std::uint8_t rau_logical = 004;
+constexpr std::uint8_t rau_multiplicative = 010;
 
 struct ErrorMessage {
     std::uint16_t code;
@@ -213,6 +216,376 @@ const ErrorMessage *find_error_message(std::uint16_t code)
 }
 
 } // namespace
+
+std::uint16_t Machine::p16672()
+{
+    // 16672 begins conversion after the scanner has accepted a decimal point.
+    const std::uint16_t saved = address_add(registers_[017], -7);
+    accumulator_ = memory_[saved];
+    select_alu_group(rau_logical);
+    const Word48 old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074475)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+    alu_mode_ = 006;
+    arithmetic_add(memory_[0], false, false);
+    memory_[saved] = accumulator_;
+
+    accumulator_ = memory_[address_add(registers_[001], 074456)];
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[001], 074460)] = accumulator_;
+    registers_[015] = 016677;
+    return 016605;
+}
+
+std::uint16_t Machine::p16675()
+{
+    accumulator_ = memory_[address_add(registers_[001], 074456)];
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[001], 074460)] = accumulator_;
+    registers_[015] = 016677;
+    return 016605;
+}
+
+std::uint16_t Machine::p16676()
+{
+    registers_[015] = 016677;
+    return 016605;
+}
+
+std::uint16_t Machine::p16677()
+{
+    // Accumulate one fractional digit while the independent record and
+    // tagged-byte routines remain explicit call boundaries.
+    accumulator_ = memory_[registers_[003]];
+    select_alu_group(rau_logical);
+    Word48 old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074475)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+    alu_mode_ = 006;
+    arithmetic_add(memory_[0], false, false);
+    multiply(memory_[address_add(registers_[001], 074460)]);
+    arithmetic_add(
+        memory_[address_add(registers_[017], -7)], false, false);
+    memory_[address_add(registers_[017], -7)] = accumulator_;
+
+    accumulator_ = memory_[address_add(registers_[001], 074460)];
+    select_alu_group(rau_logical);
+    multiply(memory_[address_add(registers_[001], 074456)]);
+    memory_[address_add(registers_[001], 074460)] = accumulator_;
+    registers_[015] = 016705;
+    return 016742;
+}
+
+std::uint16_t Machine::p16705()
+{
+    // A zero lookup result is another fractional digit.  The other accepted
+    // result is the `$` exponent marker; anything else finishes the literal.
+    remainder_ = accumulator_;
+    if (!accumulator_condition()) {
+        return address_add(registers_[001], 074415);
+    }
+
+    const Word48 old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074516)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (accumulator_condition()) {
+        return address_add(registers_[001], 074364);
+    }
+
+    registers_[005] = 016736;
+    registers_[015] = 016710;
+    return 016505;
+}
+
+std::uint16_t Machine::p16710()
+{
+    registers_[015] = 016711;
+    return 016742;
+}
+
+std::uint16_t Machine::p16711()
+{
+    // Select the positive or negative decimal-exponent multiplier.  With no
+    // explicit sign the current character is the first exponent digit.
+    remainder_ = accumulator_;
+    if (!accumulator_condition()) {
+        return address_add(registers_[001], 074437);
+    }
+
+    accumulator_ = memory_[address_add(registers_[003], 1)];
+    select_alu_group(rau_logical);
+    Word48 old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074517)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (!accumulator_condition()) {
+        return address_add(registers_[001], 074434);
+    }
+
+    old_accumulator = accumulator_;
+    accumulator_ = Word48(
+        accumulator_.raw()
+        ^ memory_[address_add(registers_[001], 074520)].raw());
+    remainder_ = old_accumulator;
+    select_alu_group(rau_logical);
+    registers_[016] = 0300;
+    remainder_ = accumulator_;
+    if (accumulator_condition()) {
+        return 03014;
+    }
+
+    registers_[005] = 016737;
+    registers_[015] = 016716;
+    return 016505;
+}
+
+std::uint16_t Machine::p16715()
+{
+    registers_[015] = 016716;
+    return 016505;
+}
+
+std::uint16_t Machine::p16716()
+{
+    registers_[015] = 016717;
+    return 016742;
+}
+
+std::uint16_t Machine::p16717()
+{
+    registers_[016] = 0300;
+    remainder_ = accumulator_;
+    if (accumulator_condition()) {
+        return 03014;
+    }
+    return 016720;
+}
+
+std::uint16_t Machine::p16720()
+{
+    accumulator_ = Word48();
+    select_alu_group(rau_logical);
+    memory_[address_add(registers_[001], 074457)] = accumulator_;
+    registers_[015] = 016722;
+    return 016605;
+}
+
+std::uint16_t Machine::p16721()
+{
+    registers_[015] = 016722;
+    return 016605;
+}
+
+std::uint16_t Machine::p16722()
+{
+    // exponent = exponent * 10 + digit, preserving the original cyclic-add
+    // sequence and the independent tagged-byte lookup call.
+    const std::uint16_t scratch =
+        address_add(registers_[001], 074457);
+    accumulator_ = memory_[scratch];
+    select_alu_group(rau_logical);
+    shift_accumulator(-3);
+    accumulator_ = cyclic_add(accumulator_, memory_[scratch]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    accumulator_ = cyclic_add(accumulator_, memory_[scratch]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    accumulator_ = cyclic_add(accumulator_, memory_[registers_[003]]);
+    remainder_ = Word48();
+    select_alu_group(rau_multiplicative);
+    memory_[scratch] = accumulator_;
+    alu_mode_ = 006;
+    registers_[015] = 016726;
+    return 016742;
+}
+
+std::uint16_t Machine::p16726()
+{
+    remainder_ = accumulator_;
+    if (!accumulator_condition()) {
+        return address_add(registers_[001], 074440);
+    }
+
+    accumulator_ = memory_[address_add(registers_[001], 074457)];
+    select_alu_group(rau_logical);
+    registers_[002] = accumulator_.address();
+    accumulator_ = accumulator_
+        & memory_[address_add(registers_[001], 074521)];
+    remainder_ = Word48();
+    select_alu_group(rau_logical);
+    registers_[016] = 0271;
+    remainder_ = accumulator_;
+    if (accumulator_condition()) {
+        return 03014;
+    }
+    return 016731;
+}
+
+std::uint16_t Machine::p16731()
+{
+    // Apply 10 or 0.1 once per decimal exponent digit.  This loop remains in
+    // BESM arithmetic so the low-bit truncation is identical to the image.
+    while (registers_[002] != 0) {
+        accumulator_ = memory_[address_add(registers_[017], -7)];
+        select_alu_group(rau_logical);
+        multiply(memory_[registers_[005]]);
+        memory_[address_add(registers_[017], -7)] = accumulator_;
+        registers_[002] = address_add(registers_[002], -1);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) {
+            continue;
+        }
+
+        accumulator_ = cyclic_add(
+            accumulator_, memory_[address_add(registers_[001], 074522)]);
+        remainder_ = Word48();
+        select_alu_group(rau_multiplicative);
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) {
+            continue;
+        }
+        registers_[016] = 0271;
+        return 03014;
+    }
+    return 016645;
+}
+
+std::uint16_t Machine::p16645()
+{
+    // 16645 is the common successful exit from the real-number scanner at
+    // 16672..16735.  The scanner has copied every source character to the
+    // packed external-code buffer beginning at r1+74276; r1+74275 holds its
+    // character count in the upper half-word.  Parse that retained spelling
+    // natively instead of treating the value accumulated at r17-7 as the
+    // authoritative result.
+    const std::size_t length = static_cast<std::size_t>(
+        memory_[address_add(registers_[001], 074275)].raw() >> 24);
+    std::string text;
+    if (length <= core_words * 6) {
+        text.reserve(length);
+        const std::uint16_t first_word = address_add(registers_[001], 074276);
+        for (std::size_t index = 0; index != length; ++index) {
+            text.push_back(static_cast<char>(memory_byte(first_word, index)));
+        }
+    }
+
+    const auto parse_real = [this](std::string_view spelling)
+        -> std::optional<Word48> {
+        const std::size_t point = spelling.find('.');
+        if (point == std::string_view::npos) {
+            return std::nullopt;
+        }
+        const std::size_t exponent_mark = spelling.find('$', point + 1);
+        const std::size_t fraction_end = exponent_mark == std::string_view::npos
+            ? spelling.size() : exponent_mark;
+        if (fraction_end == point + 1) {
+            return std::nullopt;
+        }
+
+        std::uint64_t whole = 0;
+        for (std::size_t index = 0; index != point; ++index) {
+            const unsigned char character =
+                static_cast<unsigned char>(spelling[index]);
+            if (character < '0' || character > '9') {
+                return std::nullopt;
+            }
+            whole = whole * 10 + character - '0';
+        }
+        for (std::size_t index = point + 1; index != fraction_end; ++index) {
+            if (spelling[index] < '0' || spelling[index] > '9') {
+                return std::nullopt;
+            }
+        }
+
+        bool negative_exponent = false;
+        std::uint16_t exponent = 0;
+        if (exponent_mark != std::string_view::npos) {
+            std::size_t index = exponent_mark + 1;
+            if (index != spelling.size()
+                && (spelling[index] == '+' || spelling[index] == '-')) {
+                negative_exponent = spelling[index] == '-';
+                ++index;
+            }
+            if (index == spelling.size()) {
+                return std::nullopt;
+            }
+            for (; index != spelling.size(); ++index) {
+                const unsigned char character =
+                    static_cast<unsigned char>(spelling[index]);
+                if (character < '0' || character > '9') {
+                    return std::nullopt;
+                }
+                exponent = static_cast<std::uint16_t>(
+                    exponent * 10 + character - '0');
+            }
+        }
+
+        // Replay the scanner's BESM arithmetic at routine granularity.  The
+        // decimal constants are read from the image, so the native parser
+        // retains the original truncation rather than host binary64 rounding.
+        constexpr std::uint64_t integer_tag = 06400000000000000ULL;
+        const auto real_of_integer = [this](std::uint64_t integer) {
+            accumulator_ = Word48(integer_tag | integer);
+            alu_mode_ = 006;
+            arithmetic_add(memory_[0], false, false);
+            return accumulator_;
+        };
+
+        Word48 value = real_of_integer(whole);
+        const Word48 tenth =
+            memory_[address_add(registers_[001], 074456)];
+        Word48 place = tenth;
+        for (std::size_t index = point + 1; index != fraction_end; ++index) {
+            const Word48 digit = real_of_integer(
+                static_cast<unsigned char>(spelling[index]) - '0');
+            accumulator_ = digit;
+            multiply(place);
+            arithmetic_add(value, false, false);
+            value = accumulator_;
+
+            accumulator_ = place;
+            multiply(tenth);
+            place = accumulator_;
+        }
+
+        const Word48 exponent_factor = memory_[
+            negative_exponent ? 016737 : 016736];
+        for (std::uint16_t index = 0; index != exponent; ++index) {
+            accumulator_ = value;
+            multiply(exponent_factor);
+            value = accumulator_;
+        }
+        return value;
+    };
+
+    // Native conversion uses the machine arithmetic helpers as scratch.  At
+    // this exit the original code performs only XTA -7, so retain its RMR and
+    // non-group RAU bits exactly while replacing the resulting accumulator.
+    const Word48 saved_remainder = remainder_;
+    const std::uint8_t saved_alu_mode = alu_mode_;
+    const std::optional<Word48> parsed = parse_real(text);
+    remainder_ = saved_remainder;
+    alu_mode_ = saved_alu_mode;
+    accumulator_ = parsed.value_or(
+        memory_[address_add(registers_[017], -7)]);
+    select_alu_group(rau_logical);
+    registers_[015] = 016376;
+    return 03275;
+}
 
 std::uint16_t Machine::p03106_print_error_text()
 {

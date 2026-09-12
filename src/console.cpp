@@ -74,6 +74,7 @@ std::uint8_t ascii_to_gost(unsigned char byte)
     case '&': return 0121;
     case '~': return 0123;
     case '%': return 0126;
+    case '$': return 0127;
     case '|': return 0130;
     case '_': return 0132;
     case '!': return 0133;

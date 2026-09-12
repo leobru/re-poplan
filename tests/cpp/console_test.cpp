@@ -36,6 +36,11 @@ int main()
                 poplan::Word48(01000000200000012ULL),
             "the last E71 input returns terminal 012 status");
 
+    const auto dollar = poplan::encode_gost_text("$◇");
+    require(dollar.size() == 2 && dollar[0] == 0127
+                && dollar[1] == 0127,
+            "ASCII dollar and Unicode diamond map to GOST 0127");
+
     const auto verify_cyrillic = [](const std::string &alphabet) {
         auto cyrillic = std::make_unique<poplan::Machine>();
         std::istringstream cyrillic_input(alphabet + "\n");

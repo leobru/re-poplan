@@ -58,4 +58,11 @@ if(BUILD_TESTING)
                 ${CMAKE_SOURCE_DIR}/build/poplan.bin
                 ${CMAKE_SOURCE_DIR}
     )
+    add_test(
+        NAME poplan-real-literals
+        COMMAND ${CMAKE_SOURCE_DIR}/tests/real-literals.sh
+                $<TARGET_FILE:poplan>
+                ${CMAKE_SOURCE_DIR}/build/poplan.bin
+                ${CMAKE_SOURCE_DIR}
+    )
 endif()

@@ -581,8 +581,20 @@ public:
     std::uint16_t p10737();
     std::uint16_t p16665();
     std::uint16_t p16672();
+    std::uint16_t p16675();
+    std::uint16_t p16676();
     std::uint16_t p16677();
     std::uint16_t p16705();
+    std::uint16_t p16710();
+    std::uint16_t p16711();
+    std::uint16_t p16715();
+    std::uint16_t p16716();
+    std::uint16_t p16717();
+    std::uint16_t p16720();
+    std::uint16_t p16721();
+    std::uint16_t p16722();
+    std::uint16_t p16726();
+    std::uint16_t p16731();
     std::uint16_t p17075();
     std::uint16_t p03712();
     std::uint16_t p03762();
@@ -790,6 +802,8 @@ public:
     std::uint16_t p16511();
     std::uint16_t p16605();
     std::uint16_t p16643();
+    // Common successful exit from the real-literal scanner. The retained
+    // packed spelling is converted natively in src/poplan.cpp.
     std::uint16_t p16645();
     std::uint16_t p16651();
     std::uint16_t p16653();
