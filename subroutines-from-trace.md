@@ -220,6 +220,17 @@ the quine trace is `11673`.
 
 ## Dynamic Inventory
 
+Translated original `VJM ... (r15)` sites now call the following proven
+`r15` leaves directly: `03275`, `03277`, `03301`, `03303`, `03305`, `03413`,
+`03447`, `03516`, `04426`, `05207`, `05211`, `05447`, `11266`, `11500`,
+`13217`, `16145`, `16254`, `16421`, `17614`, `20263`, `20660`, `20673`,
+`20674`, `21075`, `21107`, `21443`, and `25660`. Their dispatcher entries are
+retained for external, computed, untranslated, and explicitly disabled calls.
+An enabled nested leaf completes within its caller's machine step, so
+`translated_routine_count` and `POPLAN_ROUTINE_TRACE` record only the caller's
+semantic dispatch. Historical dispatch counts below remain measurements of
+the revisions that produced them and have not been rewritten.
+
 The quine has 98 direct `vjm` targets. All 98 now have executable semantic
 dispatch. The latest sequence additionally removes `01167`, `03716`, `03724`,
 `03736`, `04074`, `04322`, `04426`, `04665`, `04675`, `05213`, `17417`,

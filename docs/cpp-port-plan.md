@@ -7,6 +7,11 @@ not an independently designed POP-2 parser or interpreter.
 
 - Preserve original POPLAN routine boundaries and use their octal entry
   addresses in C++ names.
+- A translated original `VJM ... (r15)` call may invoke a proven `r15` leaf
+  directly in C++. The callee remains a distinct semantic routine with its
+  dispatcher entry intact; disabled leaves still stop at their octal entry for
+  instruction interpretation. Plain jumps and inlined instruction sequences
+  do not use this optimization.
 - Preserve 48-bit tagged values, dictionary records, function descriptors,
   generated objects, stack direction, and activation/environment layout.
 - Derive compiler phases and calls from the original listing and traces.

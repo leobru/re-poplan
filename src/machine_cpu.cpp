@@ -766,6 +766,14 @@ bool Machine::execute_generated_routine(std::uint16_t &continuation)
     }
 }
 
+bool Machine::translated_routine_disabled(std::uint16_t address) const
+{
+    address &= 077777;
+    return std::find(disabled_translated_routines_.begin(),
+                     disabled_translated_routines_.end(),
+                     address) != disabled_translated_routines_.end();
+}
+
 bool Machine::dispatch_translated_routine()
 {
     // BESM transfers always enter the left instruction of a word. A right
@@ -774,10 +782,8 @@ bool Machine::dispatch_translated_routine()
     if (right_half_) {
         return false;
     }
-    for (const std::uint16_t address : disabled_translated_routines_) {
-        if (program_counter_ == address) {
-            return false;
-        }
+    if (translated_routine_disabled(program_counter_)) {
+        return false;
     }
 
     std::uint16_t continuation = 0;

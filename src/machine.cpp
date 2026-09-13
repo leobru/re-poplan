@@ -985,7 +985,7 @@ std::uint16_t Machine::p03313()
 std::uint16_t Machine::p03325()
 {
     registers_[015] = 03326;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03326()
@@ -1054,14 +1054,14 @@ std::uint16_t Machine::p03336()
 std::uint16_t Machine::p03374()
 {
     registers_[015] = 03375;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03375()
 {
     hardware_push_acc();
     registers_[015] = 03376;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03376()
@@ -1164,7 +1164,7 @@ std::uint16_t Machine::p03526()
     registers_[016] = registers_[011];
     registers_[013] = 05507;
     registers_[015] = 03530;
-    return 03516;
+    return call_r15_leaf<03516, &Machine::p03516>();
 }
 
 std::uint16_t Machine::p03530()
@@ -1189,7 +1189,7 @@ std::uint16_t Machine::p03532()
     }
 
     registers_[015] = 03534;
-    return 03516;
+    return call_r15_leaf<03516, &Machine::p03516>();
 }
 
 std::uint16_t Machine::p03534()
@@ -1240,7 +1240,7 @@ std::uint16_t Machine::p03544(std::uint16_t entry)
                 return 03632;
             }
             registers_[015] = 03546;
-            return 04426;
+            return call_r15_leaf<04426, &Machine::p04426>();
 
         case 03546:
             remainder_ = accumulator_;
@@ -2101,7 +2101,7 @@ std::uint16_t Machine::p17516()
 {
     registers_[016] = 03637;
     registers_[015] = 017517;
-    return 03301;
+    return call_r15_leaf<03301, &Machine::p03301>();
 }
 
 std::uint16_t Machine::p17517()
@@ -2115,7 +2115,7 @@ std::uint16_t Machine::p17520()
 {
     registers_[016] = 017557;
     registers_[015] = 017521;
-    return 03301;
+    return call_r15_leaf<03301, &Machine::p03301>();
 }
 
 std::uint16_t Machine::p17521()
@@ -2521,7 +2521,7 @@ std::uint16_t Machine::p17655()
     select_alu_group(rau_logical);
     registers_[016] = 025575;
     registers_[015] = 017700;
-    return 016254;
+    return call_r15_leaf<016254, &Machine::p16254>();
 }
 
 std::uint16_t Machine::p17700()
@@ -3715,7 +3715,7 @@ std::uint16_t Machine::p04350()
     accumulator_ = memory_[registers_[003]];
     select_alu_group(rau_logical);
     registers_[015] = 04351;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p04351()
@@ -3730,7 +3730,7 @@ std::uint16_t Machine::p04352()
     accumulator_ = memory_[address_add(registers_[007], 01007)];
     select_alu_group(rau_logical);
     registers_[015] = 04353;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p04353()
@@ -4067,7 +4067,7 @@ std::uint16_t Machine::p04571()
 {
     if (registers_[016] != 0) {
         registers_[015] = 04576;
-        return 04426;
+        return call_r15_leaf<04426, &Machine::p04426>();
     }
     registers_[016] = 03564;
     return p04572();
@@ -4693,7 +4693,7 @@ std::uint16_t Machine::p05034()
 {
     registers_[016] = 017577;
     registers_[015] = 05035;
-    return 017614;
+    return call_r15_leaf<017614, &Machine::p17614>();
 }
 
 std::uint16_t Machine::p05035()
@@ -5047,7 +5047,7 @@ std::uint16_t Machine::p05230()
     memory_[address_add(registers_[001], 0154)] = accumulator_;
     registers_[004] = memory_[01000].address();
     registers_[015] = 05240;
-    return 020263;
+    return call_r15_leaf<020263, &Machine::p20263>();
 }
 
 std::uint16_t Machine::p05240()
@@ -5113,7 +5113,7 @@ std::uint16_t Machine::p05254()
         return p05255();
     }
     registers_[015] = 05255;
-    return 020660;
+    return call_r15_leaf<020660, &Machine::p20660>();
 }
 
 std::uint16_t Machine::p05255()
@@ -5301,7 +5301,7 @@ std::uint16_t Machine::p05316()
         accumulator_ = memory_[registers_[002]];
         select_alu_group(rau_logical);
         registers_[015] = 05316;
-        return 016145;
+        return call_r15_leaf<016145, &Machine::p16145>();
     }
 }
 
@@ -5344,7 +5344,7 @@ std::uint16_t Machine::p05335()
         return p05336();
     }
     registers_[015] = 05336;
-    return 020673;
+    return call_r15_leaf<020673, &Machine::p20673_return>();
 }
 
 std::uint16_t Machine::p05336()
@@ -5521,7 +5521,7 @@ std::uint16_t Machine::p05430()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 05433;
-    return 05447;
+    return call_r15_leaf<05447, &Machine::p05447>();
 }
 
 std::uint16_t Machine::p05433()
@@ -5540,7 +5540,7 @@ std::uint16_t Machine::p05434()
     accumulator_ = memory_[address_add(registers_[017], -1)];
     select_alu_group(rau_logical);
     registers_[015] = 05435;
-    return 05447;
+    return call_r15_leaf<05447, &Machine::p05447>();
 }
 
 std::uint16_t Machine::p05435()
@@ -5562,7 +5562,7 @@ std::uint16_t Machine::p05440()
     // Preserve the historical out-of-memory diagnostic boundary.
     registers_[016] = 05442;
     registers_[015] = 05441;
-    return 020674;
+    return call_r15_leaf<020674, &Machine::p20674>();
 }
 
 std::uint16_t Machine::p05441()
@@ -6176,7 +6176,7 @@ std::uint16_t Machine::p01043()
 std::uint16_t Machine::p01045()
 {
     registers_[015] = 01046;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p01046()
@@ -6246,7 +6246,7 @@ std::uint16_t Machine::p03315()
 std::uint16_t Machine::p03316()
 {
     registers_[015] = 03317;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 std::uint16_t Machine::p03317()
 {
@@ -6278,7 +6278,7 @@ std::uint16_t Machine::p03317()
 std::uint16_t Machine::p03350()
 {
     registers_[015] = 03351;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03351()
@@ -6290,7 +6290,7 @@ std::uint16_t Machine::p03351()
 std::uint16_t Machine::p03357()
 {
     registers_[015] = 03360;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03360()
@@ -6302,7 +6302,7 @@ std::uint16_t Machine::p03360()
 std::uint16_t Machine::p03403()
 {
     registers_[015] = 03404;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03404()
@@ -6327,7 +6327,7 @@ std::uint16_t Machine::p03404()
 std::uint16_t Machine::p03407()
 {
     registers_[015] = 03410;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03410()
@@ -6340,14 +6340,14 @@ std::uint16_t Machine::p07134()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 07135;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07135()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 07136;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07136()
@@ -6424,7 +6424,7 @@ std::uint16_t Machine::p07265()
 std::uint16_t Machine::p10152()
 {
     registers_[015] = 010153;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10153()
@@ -6447,7 +6447,7 @@ std::uint16_t Machine::p10153()
         return address_add(registers_[014], 0136);
     }
     registers_[015] = 010157;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10157()
@@ -6478,7 +6478,7 @@ std::uint16_t Machine::p10330()
 std::uint16_t Machine::p10527()
 {
     registers_[015] = 010530;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10530()
@@ -6513,7 +6513,7 @@ std::uint16_t Machine::p10542()
     accumulator_ = memory_[registers_[016]];
     select_alu_group(rau_logical);
     registers_[015] = 010544;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10627()
@@ -6578,7 +6578,7 @@ std::uint16_t Machine::p11027()
     accumulator_ = memory_[011040];
     select_alu_group(rau_logical);
     registers_[015] = 011031;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11031()
@@ -6601,7 +6601,7 @@ std::uint16_t Machine::p11034()
 std::uint16_t Machine::p11035()
 {
     registers_[015] = 011036;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11036()
@@ -6627,7 +6627,7 @@ std::uint16_t Machine::p12040()
     registers_[001] = 012055;
     hardware_push_acc();
     registers_[015] = 012042;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p16624()
@@ -6654,7 +6654,7 @@ std::uint16_t Machine::p16610()
     memory_[address_add(registers_[001], 074334)] = accumulator_;
     registers_[007] = registers_[015];
     registers_[015] = 016612;
-    return 016421;
+    return call_r15_leaf<016421, &Machine::p16421_lookup_tagged_byte>();
 }
 
 std::uint16_t Machine::p16612()
@@ -6696,7 +6696,7 @@ std::uint16_t Machine::p16627()
 std::uint16_t Machine::p16630()
 {
     registers_[015] = 016631;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p16631()
@@ -7207,7 +7207,7 @@ std::uint16_t Machine::p06536()
     if (accumulator_.raw() == 0) {
         registers_[013] = 05504;
         registers_[015] = 06545;
-        return 03516;
+        return call_r15_leaf<03516, &Machine::p03516>();
     }
 
     registers_[016] = address_add(registers_[016], 075734);
@@ -7585,7 +7585,7 @@ std::uint16_t Machine::p07652()
     accumulator_ = memory_[address_add(registers_[005], 0315)];
     select_alu_group(rau_logical);
     registers_[015] = 07661;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07661()
@@ -7614,7 +7614,7 @@ std::uint16_t Machine::p07664()
 std::uint16_t Machine::p07667()
 {
     registers_[015] = 07670;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07670()
@@ -7723,7 +7723,7 @@ std::uint16_t Machine::p07704()
     accumulator_ = memory_[address_add(registers_[005], 0326)];
     select_alu_group(rau_logical);
     registers_[015] = 07706;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07706()
@@ -7764,7 +7764,7 @@ std::uint16_t Machine::p07712()
         accumulator_ = memory_[address_add(registers_[005], 0327)];
         select_alu_group(rau_logical);
         registers_[015] = 07727;
-        return 03275;
+        return call_r15_leaf<03275, &Machine::p03275_push_acc>();
     }
     registers_[016] = 07757;
     registers_[015] = 07742;
@@ -7813,7 +7813,7 @@ std::uint16_t Machine::p07722()
     accumulator_ = memory_[address_add(registers_[005], 0322)];
     select_alu_group(rau_logical);
     registers_[015] = 07724;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07724()
@@ -7863,7 +7863,7 @@ std::uint16_t Machine::p07734()
         remainder_ = selected;
         select_alu_group(rau_logical);
         registers_[015] = 07737;
-        return 03275;
+        return call_r15_leaf<03275, &Machine::p03275_push_acc>();
     }
     return p07737();
 }
@@ -7966,7 +7966,7 @@ std::uint16_t Machine::p11647()
     its(016);
     its(016);
     registers_[015] = 011651;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11651()
@@ -8082,14 +8082,14 @@ std::uint16_t Machine::p11500()
 std::uint16_t Machine::p11524()
 {
     registers_[015] = 011525;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11525()
 {
     hardware_push_acc();
     registers_[015] = 011526;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11526()
@@ -8104,7 +8104,7 @@ std::uint16_t Machine::p11527()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 011530;
-    return 011500;
+    return call_r15_leaf<011500, &Machine::p11500>();
 }
 
 std::uint16_t Machine::p11530()
@@ -8444,7 +8444,7 @@ std::uint16_t Machine::p13113()
     accumulator_ = memory_[address_add(registers_[001], 0432)];
     select_alu_group(rau_logical);
     registers_[015] = 013115;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13115()
@@ -8488,7 +8488,7 @@ std::uint16_t Machine::p13121()
     accumulator_ = memory_[address_add(registers_[001], 0463)];
     select_alu_group(rau_logical);
     registers_[015] = 013125;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13125()
@@ -8717,7 +8717,9 @@ std::uint16_t Machine::p07773_prstri()
     its(005);
     hardware_push_acc();
     registers_[015] = 07775;
-    p03277_pop_acc();
+    if (call_r15_leaf<03277, &Machine::p03277_pop_acc>() == 03277) {
+        return 03277;
+    }
     registers_[005] = 07514;
     hardware_push_acc();
     registers_[001] = accumulator_.address();
@@ -8783,19 +8785,19 @@ std::uint16_t Machine::p07773_prstri()
 std::uint16_t Machine::p12630()
 {
     registers_[015] = 012631;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12631()
 {
     registers_[015] = 012632;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12632()
 {
     registers_[015] = 012633;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12633()
@@ -8812,27 +8814,27 @@ std::uint16_t Machine::p12635()
     hardware_push_acc();
     registers_[001] = 012635;
     registers_[015] = 012640;
-    return 013217;
+    return call_r15_leaf<013217, &Machine::p13217>();
 }
 
 std::uint16_t Machine::p12640()
 {
     registers_[015] = 012641;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12641()
 {
     memory_[address_add(registers_[001], 0503)] = accumulator_;
     registers_[015] = 012642;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12642()
 {
     memory_[address_add(registers_[001], 0502)] = accumulator_;
     registers_[015] = 012643;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12643()
@@ -9056,7 +9058,7 @@ std::uint16_t Machine::p13104()
 std::uint16_t Machine::p13105()
 {
     registers_[015] = 013106;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13106()
@@ -9354,7 +9356,7 @@ std::uint16_t Machine::p16022()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 016026;
-    return 021107;
+    return call_r15_leaf<021107, &Machine::p21107>();
 }
 
 std::uint16_t Machine::p16026()
@@ -9561,7 +9563,7 @@ std::uint16_t Machine::p16210()
 std::uint16_t Machine::p16215()
 {
     registers_[015] = 016216;
-    return 021075;
+    return call_r15_leaf<021075, &Machine::p21075>();
 }
 
 std::uint16_t Machine::p16216()
@@ -9742,7 +9744,7 @@ std::uint16_t Machine::p16477()
 std::uint16_t Machine::p16502()
 {
     registers_[015] = 016503;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p16503()
@@ -9760,7 +9762,7 @@ std::uint16_t Machine::p16742()
     select_alu_group(rau_logical);
     registers_[007] = registers_[015];
     registers_[015] = 016744;
-    return 016421;
+    return call_r15_leaf<016421, &Machine::p16421_lookup_tagged_byte>();
 }
 
 std::uint16_t Machine::p16744()
@@ -9779,7 +9781,7 @@ std::uint16_t Machine::p16347()
     accumulator_ = memory_[registers_[003]];
     select_alu_group(rau_logical);
     registers_[015] = 016350;
-    return 016421;
+    return call_r15_leaf<016421, &Machine::p16421_lookup_tagged_byte>();
 }
 
 std::uint16_t Machine::p16350()
@@ -9846,7 +9848,7 @@ std::uint16_t Machine::p16373_push_record_head()
 std::uint16_t Machine::p16374_push_record_value()
 {
     registers_[015] = 016376;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16375_push_alternate_record_value()
@@ -9854,7 +9856,7 @@ std::uint16_t Machine::p16375_push_alternate_record_value()
     accumulator_ = memory_[address_add(registers_[001], 074471)];
     select_alu_group(rau_logical);
     registers_[015] = 016376;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16376()
@@ -9908,7 +9910,7 @@ std::uint16_t Machine::p16417()
 std::uint16_t Machine::p16420()
 {
     registers_[015] = 016376;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p17013()
@@ -10195,7 +10197,7 @@ std::uint16_t Machine::p20077()
     its(015);
     its(015);
     registers_[015] = 020101;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p20101()
@@ -10256,7 +10258,7 @@ std::uint16_t Machine::p21464()
     accumulator_ = memory_[021535];
     select_alu_group(rau_logical);
     registers_[015] = 021473;
-    return 05211;
+    return call_r15_leaf<05211, &Machine::p05211>();
 }
 
 std::uint16_t Machine::p21473()
@@ -10278,7 +10280,7 @@ std::uint16_t Machine::p21473()
     accumulator_ = memory_[021535];
     select_alu_group(rau_logical);
     registers_[015] = 021476;
-    return 05207;
+    return call_r15_leaf<05207, &Machine::p05207>();
 }
 
 std::uint16_t Machine::p21476()
@@ -10307,7 +10309,7 @@ std::uint16_t Machine::p21476()
 std::uint16_t Machine::p21501()
 {
     registers_[015] = 021502;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p21502()
@@ -10738,7 +10740,7 @@ std::uint16_t Machine::p15743()
 {
     registers_[016] = 015753;
     registers_[015] = 015744;
-    return 021443;
+    return call_r15_leaf<021443, &Machine::p21443_advance_descriptor>();
 }
 
 std::uint16_t Machine::p15744()
@@ -10887,12 +10889,16 @@ std::uint16_t Machine::p03014_dispatch_error()
     // as a POP integer to the function descriptor stored at 01633.
     accumulator_ = memory_[03176];
     registers_[015] = 03035;
-    p03275_push_acc();
+    if (call_r15_leaf<03275, &Machine::p03275_push_acc>() == 03275) {
+        return 03275;
+    }
     accumulator_ = memory_[03204];
     accumulator_ =
         Word48(accumulator_.raw() ^ memory_[03155].raw());
     registers_[015] = 03037;
-    p03275_push_acc();
+    if (call_r15_leaf<03275, &Machine::p03275_push_acc>() == 03275) {
+        return 03275;
+    }
     accumulator_ = memory_[01633];
     registers_[015] = 03041;
     return p02750_dispatch();
@@ -10904,11 +10910,15 @@ std::uint16_t Machine::p03051_unpack_error()
     // r17 use the BESM hardware stack to retain the code while POP_ACC fetches
     // the object; WTC supplies the low 15 bits as the new r16.
     registers_[015] = 03052;
-    p03277_pop_acc();
+    if (call_r15_leaf<03277, &Machine::p03277_pop_acc>() == 03277) {
+        return 03277;
+    }
     hardware_push_acc();
 
     registers_[015] = 03053;
-    p03277_pop_acc();
+    if (call_r15_leaf<03277, &Machine::p03277_pop_acc>() == 03277) {
+        return 03277;
+    }
     const Word48 source_object = accumulator_;
 
     hardware_pop_acc();
@@ -10951,7 +10961,9 @@ std::uint16_t Machine::p03057_begin_error_format()
 
     accumulator_ = memory_[03164];
     registers_[015] = 03071;
-    p03275_push_acc();
+    if (call_r15_leaf<03275, &Machine::p03275_push_acc>() == 03275) {
+        return 03275;
+    }
     accumulator_ = memory_[address_add(registers_[002], 0367)];
     registers_[015] = 03072;
     return p02750_dispatch();
@@ -10993,7 +11005,7 @@ std::uint16_t Machine::p13362()
     accumulator_ = memory_[address_add(registers_[001], 050)];
     select_alu_group(rau_logical);
     registers_[015] = 013367;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13367()
@@ -11198,7 +11210,9 @@ std::uint16_t Machine::p07475_cuchin()
     // 07475..07504: consume CUCHIN's argument and normalize the distinguished
     // 0136 value to character/control code 0012 before entering 21255.
     registers_[015] = 07476;
-    p03277_pop_acc();
+    if (call_r15_leaf<03277, &Machine::p03277_pop_acc>() == 03277) {
+        return 03277;
+    }
     registers_[010] = 07472;
     memory_[07513] = accumulator_;
     accumulator_ = Word48(
@@ -11226,7 +11240,7 @@ std::uint16_t Machine::p07533()
     registers_[016] = 07545;
     xts(address_add(registers_[016], -1));
     registers_[015] = 07536;
-    return 021443;
+    return call_r15_leaf<021443, &Machine::p21443_advance_descriptor>();
 }
 
 std::uint16_t Machine::p07536()
@@ -11331,7 +11345,7 @@ std::uint16_t Machine::p11553()
     its(004);
     its(004);
     registers_[015] = 011556;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11556()
@@ -11390,7 +11404,7 @@ std::uint16_t Machine::p11564()
     memory_[address_add(registers_[016], 4)] = accumulator_;
     registers_[003] = registers_[016];
     registers_[015] = 011571;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11571()
@@ -11434,7 +11448,7 @@ std::uint16_t Machine::p11571()
     remainder_ = operand;
     select_alu_group(rau_logical);
     registers_[015] = 011601;
-    return 03413;
+    return call_r15_leaf<03413, &Machine::p03413_numeric_update>();
 }
 
 std::uint16_t Machine::p11601()
@@ -11469,13 +11483,13 @@ std::uint16_t Machine::p11604()
     memory_[target] = accumulator_;
     select_alu_group(rau_logical);
     registers_[015] = 011607;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11607()
 {
     registers_[015] = 011610;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11610()
@@ -11504,14 +11518,14 @@ std::uint16_t Machine::p11611()
     memory_[target] = accumulator_;
     select_alu_group(rau_logical);
     registers_[015] = 011615;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11615()
 {
     registers_[002] = registers_[010];
     registers_[015] = 011616;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11616()
@@ -11540,7 +11554,7 @@ std::uint16_t Machine::p11617()
     memory_[target] = accumulator_;
     select_alu_group(rau_logical);
     registers_[015] = 011623;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11623()
@@ -11579,7 +11593,7 @@ std::uint16_t Machine::p11673_begin_generated_update()
     its(016);
     its(016);
     registers_[015] = 011675;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11675_continue_generated_update()
@@ -11602,7 +11616,7 @@ std::uint16_t Machine::p11675_continue_generated_update()
     }
 
     registers_[015] = 011701;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11701_match_generated_value()
@@ -11644,7 +11658,7 @@ std::uint16_t Machine::p11703_update_generated_value()
     select_alu_group(rau_logical);
     memory_[address_add(registers_[017], -6)] = accumulator_;
     registers_[015] = 011710;
-    return 03413;
+    return call_r15_leaf<03413, &Machine::p03413_numeric_update>();
 }
 
 std::uint16_t Machine::p11710_finish_generated_update()
@@ -11782,7 +11796,7 @@ std::uint16_t Machine::p11727_continue_generated_rebinding()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 011731;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11731_finish_generated_rebinding()
@@ -11872,7 +11886,9 @@ std::uint16_t Machine::p16321_dispatch_character()
         accumulator_.raw() ^ memory_[016335].raw());
     memory_[016337] = accumulator_;
     registers_[015] = 016323;
-    p03275_push_acc();
+    if (call_r15_leaf<03275, &Machine::p03275_push_acc>() == 03275) {
+        return 03275;
+    }
     accumulator_ = memory_[01567];
     registers_[015] = 016325;
     return p02750_dispatch();
@@ -11937,7 +11953,7 @@ std::uint16_t Machine::p16412()
     accumulator_ = memory_[address_add(registers_[003], 1)];
     select_alu_group(rau_logical);
     registers_[015] = 016413;
-    return 016421;
+    return call_r15_leaf<016421, &Machine::p16421_lookup_tagged_byte>();
 }
 
 std::uint16_t Machine::p16413()
@@ -12075,7 +12091,7 @@ std::uint16_t Machine::p16465_store_record_evaluation()
 {
     registers_[016] = registers_[003];
     registers_[015] = 016466;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p16466_return_record_evaluation()
@@ -12095,7 +12111,7 @@ std::uint16_t Machine::p16467()
     xts(registers_[003]);
     registers_[016] = 016555;
     registers_[015] = 016471;
-    return 021443;
+    return call_r15_leaf<021443, &Machine::p21443_advance_descriptor>();
 }
 
 std::uint16_t Machine::p16471()
@@ -12171,7 +12187,7 @@ std::uint16_t Machine::p16532_push_record_head()
     accumulator_ = memory_[registers_[003]];
     select_alu_group(rau_logical);
     registers_[015] = 016533;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16533_select_record_path()
@@ -12202,7 +12218,7 @@ std::uint16_t Machine::p16533_select_record_path()
     }
 
     registers_[015] = 016537;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p16537_push_record_index()
@@ -12219,7 +12235,7 @@ std::uint16_t Machine::p16537_push_record_index()
     remainder_ = index;
     select_alu_group(rau_logical);
     registers_[015] = 016541;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16541_evaluate_record_index()
@@ -12232,7 +12248,7 @@ std::uint16_t Machine::p16541_evaluate_record_index()
 std::uint16_t Machine::p16542_pop_record_index()
 {
     registers_[015] = 016543;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p16543_save_record_index()
@@ -12252,7 +12268,7 @@ std::uint16_t Machine::p16544_push_record_index_again()
     remainder_ = index;
     select_alu_group(rau_logical);
     registers_[015] = 016546;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16546_push_saved_record_value()
@@ -12260,7 +12276,7 @@ std::uint16_t Machine::p16546_push_saved_record_value()
     accumulator_ = memory_[address_add(registers_[017], -7)];
     select_alu_group(rau_logical);
     registers_[015] = 016547;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16547_evaluate_saved_record_value()
@@ -12317,7 +12333,7 @@ std::uint16_t Machine::p16643()
     remainder_ = saved;
     select_alu_group(rau_logical);
     registers_[015] = 016376;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p16651()
@@ -12668,7 +12684,7 @@ std::uint16_t Machine::p16076()
     hardware_push_acc();
     registers_[016] = accumulator_.address();
     registers_[015] = 016104;
-    return 021075;
+    return call_r15_leaf<021075, &Machine::p21075>();
 }
 
 std::uint16_t Machine::p16104()
@@ -12677,7 +12693,7 @@ std::uint16_t Machine::p16104()
     select_alu_group(rau_logical);
     registers_[016] = accumulator_.address();
     registers_[015] = 016106;
-    return 021107;
+    return call_r15_leaf<021107, &Machine::p21107>();
 }
 
 std::uint16_t Machine::p16106()
@@ -13468,7 +13484,7 @@ std::uint16_t Machine::p20511()
     memory_[address_add(registers_[001], 070)] = accumulator_;
     registers_[016] = 020536;
     registers_[015] = 020514;
-    return 020674;
+    return call_r15_leaf<020674, &Machine::p20674>();
 }
 
 std::uint16_t Machine::p20514()
@@ -13575,7 +13591,7 @@ std::uint16_t Machine::p07761()
     accumulator_ = memory_[address_add(registers_[005], 0334)];
     select_alu_group(rau_logical);
     registers_[015] = 07764;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07764()
@@ -13591,7 +13607,7 @@ std::uint16_t Machine::p07766()
     accumulator_ = memory_[address_add(registers_[005], 0243)];
     select_alu_group(rau_logical);
     registers_[015] = 07767;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07767()
@@ -13606,7 +13622,7 @@ std::uint16_t Machine::p07770()
     accumulator_ = memory_[address_add(registers_[005], 0334)];
     select_alu_group(rau_logical);
     registers_[015] = 07771;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07771()
@@ -14239,7 +14255,7 @@ std::uint16_t Machine::p21202()
     registers_[017] = address_add(registers_[017], 1);
     registers_[001] = 021202;
     registers_[015] = 021204;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p21204()
@@ -14247,7 +14263,7 @@ std::uint16_t Machine::p21204()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 021205;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p21205()
@@ -14259,7 +14275,7 @@ std::uint16_t Machine::p21205()
 std::uint16_t Machine::p21206()
 {
     registers_[015] = 021207;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p21207()
@@ -14267,7 +14283,7 @@ std::uint16_t Machine::p21207()
     accumulator_ = memory_[address_add(registers_[001], 013)];
     select_alu_group(rau_logical);
     registers_[015] = 021210;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p21210()
@@ -14275,7 +14291,7 @@ std::uint16_t Machine::p21210()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 021211;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p21211()
@@ -14320,21 +14336,21 @@ std::uint16_t Machine::p21222()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 021224;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p21224()
 {
     memory_[address_add(registers_[001], 024)] = accumulator_;
     registers_[015] = 021225;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p21225()
 {
     memory_[address_add(registers_[001], 025)] = accumulator_;
     registers_[015] = 021226;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p21226()
@@ -14364,7 +14380,7 @@ std::uint16_t Machine::p21226()
 std::uint16_t Machine::p21231()
 {
     registers_[015] = 021232;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p21232()
@@ -14372,7 +14388,7 @@ std::uint16_t Machine::p21232()
     accumulator_ = memory_[address_add(registers_[001], 025)];
     select_alu_group(rau_logical);
     registers_[015] = 021233;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p21233()
@@ -14482,7 +14498,7 @@ std::uint16_t Machine::p25346_begin_character_output()
     xts(character_address);
     registers_[016] = 025417;
     registers_[015] = 025350;
-    return 021443;
+    return call_r15_leaf<021443, &Machine::p21443_advance_descriptor>();
 }
 
 std::uint16_t Machine::p25350_continue_character_output()
@@ -14970,14 +14986,14 @@ std::uint16_t Machine::p25532()
 
     registers_[016] = 017560;
     registers_[015] = 025543;
-    return 017614;
+    return call_r15_leaf<017614, &Machine::p17614>();
 }
 
 std::uint16_t Machine::p25543()
 {
     registers_[016] = 017577;
     registers_[015] = 025544;
-    return 017614;
+    return call_r15_leaf<017614, &Machine::p17614>();
 }
 
 std::uint16_t Machine::p25544()
@@ -15067,7 +15083,7 @@ std::uint16_t Machine::p25641()
     yta(0);
     multiply(memory_[025666]);
     registers_[015] = 025647;
-    return 025660;
+    return call_r15_leaf<025660, &Machine::p25660>();
 }
 
 std::uint16_t Machine::p25647()
@@ -15086,7 +15102,7 @@ std::uint16_t Machine::p25647()
     yta(0);
     multiply(memory_[025666]);
     registers_[015] = 025653;
-    return 025660;
+    return call_r15_leaf<025660, &Machine::p25660>();
 }
 
 std::uint16_t Machine::p25653()
@@ -15096,7 +15112,7 @@ std::uint16_t Machine::p25653()
     accumulator_ = memory_[025673];
     select_alu_group(rau_logical);
     registers_[015] = 025655;
-    return 025660;
+    return call_r15_leaf<025660, &Machine::p25660>();
 }
 
 std::uint16_t Machine::p25655()
@@ -15208,7 +15224,10 @@ std::uint16_t Machine::p03206_prepare_ordinary_call()
             its(011);
             its(012);
             hardware_push_acc();
-            p03277_pop_acc();
+            registers_[015] = 03230;
+            if (call_r15_leaf<03277, &Machine::p03277_pop_acc>() == 03277) {
+                return 03277;
+            }
 
             registers_[010] = 03206;
             const std::uint16_t destination =
@@ -15261,7 +15280,11 @@ std::uint16_t Machine::p03235_bind_environment()
                 its(012);
                 its(013);
                 xts(registers_[013]);
-                p03275_push_acc();
+                registers_[015] = 03250;
+                if (call_r15_leaf<03275, &Machine::p03275_push_acc>()
+                    == 03275) {
+                    return 03275;
+                }
 
                 registers_[010] = 03206;
                 hardware_pop_acc();
@@ -15310,14 +15333,14 @@ std::uint16_t Machine::p03337()
     // the first POP value through the preserved 03277 boundary.
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 03340;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03340()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 03341;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03341()
@@ -15405,7 +15428,10 @@ std::uint16_t Machine::p20124_build_activation()
         const std::uint16_t source = address_add(
             registers_[017], static_cast<int>(registers_[002]) - 3);
         accumulator_ = memory_[source];
-        p03275_push_acc();
+        registers_[015] = 020135;
+        if (call_r15_leaf<03275, &Machine::p03275_push_acc>() == 03275) {
+            return 03275;
+        }
         if (registers_[002] == 0) {
             break;
         }
@@ -15437,13 +15463,13 @@ std::uint16_t Machine::p03424()
 {
     registers_[016] = 03451;
     registers_[015] = 03425;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p03425()
 {
     registers_[015] = 03426;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03426()
@@ -15487,14 +15513,14 @@ std::uint16_t Machine::p03426()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 03435;
-    return 03413;
+    return call_r15_leaf<03413, &Machine::p03413_numeric_update>();
 }
 
 std::uint16_t Machine::p03435()
 {
     stx(address_add(registers_[013], 0141));
     registers_[015] = 03436;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p03436()
@@ -15574,7 +15600,7 @@ std::uint16_t Machine::p04131()
 std::uint16_t Machine::p04134()
 {
     registers_[015] = 04135;
-    return 03305;
+    return call_r15_leaf<03305, &Machine::p03305>();
 }
 
 std::uint16_t Machine::p04135()
@@ -15597,7 +15623,7 @@ std::uint16_t Machine::p04142()
     its(003);
     hardware_push_acc();
     registers_[015] = 04144;
-    return 03305;
+    return call_r15_leaf<03305, &Machine::p03305>();
 }
 
 std::uint16_t Machine::p04144()
@@ -15612,7 +15638,7 @@ std::uint16_t Machine::p04144()
     accumulator_ = memory_[02047];
     select_alu_group(rau_logical);
     registers_[015] = 04147;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p04147()
@@ -15635,7 +15661,7 @@ std::uint16_t Machine::p04147()
         return address_add(registers_[002], 0421);
     }
     registers_[015] = 04154;
-    return 03447;
+    return call_r15_leaf<03447, &Machine::p03447>();
 }
 
 std::uint16_t Machine::p04154()
@@ -15760,7 +15786,7 @@ std::uint16_t Machine::p07011()
     its(014);
     hardware_push_acc();
     registers_[015] = 07013;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07013()
@@ -15794,14 +15820,14 @@ std::uint16_t Machine::p07013()
 std::uint16_t Machine::p07022()
 {
     registers_[015] = 07023;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07023()
 {
     hardware_push_acc();
     registers_[015] = 07024;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07024()
@@ -15877,7 +15903,7 @@ std::uint16_t Machine::p07042()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 07043;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07043()
@@ -15921,7 +15947,7 @@ std::uint16_t Machine::p12131()
 std::uint16_t Machine::p12133()
 {
     registers_[015] = 012134;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12134()
@@ -15935,7 +15961,7 @@ std::uint16_t Machine::p12134()
 std::uint16_t Machine::p12135()
 {
     registers_[015] = 012136;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12136()
@@ -15966,7 +15992,7 @@ std::uint16_t Machine::p12142()
     accumulator_ = memory_[address_add(registers_[007], 01137)];
     select_alu_group(rau_logical);
     registers_[015] = 012143;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12143()
@@ -16004,7 +16030,7 @@ std::uint16_t Machine::p12147()
 std::uint16_t Machine::p12151()
 {
     registers_[015] = 012152;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12152()
@@ -16047,7 +16073,7 @@ std::uint16_t Machine::p12246()
     xts(address_add(registers_[001], 034));
     hardware_push_acc();
     registers_[015] = 012251;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12251()
@@ -16064,7 +16090,7 @@ std::uint16_t Machine::p12252()
         return address_add(registers_[001], 026);
     }
     registers_[015] = 012253;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12253()
@@ -16134,7 +16160,7 @@ std::uint16_t Machine::p12270()
     accumulator_ = memory_[address_add(registers_[001], 034)];
     select_alu_group(rau_logical);
     registers_[015] = 012271;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12271()
@@ -16219,14 +16245,14 @@ std::uint16_t Machine::p14656()
 {
     registers_[016] = 014217;
     registers_[015] = 014657;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p14657()
 {
     registers_[016] = 014216;
     registers_[015] = 014660;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p14660()
@@ -16306,7 +16332,7 @@ std::uint16_t Machine::p14716()
 {
     registers_[016] = 015224;
     registers_[015] = 014717;
-    return 021443;
+    return call_r15_leaf<021443, &Machine::p21443_advance_descriptor>();
 }
 
 std::uint16_t Machine::p14717()
@@ -16327,7 +16353,7 @@ std::uint16_t Machine::p14677()
     accumulator_ = memory_[address_add(registers_[001], 077105)];
     select_alu_group(rau_logical);
     registers_[015] = 014700;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p14700()
@@ -16506,7 +16532,7 @@ std::uint16_t Machine::p14662()
 std::uint16_t Machine::p11053()
 {
     registers_[015] = 011054;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11102()
@@ -16517,7 +16543,7 @@ std::uint16_t Machine::p11102()
     its(004);
     its(004);
     registers_[015] = 011105;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11105()
@@ -16525,7 +16551,7 @@ std::uint16_t Machine::p11105()
     registers_[001] = 011102;
     memory_[address_add(registers_[001], 0317)] = accumulator_;
     registers_[015] = 011107;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11107()
@@ -16545,7 +16571,7 @@ std::uint16_t Machine::p11110()
 std::uint16_t Machine::p11111()
 {
     registers_[015] = 011112;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11112()
@@ -16586,7 +16612,7 @@ std::uint16_t Machine::p11114()
     memory_[address_add(registers_[016], 7)] = accumulator_;
     registers_[003] = registers_[016];
     registers_[015] = 011123;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11123()
@@ -16594,13 +16620,13 @@ std::uint16_t Machine::p11123()
     memory_[address_add(registers_[003], 010)] = accumulator_;
     registers_[010] = registers_[003];
     registers_[015] = 011125;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11125()
 {
     registers_[015] = 011126;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11126()
@@ -16655,13 +16681,13 @@ std::uint16_t Machine::p11132()
     memory_[target] = accumulator_;
     select_alu_group(rau_logical);
     registers_[015] = 011137;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11137()
 {
     registers_[015] = 011140;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11140()
@@ -16874,7 +16900,7 @@ std::uint16_t Machine::p11165()
 
     registers_[004] = registers_[010];
     registers_[015] = 011201;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11201()
@@ -16883,7 +16909,7 @@ std::uint16_t Machine::p11201()
         memory_[address_add(registers_[001], 0320)].address();
     memory_[address_add(registers_[002], modifier)] = accumulator_;
     registers_[015] = 011203;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11203()
@@ -17045,7 +17071,7 @@ std::uint16_t Machine::p11204()
     select_alu_group(rau_multiplicative);
     memory_[address_add(registers_[001], 0325)] = accumulator_;
     registers_[015] = 011234;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11234()
@@ -17132,7 +17158,7 @@ std::uint16_t Machine::p11247()
     select_alu_group(rau_logical);
     registers_[004] = registers_[010];
     registers_[015] = 011254;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11254()
@@ -17141,7 +17167,7 @@ std::uint16_t Machine::p11254()
         memory_[address_add(registers_[001], 0320)].address();
     memory_[address_add(registers_[002], modifier)] = accumulator_;
     registers_[015] = 011256;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11256()
@@ -17171,7 +17197,7 @@ std::uint16_t Machine::p11257()
     memory_[target] = accumulator_;
     select_alu_group(rau_logical);
     registers_[015] = 011264;
-    return 011266;
+    return call_r15_leaf<011266, &Machine::p11266>();
 }
 
 std::uint16_t Machine::p11264()
@@ -17231,7 +17257,7 @@ std::uint16_t Machine::p11274()
     registers_[002] = registers_[014];
     memory_[address_add(registers_[017], -3)] = accumulator_;
     registers_[015] = 011300;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11300()
@@ -17257,7 +17283,7 @@ std::uint16_t Machine::p11304()
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     registers_[015] = 011305;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11305()
@@ -17281,7 +17307,7 @@ std::uint16_t Machine::p11330()
     registers_[002] = registers_[015];
     registers_[003] = registers_[016];
     registers_[015] = 011334;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11334()
@@ -17306,7 +17332,7 @@ std::uint16_t Machine::p11334()
         address_add(registers_[003], registers_[015]), -1)];
     select_alu_group(rau_logical);
     registers_[015] = 011340;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p11340()
@@ -17328,7 +17354,7 @@ std::uint16_t Machine::p11343()
     registers_[002] = registers_[015];
     registers_[003] = registers_[016];
     registers_[015] = 011347;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11347()
@@ -17351,7 +17377,7 @@ std::uint16_t Machine::p11347()
     }
     registers_[002] = registers_[015];
     registers_[015] = 011353;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11353()
@@ -17420,7 +17446,7 @@ std::uint16_t Machine::p06410()
         return 06421;
     }
     registers_[015] = 06414;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06414()
@@ -17459,7 +17485,7 @@ std::uint16_t Machine::p11432()
     registers_[001] = 011432;
     registers_[002] = 0;
     registers_[015] = 011435;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11435()
@@ -17569,7 +17595,7 @@ std::uint16_t Machine::p07604()
 {
     hardware_push_acc();
     registers_[015] = 07605;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07605()
@@ -17613,7 +17639,7 @@ std::uint16_t Machine::p07613()
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     registers_[015] = 07614;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07614()
@@ -17641,13 +17667,13 @@ std::uint16_t Machine::p07616()
 std::uint16_t Machine::p07142()
 {
     registers_[015] = 07143;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07064()
 {
     registers_[015] = 07065;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07065()
@@ -17665,7 +17691,7 @@ std::uint16_t Machine::p07066()
 std::uint16_t Machine::p07100()
 {
     registers_[015] = 07101;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07101()
@@ -17858,7 +17884,7 @@ std::uint16_t Machine::p10725()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010727;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10727()
@@ -17960,14 +17986,14 @@ std::uint16_t Machine::p06634()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06635;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06635()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06636;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06636()
@@ -17981,7 +18007,7 @@ std::uint16_t Machine::p07165()
 {
     registers_[016] = 02333;
     registers_[015] = 07166;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p07166()
@@ -18018,7 +18044,7 @@ std::uint16_t Machine::p07173()
     select_alu_group(rau_logical);
     memory_[address_add(registers_[005], 01127)] = accumulator_;
     registers_[015] = 07177;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07177()
@@ -18069,7 +18095,7 @@ std::uint16_t Machine::p07245()
     accumulator_ = memory_[address_add(registers_[005], 01137)];
     select_alu_group(rau_logical);
     registers_[015] = 07246;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07246()
@@ -18083,7 +18109,7 @@ std::uint16_t Machine::p07246()
 std::uint16_t Machine::p07247()
 {
     registers_[015] = 07250;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07250()
@@ -18140,7 +18166,7 @@ std::uint16_t Machine::p07332()
 {
     registers_[007] = registers_[015];
     registers_[015] = 07333;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07333()
@@ -18262,7 +18288,7 @@ std::uint16_t Machine::p07335()
 std::uint16_t Machine::p07361()
 {
     registers_[015] = 07362;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07362()
@@ -18310,7 +18336,7 @@ std::uint16_t Machine::p07370()
 {
     registers_[016] = 07204;
     registers_[015] = 07371;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p07371()
@@ -18323,7 +18349,7 @@ std::uint16_t Machine::p07371()
 std::uint16_t Machine::p07372()
 {
     registers_[015] = 07373;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07373()
@@ -18347,7 +18373,7 @@ std::uint16_t Machine::p04520()
     accumulator_ = memory_[01637];
     select_alu_group(rau_logical);
     registers_[015] = 04522;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p04522()
@@ -18371,7 +18397,7 @@ std::uint16_t Machine::p11503()
 std::uint16_t Machine::p11506()
 {
     registers_[015] = 011507;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11507()
@@ -18404,14 +18430,14 @@ std::uint16_t Machine::p11507()
 std::uint16_t Machine::p11531()
 {
     registers_[015] = 011532;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11532()
 {
     hardware_push_acc();
     registers_[015] = 011533;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11533()
@@ -18424,7 +18450,7 @@ std::uint16_t Machine::p11533()
 std::uint16_t Machine::p11534()
 {
     registers_[015] = 011535;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p11535()
@@ -18474,14 +18500,14 @@ std::uint16_t Machine::p10745()
 {
     registers_[002] = 010737;
     registers_[015] = 010746;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10746()
 {
     memory_[address_add(registers_[002], 062)] = accumulator_;
     registers_[015] = 010747;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10747()
@@ -18489,14 +18515,14 @@ std::uint16_t Machine::p10747()
     memory_[address_add(registers_[002], 026)] = accumulator_;
     memory_[address_add(registers_[002], 046)] = accumulator_;
     registers_[015] = 010751;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10751()
 {
     memory_[address_add(registers_[002], 022)] = accumulator_;
     registers_[015] = 010752;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10752()
@@ -18508,7 +18534,7 @@ std::uint16_t Machine::p10752()
     accumulator_ = memory_[address_add(registers_[002], 021)];
     select_alu_group(rau_logical);
     registers_[015] = 010755;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10755()
@@ -18537,14 +18563,14 @@ std::uint16_t Machine::p16665()
 std::uint16_t Machine::p16666()
 {
     registers_[015] = 016667;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p16667()
 {
     memory_[address_add(registers_[003], 2)] = accumulator_;
     registers_[015] = 016670;
-    return 016421;
+    return call_r15_leaf<016421, &Machine::p16421_lookup_tagged_byte>();
 }
 
 std::uint16_t Machine::p16670()
@@ -18724,7 +18750,7 @@ std::uint16_t Machine::p17450()
 {
     registers_[016] = registers_[003];
     registers_[015] = 017451;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p03477()
@@ -18760,7 +18786,7 @@ std::uint16_t Machine::p25701()
         return 025714;
     }
     registers_[015] = 025702;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p25702()
@@ -18845,7 +18871,7 @@ std::uint16_t Machine::p25730()
     accumulator_ = memory_[address_add(registers_[017], -5)];
     select_alu_group(rau_logical);
     registers_[015] = 025734;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p25734()
@@ -18859,7 +18885,7 @@ std::uint16_t Machine::p25734()
 std::uint16_t Machine::p25736()
 {
     registers_[015] = 025737;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p25737()
@@ -18888,7 +18914,7 @@ std::uint16_t Machine::p25742()
     accumulator_ = memory_[address_add(registers_[017], -5)];
     select_alu_group(rau_logical);
     registers_[015] = 025745;
-    return 05207;
+    return call_r15_leaf<05207, &Machine::p05207>();
 }
 
 std::uint16_t Machine::p25745()
@@ -18897,7 +18923,7 @@ std::uint16_t Machine::p25745()
     accumulator_ = memory_[address_add(registers_[017], -5)];
     select_alu_group(rau_logical);
     registers_[015] = 025747;
-    return 05211;
+    return call_r15_leaf<05211, &Machine::p05211>();
 }
 
 std::uint16_t Machine::p25747()
@@ -18995,7 +19021,7 @@ std::uint16_t Machine::p13454()
     registers_[007] = 01200;
     xts(address_add(registers_[001], 047));
     registers_[015] = 013460;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13460()
@@ -19011,13 +19037,13 @@ std::uint16_t Machine::p13461()
     accumulator_ = memory_[address_add(registers_[001], 050)];
     select_alu_group(rau_logical);
     registers_[015] = 013462;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13462()
 {
     registers_[015] = 013463;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13463()
@@ -19039,7 +19065,7 @@ std::uint16_t Machine::p13464()
 std::uint16_t Machine::p13465()
 {
     registers_[015] = 013466;
-    return 03305;
+    return call_r15_leaf<03305, &Machine::p03305>();
 }
 
 std::uint16_t Machine::p13466()
@@ -19057,7 +19083,7 @@ std::uint16_t Machine::p13470()
 {
     registers_[002] = address_add(registers_[002], -1);
     registers_[015] = 013471;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p13471()
@@ -19084,7 +19110,7 @@ std::uint16_t Machine::p13474()
     accumulator_ = memory_[address_add(registers_[001], 051)];
     select_alu_group(rau_logical);
     registers_[015] = 013476;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13476()
@@ -19100,7 +19126,7 @@ std::uint16_t Machine::p13500()
     accumulator_ = memory_[address_add(registers_[001], 047)];
     select_alu_group(rau_logical);
     registers_[015] = 013501;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p13501()
@@ -19233,7 +19259,7 @@ std::uint16_t Machine::p15344()
     accumulator_ = memory_[address_add(registers_[007], 01057)];
     select_alu_group(rau_logical);
     registers_[015] = 015345;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p15345()
@@ -19251,7 +19277,7 @@ std::uint16_t Machine::p15345()
 std::uint16_t Machine::p03310()
 {
     registers_[015] = 03311;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03311()
@@ -19274,7 +19300,7 @@ std::uint16_t Machine::p03311()
 std::uint16_t Machine::p03371()
 {
     registers_[015] = 03372;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03372()
@@ -19298,7 +19324,7 @@ std::uint16_t Machine::p03372()
 std::uint16_t Machine::p03442()
 {
     registers_[015] = 03443;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p03443()
@@ -19343,7 +19369,7 @@ std::uint16_t Machine::p04227()
 std::uint16_t Machine::p04437()
 {
     registers_[015] = 04440;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p04440()
@@ -19353,7 +19379,7 @@ std::uint16_t Machine::p04440()
     accumulator_ = memory_[01637];
     select_alu_group(rau_logical);
     registers_[015] = 04442;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p04442()
@@ -19361,7 +19387,7 @@ std::uint16_t Machine::p04442()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 04443;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p04443()
@@ -19380,14 +19406,14 @@ std::uint16_t Machine::p12036()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 012042;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12042()
 {
     hardware_push_acc();
     registers_[015] = 012043;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12043()
@@ -19494,7 +19520,7 @@ std::uint16_t Machine::p12057()
 std::uint16_t Machine::p12063()
 {
     registers_[015] = 012064;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12064()
@@ -19534,14 +19560,14 @@ std::uint16_t Machine::p12070()
 std::uint16_t Machine::p12071()
 {
     registers_[015] = 012072;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12072()
 {
     hardware_push_acc();
     registers_[015] = 012073;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12073()
@@ -19718,21 +19744,21 @@ std::uint16_t Machine::p12200()
     select_alu_group(rau_logical);
     memory_[address_add(registers_[014], 3)] = accumulator_;
     registers_[015] = 012210;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12210()
 {
     hardware_push_acc();
     registers_[015] = 012211;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12211()
 {
     hardware_push_acc();
     registers_[015] = 012212;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p12212()
@@ -19745,7 +19771,7 @@ std::uint16_t Machine::p12212()
     accumulator_ = memory_[address_add(registers_[001], 047)];
     select_alu_group(rau_logical);
     registers_[015] = 012215;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12215()
@@ -19761,7 +19787,7 @@ std::uint16_t Machine::p12217()
     accumulator_ = memory_[address_add(registers_[001], 047)];
     select_alu_group(rau_logical);
     registers_[015] = 012220;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p12220()
@@ -19832,7 +19858,7 @@ std::uint16_t Machine::p20073()
     its(015);
     its(015);
     registers_[015] = 020075;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p20075()
@@ -19859,13 +19885,13 @@ std::uint16_t Machine::p20075()
 std::uint16_t Machine::p10052()
 {
     registers_[015] = 010053;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06600()
 {
     registers_[015] = 06601;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06601()
@@ -19900,7 +19926,7 @@ std::uint16_t Machine::p06601()
 std::uint16_t Machine::p06605()
 {
     registers_[015] = 06606;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06606()
@@ -19920,7 +19946,7 @@ std::uint16_t Machine::p06606()
 std::uint16_t Machine::p06611()
 {
     registers_[015] = 06612;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06612()
@@ -19962,14 +19988,14 @@ std::uint16_t Machine::p06620()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06621;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06621()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06622;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06622()
@@ -19983,14 +20009,14 @@ std::uint16_t Machine::p06626()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06627;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06627()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06630;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06630()
@@ -20004,14 +20030,14 @@ std::uint16_t Machine::p06642()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06643;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06643()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06644;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p06644()
@@ -20025,14 +20051,14 @@ std::uint16_t Machine::p07125()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 07126;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07126()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 07127;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07127()
@@ -20051,7 +20077,7 @@ std::uint16_t Machine::p07130()
 std::uint16_t Machine::p07131()
 {
     registers_[015] = 07132;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07132()
@@ -20069,14 +20095,14 @@ std::uint16_t Machine::p07133()
 std::uint16_t Machine::p07410()
 {
     registers_[015] = 07411;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07411()
 {
     hardware_push_acc();
     registers_[015] = 07412;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07412()
@@ -20128,14 +20154,14 @@ std::uint16_t Machine::p07417()
 std::uint16_t Machine::p07421()
 {
     registers_[015] = 07422;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07422()
 {
     hardware_push_acc();
     registers_[015] = 07423;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07423()
@@ -20164,14 +20190,14 @@ std::uint16_t Machine::p07433()
     registers_[001] = 07426;
     registers_[002] = 01200;
     registers_[015] = 07436;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07436()
 {
     xts(address_add(registers_[002], 01007));
     registers_[015] = 07437;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07437()
@@ -20179,7 +20205,7 @@ std::uint16_t Machine::p07437()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 07440;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p07440()
@@ -20194,7 +20220,7 @@ std::uint16_t Machine::p07441()
 {
     // 07441L is a padded UTC 0 left half.
     registers_[015] = 07442;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p07442()
@@ -20226,7 +20252,7 @@ std::uint16_t Machine::p07442()
         accumulator_ = memory_[address_add(registers_[001], 043)];
         select_alu_group(rau_logical);
         registers_[015] = 07460;
-        return 03275;
+        return call_r15_leaf<03275, &Machine::p03275_push_acc>();
     }
 
     alu_mode_ = 003;
@@ -20262,7 +20288,7 @@ std::uint16_t Machine::p07455()
         accumulator_ = memory_[address_add(registers_[001], 043)];
         select_alu_group(rau_logical);
         registers_[015] = 07460;
-        return 03275;
+        return call_r15_leaf<03275, &Machine::p03275_push_acc>();
     }
 
     alu_mode_ = 003;
@@ -20334,7 +20360,7 @@ std::uint16_t Machine::p10060()
     remainder_ = Word48();
     select_alu_group(rau_multiplicative);
     registers_[015] = 010063;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10063()
@@ -20358,7 +20384,7 @@ std::uint16_t Machine::p10067()
     accumulator_ = memory_[address_add(registers_[014], 0135)];
     select_alu_group(rau_logical);
     registers_[015] = 010070;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10070()
@@ -20370,14 +20396,14 @@ std::uint16_t Machine::p10071()
 {
     registers_[016] = 010206;
     registers_[015] = 010072;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p10072()
 {
     registers_[016] = 010207;
     registers_[015] = 010073;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p10073()
@@ -20465,7 +20491,7 @@ std::uint16_t Machine::p10113()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010115;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10115()
@@ -20504,7 +20530,7 @@ std::uint16_t Machine::p10123()
 {
     registers_[005] = address_add(registers_[005], -1);
     registers_[015] = 010124;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10124()
@@ -20552,7 +20578,7 @@ std::uint16_t Machine::p10124()
 std::uint16_t Machine::p10134()
 {
     registers_[015] = 010135;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10135()
@@ -20566,7 +20592,7 @@ std::uint16_t Machine::p10135()
 std::uint16_t Machine::p10144()
 {
     registers_[015] = 010145;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10145()
@@ -20607,7 +20633,7 @@ std::uint16_t Machine::p10210()
 std::uint16_t Machine::p10257()
 {
     registers_[015] = 010260;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10260()
@@ -20639,7 +20665,7 @@ std::uint16_t Machine::p10264()
 std::uint16_t Machine::p10266()
 {
     registers_[015] = 010267;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10267()
@@ -20656,7 +20682,7 @@ std::uint16_t Machine::p10267()
         return 010275;
     }
     registers_[015] = 010273;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10273()
@@ -20688,7 +20714,7 @@ std::uint16_t Machine::p10300()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010302;
-    return 03303;
+    return call_r15_leaf<03303, &Machine::p03303_store_stack_top>();
 }
 
 std::uint16_t Machine::p10302()
@@ -20709,7 +20735,7 @@ std::uint16_t Machine::p10305()
     its(007);
     hardware_push_acc();
     registers_[015] = 010307;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10307()
@@ -20756,7 +20782,7 @@ std::uint16_t Machine::p10334()
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     registers_[015] = 010335;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10335()
@@ -20787,7 +20813,7 @@ std::uint16_t Machine::p10337()
     } while (registers_[007] != 0);
     registers_[007] = registers_[016];
     registers_[015] = 010343;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10343()
@@ -20803,7 +20829,7 @@ std::uint16_t Machine::p10343()
     remainder_ = index;
     select_alu_group(rau_logical);
     registers_[015] = 010346;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10346()
@@ -20818,7 +20844,7 @@ std::uint16_t Machine::p10346()
 std::uint16_t Machine::p10350()
 {
     registers_[015] = 010351;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10351()
@@ -20836,7 +20862,7 @@ std::uint16_t Machine::p10352()
 std::uint16_t Machine::p10365()
 {
     registers_[015] = 010366;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10366()
@@ -20935,7 +20961,7 @@ std::uint16_t Machine::p10402()
     remainder_ = used_cells;
     select_alu_group(rau_logical);
     registers_[015] = 010415;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10415()
@@ -20971,7 +20997,7 @@ std::uint16_t Machine::p10421()
     its(002);
     hardware_push_acc();
     registers_[015] = 010423;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10423()
@@ -20990,7 +21016,7 @@ std::uint16_t Machine::p10423()
         return 010443;
     }
     registers_[015] = 010426;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10426()
@@ -21031,7 +21057,7 @@ std::uint16_t Machine::p10431()
     remainder_ = allocation;
     select_alu_group(rau_logical);
     registers_[015] = 010436;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10436()
@@ -21066,7 +21092,7 @@ std::uint16_t Machine::p10443()
 std::uint16_t Machine::p10463()
 {
     registers_[015] = 010464;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10464()
@@ -21119,7 +21145,7 @@ std::uint16_t Machine::p10473()
 std::uint16_t Machine::p10535()
 {
     registers_[015] = 010536;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10536()
@@ -21147,7 +21173,7 @@ std::uint16_t Machine::p10536()
     accumulator_ = memory_[registers_[016]];
     select_alu_group(rau_logical);
     registers_[015] = 010544;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10544()
@@ -21216,7 +21242,7 @@ std::uint16_t Machine::p10615()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010617;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10617()
@@ -21237,7 +21263,7 @@ std::uint16_t Machine::p10617()
     remainder_ = comparison;
     select_alu_group(rau_logical);
     registers_[015] = 010622;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10622()
@@ -21245,7 +21271,7 @@ std::uint16_t Machine::p10622()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 010623;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10623()
@@ -21282,7 +21308,7 @@ std::uint16_t Machine::p10645()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010647;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10647()
@@ -21304,7 +21330,7 @@ std::uint16_t Machine::p10647()
     remainder_ = comparison;
     select_alu_group(rau_logical);
     registers_[015] = 010652;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10652()
@@ -21315,7 +21341,7 @@ std::uint16_t Machine::p10652()
     accumulator_ = memory_[address_add(registers_[016], 4)];
     select_alu_group(rau_logical);
     registers_[015] = 010654;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p10654()
@@ -21329,7 +21355,7 @@ std::uint16_t Machine::p10654()
 std::uint16_t Machine::p10656()
 {
     registers_[015] = 010657;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10657()
@@ -21361,7 +21387,7 @@ std::uint16_t Machine::p10663()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010665;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10665()
@@ -21392,7 +21418,7 @@ std::uint16_t Machine::p10672()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010674;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p10674()
@@ -21532,7 +21558,7 @@ std::uint16_t Machine::p20724()
     accumulator_ = memory_[address_add(registers_[001], 075)];
     select_alu_group(rau_logical);
     registers_[015] = 020732;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p20732()
@@ -21540,7 +21566,7 @@ std::uint16_t Machine::p20732()
     accumulator_ = memory_[address_add(registers_[001], 076)];
     select_alu_group(rau_logical);
     registers_[015] = 020733;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p20733()
@@ -21560,7 +21586,7 @@ std::uint16_t Machine::p20735()
 std::uint16_t Machine::p20736()
 {
     registers_[015] = 020737;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p20737()
@@ -21606,19 +21632,19 @@ std::uint16_t Machine::p20747()
     accumulator_ = memory_[0];
     select_alu_group(rau_logical);
     registers_[015] = 020751;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p20751()
 {
     registers_[015] = 020752;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p20752()
 {
     registers_[015] = 020753;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p20753()
@@ -21626,7 +21652,7 @@ std::uint16_t Machine::p20753()
     accumulator_ = memory_[address_add(registers_[001], 0110)];
     select_alu_group(rau_logical);
     registers_[015] = 020754;
-    return 03275;
+    return call_r15_leaf<03275, &Machine::p03275_push_acc>();
 }
 
 std::uint16_t Machine::p20754()
@@ -21640,7 +21666,7 @@ std::uint16_t Machine::p20754()
 std::uint16_t Machine::p20755()
 {
     registers_[015] = 020756;
-    return 03277;
+    return call_r15_leaf<03277, &Machine::p03277_pop_acc>();
 }
 
 std::uint16_t Machine::p20756()

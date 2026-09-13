@@ -1615,6 +1615,18 @@ private:
         std::uint16_t zone,
         std::array<Word48, 02000> &data) const;
     bool dispatch_translated_routine();
+    bool translated_routine_disabled(std::uint16_t address) const;
+
+    template<std::uint16_t Address, auto Routine>
+    std::uint16_t call_r15_leaf()
+    {
+        static_assert(Address <= 077777, "BESM address must fit in 15 bits");
+        if (translated_routine_disabled(Address)) {
+            return Address;
+        }
+        (this->*Routine)();
+        return registers_[015];
+    }
 
     Word48 accumulator_;
     Word48 remainder_;
