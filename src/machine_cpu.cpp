@@ -799,6 +799,19 @@ bool Machine::dispatch_translated_routine()
     }
 
     switch (program_counter_) {
+    case 03101: case 03102: case 03103: case 03104: case 03105:
+    case 03112: case 03116: case 03122: case 03123:
+    case 03124: case 03125: case 03126: case 03127: case 03130:
+    case 03131: case 03135: case 03136: case 03140: case 03141:
+        continuation = p03101(program_counter_); break;
+    case 03145: case 03147: case 03152:
+        continuation = p03145(program_counter_); break;
+    case 07622: case 07625: case 07626: case 07633: case 07636:
+    case 07641: case 07644:
+        continuation = p07622(program_counter_); break;
+    case 010002: case 010005: case 010006: case 010007:
+    case 010011: case 010013: case 010015:
+        continuation = p10002(program_counter_); break;
     case 010161: case 010162: case 010167: case 010177:
     case 010200: case 010201: case 010202: case 010203:
         continuation = p10161(program_counter_); break;

@@ -362,6 +362,35 @@ above describe their original fixtures, not this expansion.
 
 ## Port Order
 
+The local ALU-mode cleanup removes 874 redundant group selections from the
+semantic implementations (863 in `machine.cpp`, 11 in `poplan.cpp`). It removes
+repeated selections across mode-preserving assignments, selections already
+established by verified stack/shift helpers, and selections overwritten before
+use. For example, `16672` and `16677` retain their full `006` mode assignment,
+and `16722` retains its shift and final `006` assignment without intermediate
+group selections that no operation reads. Arithmetic helpers and the raw
+interpreter are unchanged; full-mode assignments, uncertain call boundaries,
+and control-flow joins remain intact. These edits do not fuse dispatches or
+change routine tracing. Focused full-state differentials cover all 64 incoming
+six-bit mode values across seven representative entries.
+
+The diagnostic-path expansion translates `03101..03152`, `07622..07645`,
+and `10002..10017` around the existing native message catalog at `03106`.
+That catalog entry and the guarded `07773` fast path remain unchanged.
+The extraction loop at `07633..07640` stays in C++ across enabled `03275`
+calls; stack setup calls and known-return continuations are similarly fused.
+Evaluator, character-sequence, computed, and error transfers remain independent
+boundaries. Original call-return and branch entries remain dispatchable,
+including when `03275`, `03303`, or `16254` is disabled.
+
+For the probe `NUMBERREAD()=>` followed by `ABC`, this expansion reduces raw
+steps from 712 to 14: zero in the three converted clusters, ten in the guarded
+`07773..07777` prologue, and four at `03041..03042`. These are measurements of
+this diagnostic probe, not replacements for the historical corpus counts.
+Nested-diagnostic handling remains outside this expansion. Full-state fixtures
+exercise the continuations and disabled-leaf returns; the standard-function
+test also checks diagnostic output and the absence of raw target-cluster steps.
+
 ### 1. Tagged Machine State
 
 Keep the current `Word48`, 32K-word core, accumulator, and BESM index

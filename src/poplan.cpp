@@ -459,13 +459,11 @@ std::uint16_t Machine::p16672()
     // 16672 begins conversion after the scanner has accepted a decimal point.
     const std::uint16_t saved = address_add(registers_[017], -7);
     accumulator_ = memory_[saved];
-    select_alu_group(rau_logical);
     const Word48 old_accumulator = accumulator_;
     accumulator_ = Word48(
         accumulator_.raw()
         ^ memory_[address_add(registers_[001], 074475)].raw());
     remainder_ = old_accumulator;
-    select_alu_group(rau_logical);
     alu_mode_ = 006;
     arithmetic_add(memory_[0], false, false);
     memory_[saved] = accumulator_;
@@ -497,13 +495,11 @@ std::uint16_t Machine::p16677()
     // Accumulate one fractional digit while the independent record and
     // tagged-byte routines remain explicit call boundaries.
     accumulator_ = memory_[registers_[003]];
-    select_alu_group(rau_logical);
     Word48 old_accumulator = accumulator_;
     accumulator_ = Word48(
         accumulator_.raw()
         ^ memory_[address_add(registers_[001], 074475)].raw());
     remainder_ = old_accumulator;
-    select_alu_group(rau_logical);
     alu_mode_ = 006;
     arithmetic_add(memory_[0], false, false);
     multiply(memory_[address_add(registers_[001], 074460)]);
@@ -566,7 +562,6 @@ std::uint16_t Machine::p16711()
         accumulator_.raw()
         ^ memory_[address_add(registers_[001], 074517)].raw());
     remainder_ = old_accumulator;
-    select_alu_group(rau_logical);
     remainder_ = accumulator_;
     if (!accumulator_condition()) {
         return address_add(registers_[001], 074434);
@@ -633,17 +628,13 @@ std::uint16_t Machine::p16722()
     const std::uint16_t scratch =
         address_add(registers_[001], 074457);
     accumulator_ = memory_[scratch];
-    select_alu_group(rau_logical);
     shift_accumulator(-3);
     accumulator_ = cyclic_add(accumulator_, memory_[scratch]);
     remainder_ = Word48();
-    select_alu_group(rau_multiplicative);
     accumulator_ = cyclic_add(accumulator_, memory_[scratch]);
     remainder_ = Word48();
-    select_alu_group(rau_multiplicative);
     accumulator_ = cyclic_add(accumulator_, memory_[registers_[003]]);
     remainder_ = Word48();
-    select_alu_group(rau_multiplicative);
     memory_[scratch] = accumulator_;
     alu_mode_ = 006;
     registers_[015] = 016726;
@@ -663,7 +654,6 @@ std::uint16_t Machine::p16726()
     accumulator_ = accumulator_
         & memory_[address_add(registers_[001], 074521)];
     remainder_ = Word48();
-    select_alu_group(rau_logical);
     registers_[016] = 0271;
     remainder_ = accumulator_;
     if (accumulator_condition()) {
@@ -834,7 +824,6 @@ std::uint16_t Machine::p03106_print_error_text()
     accumulator_ = Word48(
         accumulator_.raw() | memory_[03205].raw());
     remainder_ = first_flag;
-    select_alu_group(rau_logical);
     if (accumulator_.raw() != 0) {
         return 03124;
     }

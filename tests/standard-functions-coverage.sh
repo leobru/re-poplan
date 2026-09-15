@@ -25,6 +25,32 @@ for mode in hybrid interpreted; do
     diff -u "$expected" "$temporary/$mode.normalized"
 done
 
+# Trace the diagnostic workload separately: generated code and the guarded
+# PRSTRI prologue are allowed, but these converted static clusters are not.
+printf 'NUMBERREAD()=>\nABC\n' | \
+    POPLAN_CPU_TRACE=1 POPLAN_ROUTINE_TRACE=1 "$poplan" --image "$image" \
+    > "$temporary/diagnostic.out" 2> "$temporary/diagnostic.trace"
+python3 - "$temporary/diagnostic.trace" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+lines = Path(sys.argv[1]).read_text().splitlines()
+regions = ((0o3101, 0o3152), (0o7622, 0o7645), (0o10002, 0o10017))
+seen = set()
+for index, line in enumerate(lines):
+    match = re.match(r"^([0-7]{5})[LR] ", line)
+    if not match:
+        continue
+    address = int(match[1], 8)
+    for lo, hi in regions:
+        if lo <= address <= hi:
+            seen.add(lo)
+            assert index + 1 < len(lines)
+            assert lines[index + 1].startswith("ROUTINE " + match[1]), line
+assert seen == {lo for lo, hi in regions}, seen
+PY
+
 # Invalid tokens and EOF deliberately exercise NUMBERREAD's diagnostic path,
 # separately from the successful fixture and its static-code profile.
 for token in ABC ''; do

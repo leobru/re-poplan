@@ -2,6 +2,21 @@
 
 ## Resident primitive expansion
 
+### Diagnostic continuation expansion
+
+The `NUMBERREAD` invalid-token probe additionally exercises native diagnostic
+formatting/restoration at `03101..03143`, callback/counting at `03145..03152`,
+packed extraction at `07622..07645`, and callback-aware string output at
+`10002..10017`. `03144` remains a descriptor, not code; the existing `03106`
+native message catalog and `07773` callback guard are preserved.
+
+Enabled extraction iterations and stack-leaf return continuations execute
+within their caller's semantic dispatch. Rebound character callbacks still
+pass through the original evaluator boundary; no callback is bypassed.
+The probe's raw count falls from 712 to 14, with none in the new clusters.
+The remaining addresses are `03041..03042` and `07773..07777`. This observation
+does not establish full translation of nested or other diagnostic paths.
+
 The standard-function fixture now exercises these additional native regions:
 
 | Region | Dictionary operation | Preserved boundaries |

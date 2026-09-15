@@ -8991,6 +8991,55 @@ int main(int argc, char **argv)
         return continuation;
     };
 
+    // Mode-write cleanup must not depend on a caller's incoming group or
+    // normalization, rounding, and overflow flags. Use a fully raw oracle.
+    for (auto entry : {03330, 05316, 06424, 016672, 016677, 016722, 017047}) {
+        for (unsigned mode = 0; mode != 0100; ++mode) {
+            auto native = std::make_unique<Machine>();
+            std::istringstream stream(image_bytes);
+            native->load_image(stream);
+            native->accumulator() = Word48(012345);
+            native->remainder() = Word48(0765432107654321ULL);
+            native->alu_mode() = mode;
+            native->reg(001) = 0;
+            native->reg(003) = 04000;
+            native->reg(006) = 06000;
+            native->reg(015) = 07000;
+            native->reg(016) = 04000;
+            native->reg(017) = 05007;
+            native->memory(04000) = Word48(0411000000000000ULL);
+            native->memory(05000) = Word48(0411000000000000ULL);
+            if (entry == 05316) {
+                native->reg(001) = 05230; // Modifier-relative branch base.
+                native->reg(002) = 07000;
+                native->memory(07001) = Word48(1);
+                native->memory(05361) = Word48(mode & 1);
+                native->memory(05362) = Word48(07001);
+            }
+            if (entry == 016722) {
+                native->reg(001) = 022261;
+                native->memory(04000) = Word48(3);
+                native->memory(016740) = Word48(2);
+            }
+            native->start(entry);
+            auto raw = std::make_unique<Machine>(*native);
+            raw->set_translated_routines_enabled(false);
+            const auto count = native->translated_routine_count();
+            const auto label = "mode cleanup " + std::to_string(entry)
+                + "/" + std::to_string(mode);
+            try {
+                compare_one_semantic_step(*native, *raw, {}, label, 2000);
+            } catch (const std::exception &error) {
+                require(false, label + ": " + error.what());
+            }
+            require(native->translated_routine_count() == count + 1,
+                    "mode cleanup preserves semantic dispatch count");
+            require(native->console_output() == raw->console_output()
+                        && native->console_output_record_ends() == raw->console_output_record_ends(),
+                    "mode cleanup preserves console records");
+        }
+    }
+
     const auto compare_static_entry = [
         &compare_one_semantic_step](
             std::uint16_t entry,
@@ -9088,6 +9137,94 @@ int main(int argc, char **argv)
     compare_primitive(010161, 1, 03277);
     compare_primitive(013451, 1, 03305);
     compare_primitive(015372, 1, 03275);
+
+    const auto compare_diagnostic = [&](std::uint16_t entry, unsigned variant,
+                                        std::uint16_t disabled = 0) {
+        auto native = std::make_unique<Machine>();
+        std::istringstream stream(image_bytes);
+        native->load_image(stream);
+        native->reg(001) = 03014;
+        native->reg(002) = 01200;
+        native->reg(005) = 07514;
+        native->reg(006) = 06000;
+        native->reg(010) = 03144;
+        native->reg(016) = 07514;
+        native->reg(017) = 05000;
+        native->accumulator() = Word48(012345);
+        native->remainder() = Word48(0765432107654321ULL);
+        native->alu_mode() = 004;
+        native->memory(04777) = Word48(06000);
+        native->memory(04776) = Word48(01200);
+        native->memory(04775) = Word48(07000);
+        native->memory(03172) = Word48(variant);
+        native->memory(03171) = Word48(2);
+        if (entry == 03116 && variant == 0)
+            native->accumulator() = Word48(); // Successful lookup.
+        if (entry == 03112) {
+            native->accumulator() = Word48(025475);
+            native->memory(03174) = Word48(01717);
+            native->memory(025575) = Word48(020);
+            native->memory(025576) = Word48(2);
+            native->memory(025577) = Word48(077777);
+            native->memory(025600) = Word48(02021010000001403ULL);
+            native->memory(025616) = Word48(02021010000001437ULL);
+            native->memory(025626) = Word48(02111212000001677ULL);
+            native->memory(025630) = Word48(02111010000001747ULL);
+            native->memory(025632) = Word48(02011010000002063ULL);
+        }
+        if (entry >= 07622 && entry <= 07644) {
+            native->reg(001) = 2;
+            native->reg(002) = variant + 1;
+            native->memory(07760) = Word48(06400000000000000ULL | variant);
+            native->memory(07757) = Word48(0123456701234567ULL);
+            native->memory(06000) = native->memory(07760);
+            native->memory(06001) = native->memory(07757);
+            if (entry == 07626 && variant == 3)
+                native->memory(07760) = Word48(1); // Invalid tag.
+        }
+        if (entry >= 010002 && entry <= 010015) {
+            native->reg(001) = variant;
+            native->memory(variant) = Word48(std::uint64_t(variant) << 24);
+        }
+        if (disabled) native->disable_translated_routine(disabled);
+        native->start(entry);
+        auto raw = std::make_unique<Machine>(*native);
+        raw->set_translated_routines_enabled(false);
+        const auto count = native->translated_routine_count();
+        compare_one_semantic_step(*native, *raw, {},
+            "diagnostic " + std::to_string(entry) + "/" + std::to_string(variant), 2000);
+        require(native->translated_routine_count() == count + 1,
+                "diagnostic leaf calls and loop iterations add no dispatches");
+        require(native->console_output() == raw->console_output(),
+                "diagnostic entry preserves console output");
+        if (disabled) {
+            require(native->program_counter() == disabled,
+                    "disabled diagnostic leaf stops at its original boundary");
+            // Interpret the leaf on both sides and compare its return state.
+            const auto link = native->reg(015);
+            for (Machine *m : {native.get(), raw.get()}) {
+                unsigned steps = 0;
+                do {
+                    require(m->step() == poplan::ExecutionStatus::running,
+                            "disabled leaf runs through raw instructions");
+                    require(++steps < 2000, "disabled leaf returns");
+                } while (m->program_counter() != link || m->right_half());
+            }
+            require_same_architectural_state(*native, *raw, "disabled leaf return");
+        }
+    };
+    for (auto entry : {03101, 03102, 03103, 03104, 03105, 03112, 03116,
+                       03122, 03123, 03124, 03125, 03126, 03127, 03130,
+                       03131, 03135, 03136, 03140, 03141, 03145, 03147, 03152,
+                       07622, 07625, 07626, 07633, 07636, 07641, 07644,
+                       010002, 010005, 010006, 010007, 010011, 010013, 010015})
+        for (unsigned variant = 0; variant != 4; ++variant)
+            compare_diagnostic(entry, variant);
+    compare_diagnostic(03101, 1, 03275);
+    compare_diagnostic(03112, 1, 016254);
+    compare_diagnostic(07622, 1, 03303);
+    compare_diagnostic(07633, 1, 03275);
+    compare_diagnostic(010005, 1, 03275);
 
     require(compare_image_entry(
                 016645,

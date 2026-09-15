@@ -394,6 +394,10 @@ public:
 
     // Static quine paths retained as address-named semantic boundaries.
     std::uint16_t p01000();
+    std::uint16_t p03101(std::uint16_t entry);
+    std::uint16_t p03145(std::uint16_t entry);
+    std::uint16_t p07622(std::uint16_t entry);
+    std::uint16_t p10002(std::uint16_t entry);
     std::uint16_t p10161(std::uint16_t entry = 010161);
     std::uint16_t p10564(std::uint16_t entry = 010564);
     std::uint16_t p13451(std::uint16_t entry = 013451);
