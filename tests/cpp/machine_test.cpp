@@ -956,15 +956,11 @@ int main(int argc, char **argv)
         Word48(06400000000000000ULL);
     generated_return->start(020077);
     require(generated_return->step() == poplan::ExecutionStatus::running
-                && generated_return->program_counter() == 020101
-                && generated_return->reg(015) == 020101,
-            "20077 directly executes the POP-stack return selector");
-    require(generated_return->step() == poplan::ExecutionStatus::running
                 && generated_return->program_counter() == 07005
                 && generated_return->reg(015) == 07005
                 && generated_return->reg(017) == 066000
                 && generated_return->accumulator() == Word48(04321),
-            "20101 restores the saved link and r16 value");
+            "20077 merges POP_ACC with its return selector");
 
     auto evaluator_classify = std::make_unique<Machine>();
     evaluator_classify->reg(001) = 05001;
@@ -1748,30 +1744,20 @@ int main(int argc, char **argv)
     classifier_continuations->start(04350);
     require(classifier_continuations->step()
                 == poplan::ExecutionStatus::running
-                && classifier_continuations->program_counter() == 04351
-                && classifier_continuations->reg(015) == 04351,
-            "04350 directly pushes the selected record");
-    classifier_continuations->start(04351);
-    classifier_continuations->step();
-    require(classifier_continuations->program_counter() == 02764
+                && classifier_continuations->program_counter() == 02764
                 && classifier_continuations->reg(015) == 04352
                 && classifier_continuations->reg(016) == 07667,
-            "04351 enters the first original 02764 dependency");
+            "04350 merges PUSH_ACC with its continuation");
     classifier_continuations->reg(007) = 02000;
     classifier_continuations->memory(03007) = Word48(07100000000000001ULL);
     classifier_continuations->start(04352);
     classifier_continuations->step();
-    require(classifier_continuations->program_counter() == 04353
-                && classifier_continuations->reg(015) == 04353
-                && classifier_continuations->accumulator()
-                    == Word48(07100000000000001ULL),
-            "04352 directly pushes the r7-relative value");
-    classifier_continuations->start(04353);
-    classifier_continuations->step();
     require(classifier_continuations->program_counter() == 02764
                 && classifier_continuations->reg(015) == 04354
-                && classifier_continuations->reg(016) == 07601,
-            "04353 enters the second original 02764 dependency");
+                && classifier_continuations->reg(016) == 07601
+                && classifier_continuations->accumulator()
+                    == Word48(07100000000000001ULL),
+            "04352 merges PUSH_ACC with its continuation");
     classifier_continuations->reg(017) = 04301;
     classifier_continuations->memory(04300) = Word48(04567);
     classifier_continuations->start(04354);
@@ -2449,6 +2435,7 @@ int main(int argc, char **argv)
                     && disabled->translated_routine_count() == 1,
                 label + " counts only the caller dispatch");
 
+        disabled->set_translated_routines_enabled(false);
         for (unsigned steps = 0;
              (disabled->program_counter() != enabled->program_counter()
               || disabled->right_half()) && steps != 64;
@@ -2514,13 +2501,16 @@ int main(int argc, char **argv)
 
         require(semantic->step() == poplan::ExecutionStatus::running,
                 label + " semantic entry keeps running");
-        const std::uint16_t semantic_boundary =
-            is_direct_leaf(expected_continuation)
-            ? semantic->program_counter() : expected_continuation;
-        interpreted->set_translated_routines_enabled(false);
+        const std::uint16_t semantic_boundary = semantic->program_counter();
+        if (is_direct_leaf(expected_continuation)) {
+            interpreted->disable_translated_routine(entry);
+            interpreted->disable_translated_routine(expected_continuation);
+        } else {
+            interpreted->set_translated_routines_enabled(false);
+        }
         for (unsigned steps = 0;
              (interpreted->program_counter() != semantic_boundary
-              || interpreted->right_half()) && steps != 64;
+              || interpreted->right_half()) && steps != 4096;
              ++steps) {
             require(interpreted->step()
                         == poplan::ExecutionStatus::running,
@@ -2535,7 +2525,8 @@ int main(int argc, char **argv)
                       << interpreted->program_counter() << " half "
                       << semantic->right_half() << '/'
                       << interpreted->right_half() << " expected "
-                      << semantic_boundary << '\n';
+                      << semantic_boundary << " (first continuation "
+                      << expected_continuation << ")\n";
         }
         require(semantic->program_counter() == semantic_boundary
                     && !semantic->right_half()
@@ -3800,7 +3791,7 @@ int main(int argc, char **argv)
                     || is_direct_leaf(target),
                 label + " preserves its documented boundary");
         run_interpreted_to(
-            *interpreted, semantic->program_counter(), 32, label);
+            *interpreted, semantic->program_counter(), 4096, label);
         require_same_architectural_state(*semantic, *interpreted, label);
     };
 
@@ -4558,6 +4549,14 @@ int main(int argc, char **argv)
             machine->start(entry);
         }
         semantic->step();
+        if (entry == 020511) {
+            run_interpreted_to(
+                *interpreted, 020674, 64,
+                "20475 first output-leaf entry");
+            run_interpreted_to(
+                *interpreted, 020514, 64,
+                "20475 first output-leaf return");
+        }
         run_interpreted_to(
             *interpreted, semantic->program_counter(), 64,
             "20475 exit formatter continuation");
@@ -5285,8 +5284,8 @@ int main(int argc, char **argv)
         return continuation;
     };
 
-    require(compare_generated_dispatch(013121, Word48(1)) == 013125,
-            "13121 directly pushes its pending value");
+    require(compare_generated_dispatch(013121, Word48(1)) == 02750,
+            "13121 merges its pending-value push with descriptor dispatch");
     require(compare_generated_dispatch(013121, Word48()) == 07700,
             "13121 takes the computed empty return");
     require(compare_generated_dispatch(013125, Word48(1)) == 02750,
@@ -5787,8 +5786,8 @@ int main(int argc, char **argv)
                 016201,
                 [](Machine &machine) {
                     machine.memory(03000) = Word48();
-                }, "16201 external zero arm", 24) == 016216,
-            "16201 directly executes the 21075 leaf");
+                }, "16201 external zero arm", 32) == 07000,
+            "16201 merges the 21075 leaf with its return path");
     require(compare_generated_scan(
                 016201,
                 [](Machine &machine) {
@@ -8083,13 +8082,13 @@ int main(int argc, char **argv)
                 && buffered_character.p21260_forward_converted_character()
                     == 025346,
             "21255..21260 reaches the translated output entry");
-    require(buffered_character.p25346_begin_character_output() == 025350,
-            "25346 directly advances the packed descriptor");
+    require(buffered_character.p25346_begin_character_output() == 021261,
+            "25346 merges descriptor advancement with its return path");
     require(buffered_character.memory(066024) == Word48(031)
                 && buffered_character.memory(066025) == Word48(021261)
-                && buffered_character.reg(015) == 025350
+                && buffered_character.reg(015) == 021261
                 && buffered_character.reg(016) == 025417
-                && buffered_character.reg(017) == 066026,
+                && buffered_character.reg(017) == 066024,
             "25346 preserves the converted byte and both return links");
     require(buffered_character.memory(020440)
                 == Word48(00620000000000000ULL)
@@ -8097,11 +8096,8 @@ int main(int argc, char **argv)
                     == Word48(02000000000020440ULL),
             "21443 packs 031 and advances descriptor 140 to 200");
     require(buffered_character.reg(014) == 020440
-                && buffered_character.reg(017) == 066026,
+                && buffered_character.reg(017) == 066024,
             "21443 preserves its packed-word address and balances r17");
-    require(buffered_character.p25350_continue_character_output()
-                == 021261,
-            "25350 returns an ordinary converted character to 21261");
     require(buffered_character.memory(025412) == Word48(1)
                 && buffered_character.accumulator() == Word48(031)
                 && buffered_character.reg(015) == 021261
@@ -8125,11 +8121,9 @@ int main(int argc, char **argv)
     terminated_output.p21255_begin_character_input();
     terminated_output.p21275_encode_character();
     terminated_output.p21260_forward_converted_character();
-    terminated_output.p25346_begin_character_output();
-    require(terminated_output.p25350_continue_character_output()
-                == 020245
+    require(terminated_output.p25346_begin_character_output() == 020245
                 && terminated_output.reg(015) == 025361,
-            "25350 calls boundary 20245 for converted character 0377");
+            "25346 reaches 20245 for converted character 0377");
     require(terminated_output.accumulator() == Word48()
                 && terminated_output.remainder() == Word48()
                 && terminated_output.memory(020440)
@@ -8188,14 +8182,12 @@ int main(int argc, char **argv)
     output_limit.p21255_begin_character_input();
     output_limit.p21275_encode_character();
     output_limit.p21260_forward_converted_character();
-    output_limit.p25346_begin_character_output();
-    require(output_limit.p25350_continue_character_output() == 025346
+    require(output_limit.p25346_begin_character_output() == 025346
                 && output_limit.accumulator() == Word48(0377)
                 && output_limit.reg(015) == 021261
                 && output_limit.reg(017) == 066024,
             "25355 injects 0377 after configured count 0117");
-    output_limit.p25346_begin_character_output();
-    require(output_limit.p25350_continue_character_output() == 020245
+    require(output_limit.p25346_begin_character_output() == 020245
                 && output_limit.reg(015) == 025361
                 && output_limit.memory(025412) == Word48(0120),
             "the injected 0377 reaches the same 20245 boundary");
@@ -9052,6 +9044,51 @@ int main(int argc, char **argv)
             *semantic, *interpreted, {entry}, label, max_steps);
     };
 
+    // Each new primitive entry is checked against instruction-only execution,
+    // including all identifier classes and both reader classification branches.
+    const auto compare_primitive = [&](std::uint16_t entry, unsigned variant,
+                                       std::uint16_t disabled_leaf = 0) {
+        auto native = std::make_unique<Machine>();
+        auto raw = std::make_unique<Machine>();
+        for (Machine *m : {native.get(), raw.get()}) {
+            std::istringstream stream(image_bytes);
+            m->load_image(stream);
+            m->reg(006) = 06000;
+            m->reg(017) = 05000;
+            m->reg(014) = 010052;
+            m->reg(007) = 01200;
+            m->reg(016) = variant == 0 ? 0 : 04000;
+            if (entry == 015320 && variant == 2) m->reg(016) = 02257;
+            if (entry == 015357 && variant < 4)
+                m->reg(016) = variant < 2 ? 01623 : 01627;
+            m->reg(001) = variant & 1;
+            m->accumulator() = Word48((variant & 1) == 0 ? 0 : 04110000000000000ULL);
+            m->remainder() = Word48(0123456701234567ULL);
+            m->alu_mode() = 053;
+            m->memory(04000) = Word48(std::uint64_t(variant) << 43);
+            m->memory(04002) = Word48(0765432);
+            m->memory(04777) = Word48(012345);
+            m->memory(04776) = Word48(07654);
+            m->start(entry);
+            if (disabled_leaf) m->disable_translated_routine(disabled_leaf);
+        }
+        raw->set_translated_routines_enabled(false);
+        const std::string label = "primitive " + std::to_string(entry)
+            + " variant " + std::to_string(variant);
+        compare_one_semantic_step(*native, *raw, {}, label, 200);
+    };
+    for (auto entry : {010161, 010162, 010167, 010177, 010200, 010201,
+                       010202, 010203, 010564, 010565, 010566,
+                       013451, 013452, 013453, 015314, 015320,
+                       015354, 015357, 015364, 015365, 015370, 015371,
+                       015372, 015373, 015375}) {
+        for (unsigned variant = 0; variant != 16; ++variant)
+            compare_primitive(entry, variant);
+    }
+    compare_primitive(010161, 1, 03277);
+    compare_primitive(013451, 1, 03305);
+    compare_primitive(015372, 1, 03275);
+
     require(compare_image_entry(
                 016645,
                 [](Machine &machine) {
@@ -9173,8 +9210,8 @@ int main(int argc, char **argv)
                 [](Machine &machine) {
                     machine.reg(017) = 05000;
                 },
-                "11102 record constructor frame", 24) == 011105,
-            "11102 directly executes the first POP_ACC call");
+                "11102 record constructor frame", 40) == 017275,
+            "11102 merges its stack leaves through the constructor call");
     require(compare_image_entry(
                 011571,
                 [](Machine &machine) {
@@ -9245,8 +9282,8 @@ int main(int argc, char **argv)
                     machine.reg(001) = 01234;
                     machine.reg(017) = 05000;
                 },
-                "12040 logical-function frame", 16) == 012042,
-            "12040 directly executes its first POP_ACC call");
+                "12040 logical-function frame", 64) == 03014,
+            "12040 merges both POP_ACC calls with operand validation");
     require(compare_image_entry(
                 016624,
                 [](Machine &machine) {
@@ -9262,8 +9299,8 @@ int main(int argc, char **argv)
                     machine.reg(001) = 0;
                     machine.reg(015) = 06000;
                 },
-                "16610 tagged-byte callback", 40) == 016612,
-            "16610 directly executes the tagged-byte lookup");
+                "16610 tagged-byte callback", 64) == 06000,
+            "16610 merges tagged-byte lookup with its callback return");
     require(compare_image_entry(
                 017077,
                 [](Machine &machine) {
@@ -9345,8 +9382,8 @@ int main(int argc, char **argv)
                     machine.memory(05000) =
                         Word48(06400000000000001ULL);
                 },
-                "11304 scanned result push", 12) == 011305,
-            "11304 directly executes PUSH_ACC");
+                "11304 scanned result push", 16) == 011302,
+            "11304 merges PUSH_ACC with the next scan iteration");
     require(compare_image_entry(
                 011305,
                 [](Machine &machine) {
@@ -9356,8 +9393,8 @@ int main(int argc, char **argv)
             "11305 preserves the next scan iteration");
     require(compare_image_entry(
                 011343, [](Machine &) {},
-                "11343 generated update frame", 24) == 011347,
-            "11343 directly executes the first POP_ACC call");
+                "11343 generated update frame", 48) == 011417,
+            "11343 merges POP_ACC with generated-update validation");
     require(compare_image_entry(
                 011347,
                 [](Machine &machine) {
@@ -9367,8 +9404,8 @@ int main(int argc, char **argv)
                     machine.memory(0675) = Word48(Word48::mask);
                     machine.memory(04000) = Word48(5);
                 },
-                "11347 generated update selector", 24) == 011353,
-            "11347 directly executes the second POP_ACC call");
+                "11347 generated update selector", 32) == 03235,
+            "11347 merges the second POP_ACC call with frame restoration");
     require(compare_image_entry(
                 011353,
                 [](Machine &machine) {
@@ -9461,8 +9498,8 @@ int main(int argc, char **argv)
             "21603 preserves the allocation continuation boundary");
     require(compare_image_entry(
                 021231, [](Machine &) {},
-                "21231 conversion result push", 12) == 021232,
-            "21231 directly executes PUSH_ACC");
+                "21231 conversion result push", 32) == 02774,
+            "21231 merges both pushes with conversion dispatch");
     require(compare_image_entry(
                 021232,
                 [](Machine &machine) {
@@ -9470,8 +9507,8 @@ int main(int argc, char **argv)
                     machine.memory(021247) =
                         Word48(06400000000000003ULL);
                 },
-                "21232 saved conversion result", 12) == 021233,
-            "21232 directly executes the second PUSH_ACC call");
+                "21232 saved conversion result", 24) == 02750,
+            "21232 merges PUSH_ACC with conversion dispatch");
     require(compare_image_entry(
                 025675,
                 [](Machine &machine) {
@@ -9481,15 +9518,15 @@ int main(int argc, char **argv)
                     machine.reg(015) = 06000;
                     machine.reg(017) = 05000;
                 },
-                "25675 numeric conversion frame", 32) == 025702,
-            "25675 directly executes the first POP_ACC call");
+                "25675 numeric conversion frame", 64) == 025720,
+            "25675 merges POP_ACC with numeric conversion");
     require(compare_image_entry(
                 025701,
                 [](Machine &machine) {
                     machine.reg(002) = 3;
                 },
-                "25701 conversion loop test", 12) == 025702,
-            "25701 directly executes POP_ACC");
+                "25701 conversion loop test", 32) == 025720,
+            "25701 merges POP_ACC with its conversion test");
     require(compare_image_entry(
                 025702,
                 [](Machine &machine) {
@@ -9676,8 +9713,8 @@ int main(int argc, char **argv)
 
     require(compare_image_entry(
                 013362, [](Machine &) {},
-                "13362 diagnostic formatter setup", 40) == 013367,
-            "13362 directly executes its first PUSH_ACC call");
+                "13362 diagnostic formatter setup", 48) == 02750,
+            "13362 merges PUSH_ACC with formatter dispatch");
     require(compare_image_entry(
                 013367, [](Machine &) {},
                 "13367 formatter dispatch", 4) == 02750,
@@ -9826,8 +9863,8 @@ int main(int argc, char **argv)
                     machine.accumulator() = Word48(04000);
                     machine.memory(04000) = Word48();
                 },
-                "16076 packed update setup", 48) == 016104,
-            "16076 directly executes the packed-field update leaf");
+                "16076 packed update setup", 80) == 016151,
+            "16076 merges both descriptor leaves with table compaction");
     require(compare_image_entry(
                 016076,
                 [](Machine &machine) {
@@ -9843,8 +9880,8 @@ int main(int argc, char **argv)
                     machine.reg(017) = 05002;
                     machine.memory(05001) = Word48(04000);
                 },
-                "16104 descriptor update", 40) == 016106,
-            "16104 directly executes the descriptor-update leaf");
+                "16104 descriptor update", 48) == 016151,
+            "16104 merges descriptor update with table compaction");
     require(compare_image_entry(
                 016106, [](Machine &) {},
                 "16106 table compaction", 8) == 016151,
@@ -10137,24 +10174,24 @@ int main(int argc, char **argv)
     };
     require(compare_static_entry(
                 07761, p07761_code, setup_07761,
-                "07761 selector", 16) == 07764,
-            "07761 directly executes its first PUSH_ACC call");
+                "07761 selector", 24) == 02750,
+            "07761 merges PUSH_ACC with evaluator dispatch");
     require(compare_static_entry(
                 07764, p07761_code, setup_07761,
                 "07764 evaluator call", 6) == 02750,
             "07764 preserves the first EVAL_DISPATCH boundary");
     require(compare_static_entry(
                 07766, p07761_code, setup_07761,
-                "07766 push", 12) == 07767,
-            "07766 directly executes its second PUSH_ACC call");
+                "07766 push", 20) == 02764,
+            "07766 merges PUSH_ACC with descriptor dispatch");
     require(compare_static_entry(
                 07767, p07761_code, setup_07761,
                 "07767 descriptor call", 4) == 02764,
             "07767 preserves the 02764 boundary");
     require(compare_static_entry(
                 07770, p07761_code, setup_07761,
-                "07770 push", 12) == 07771,
-            "07770 directly executes its third PUSH_ACC call");
+                "07770 push", 20) == 02750,
+            "07770 merges PUSH_ACC with evaluator dispatch");
     require(compare_static_entry(
                 07771, p07761_code, setup_07761,
                 "07771 evaluator call", 6) == 02750,
@@ -10643,8 +10680,8 @@ int main(int argc, char **argv)
     require(compare_one_semantic_step(
                 *semantic_generated_bracket,
                 *interpreted_generated_bracket, {03337},
-                "03337 generated bracket", 16) == 03340,
-            "03337 directly executes the first POP call");
+                "03337 generated bracket", 32) == 05215,
+            "03337 merges both POP calls with evaluator dispatch");
 
     const std::pair<std::uint16_t, Word48> record_cycle_code[] = {
         {016651, Word48(02640001414100000ULL)},
@@ -11077,8 +11114,8 @@ int main(int argc, char **argv)
         interpreted->start(016465);
         require(compare_one_semantic_step(
                     *semantic, *interpreted, {016465},
-                    "16465 record store", 16) == 016466,
-                "16465 directly executes the stack-store leaf");
+                    "16465 record store", 24) == 016467,
+                "16465 merges the stack-store leaf with record return");
     }
     {
         auto [semantic, interpreted] = make_record_evaluation_pair();
@@ -11151,8 +11188,8 @@ int main(int argc, char **argv)
             "16531 preserves the record-shift boundary");
     require(compare_record_loop(
                 016532, [](Machine &) {}, "16532 record head", 12)
-                == 016533,
-            "16532 directly executes its POP push");
+                == 076224,
+            "16532 merges its push with equal-pair selection");
     require(compare_record_loop(
                 016533,
                 [](Machine &machine) { machine.accumulator() = Word48(1); },
@@ -11172,8 +11209,8 @@ int main(int argc, char **argv)
                     machine.accumulator() = Word48(01234);
                     machine.memory(03001) = Word48(01235);
                 },
-                "16533 unequal pair", 20) == 016537,
-            "16533 directly executes its POP return call");
+                "16533 unequal pair", 40) == 02767,
+            "16533 merges POP and index push with evaluator dispatch");
     require(compare_record_loop(
                 016537,
                 [](Machine &machine) { machine.reg(007) = 0; },
@@ -11181,28 +11218,28 @@ int main(int argc, char **argv)
             "16537 selects the empty-loop continuation");
     require(compare_record_loop(
                 016537, [](Machine &) {}, "16537 record index", 16)
-                == 016541,
-            "16537 directly executes the record-index push");
+                == 02767,
+            "16537 merges the record-index push with evaluator dispatch");
     require(compare_record_loop(
                 016541, [](Machine &) {}, "16541 index evaluation", 4)
                 == 02767,
             "16541 preserves the index-evaluator boundary");
     require(compare_record_loop(
                 016542, [](Machine &) {}, "16542 index pop", 12)
-                == 016543,
-            "16542 directly executes the index-pop call");
+                == 02770,
+            "16542 merges index pop and value pushes with evaluation");
     require(compare_record_loop(
                 016543, [](Machine &) {}, "16543 saved index", 16)
-                == 016546,
-            "16543 saves and directly pushes the loop index");
+                == 02770,
+            "16543 merges both saved-value pushes with evaluation");
     require(compare_record_loop(
                 016544, [](Machine &) {}, "16544 repeated index", 16)
-                == 016546,
-            "16544 directly executes the repeated-index push");
+                == 02770,
+            "16544 merges repeated-index and saved-value pushes");
     require(compare_record_loop(
                 016546, [](Machine &) {}, "16546 saved value", 12)
-                == 016547,
-            "16546 directly executes the saved-value push");
+                == 02770,
+            "16546 merges the saved-value push with evaluation");
     require(compare_record_loop(
                 016547, [](Machine &) {}, "16547 saved evaluation", 4)
                 == 02770,
@@ -11475,11 +11512,11 @@ int main(int argc, char **argv)
                 016373, "16373 record head", 4) == 016374,
             "16373 loads the record head before its push");
     require(compare_lookup_continuation(
-                016374, "16374 record push", 12) == 016376,
-            "16374 directly executes the record push");
+                016374, "16374 record push", 24) == 03235,
+            "16374 merges the record push with frame restoration");
     require(compare_lookup_continuation(
-                016375, "16375 alternate record push", 12) == 016376,
-            "16375 directly executes the alternate record push");
+                016375, "16375 alternate record push", 24) == 03235,
+            "16375 merges the alternate push with frame restoration");
     require(compare_lookup_continuation(
                 016402, "16402 nonempty record", 4) == 016404,
             "16402 selects the nonempty record setup");
@@ -12391,8 +12428,8 @@ int main(int argc, char **argv)
 
     require(compare_image_entry(
                 03325, [](Machine &) {},
-                "03325 ISLIST pop", 12) == 03326,
-            "03325 directly executes POP_ACC");
+                "03325 ISLIST pop", 16) == 03330,
+            "03325 merges POP_ACC with classifier setup");
     require(compare_image_entry(
                 03326, [](Machine &) {},
                 "03326 ISLIST classifier", 2) == 03330,
@@ -12418,8 +12455,8 @@ int main(int argc, char **argv)
 
     require(compare_image_entry(
                 06611, [](Machine &) {},
-                "06611 ISWORD pop", 12) == 06612,
-            "06611 directly executes POP_ACC");
+                "06611 ISWORD pop", 20) == 06614,
+            "06611 merges POP_ACC with tag classification");
     require(compare_image_entry(
                 06612,
                 [](Machine &machine) {
@@ -12441,16 +12478,16 @@ int main(int argc, char **argv)
             "07367 preserves the first evaluator boundary");
     require(compare_image_entry(
                 07370, [](Machine &) {},
-                "07370 SAMEDATA save", 16) == 07371,
-            "07370 directly executes the stack-top store");
+                "07370 SAMEDATA save", 20) == 02767,
+            "07370 merges stack-top storage with evaluation");
     require(compare_image_entry(
                 07371, [](Machine &) {},
                 "07371 SAMEDATA second evaluation", 4) == 02767,
             "07371 preserves the second evaluator boundary");
     require(compare_image_entry(
                 07372, [](Machine &) {},
-                "07372 SAMEDATA pop", 12) == 07373,
-            "07372 directly executes POP_ACC");
+                "07372 SAMEDATA pop", 24) == 03301,
+            "07372 merges POP_ACC with data comparison");
     require(compare_image_entry(
                 07373,
                 [](Machine &machine) {
@@ -12470,8 +12507,8 @@ int main(int argc, char **argv)
 
     require(compare_image_entry(
                 010350, [](Machine &) {},
-                "10350 ISLINK pop", 12) == 010351,
-            "10350 directly executes POP_ACC");
+                "10350 ISLINK pop", 16) == 010353,
+            "10350 merges POP_ACC with classifier setup");
     require(compare_image_entry(
                 010351, [](Machine &) {},
                 "10351 ISLINK classifier", 2) == 010353,
@@ -12483,23 +12520,23 @@ int main(int argc, char **argv)
 
     require(compare_image_entry(
                 07433, [](Machine &) {},
-                "07433 BOUNDSLIST frame", 24) == 07436,
-            "07433 directly executes the first POP_ACC call");
+                "07433 BOUNDSLIST frame", 48) == 02750,
+            "07433 merges its stack leaves with evaluator dispatch");
     require(compare_image_entry(
                 07436,
                 [](Machine &machine) {
                     machine.reg(002) = 01200;
                 },
-                "07436 BOUNDSLIST first argument", 12) == 07437,
-            "07436 directly executes the first PUSH_ACC call");
+                "07436 BOUNDSLIST first argument", 32) == 02750,
+            "07436 merges both argument pushes with evaluation");
     require(compare_image_entry(
                 07437,
                 [](Machine &machine) {
                     machine.reg(017) = 05001;
                     machine.memory(05000) = Word48(07654321);
                 },
-                "07437 BOUNDSLIST second argument", 12) == 07440,
-            "07437 directly executes the second PUSH_ACC call");
+                "07437 BOUNDSLIST second argument", 20) == 02750,
+            "07437 merges the second argument push with evaluation");
     require(compare_image_entry(
                 07440,
                 [](Machine &machine) {
@@ -12509,8 +12546,8 @@ int main(int argc, char **argv)
             "07440 preserves the evaluator boundary");
     require(compare_image_entry(
                 07441, [](Machine &) {},
-                "07441 BOUNDSLIST result pop", 12) == 07442,
-            "07441 directly executes the final POP_ACC call");
+                "07441 BOUNDSLIST result pop", 32) == 07463,
+            "07441 merges result pop with bounds classification");
     require(compare_image_entry(
                 07442,
                 [](Machine &machine) {
@@ -12547,8 +12584,8 @@ int main(int argc, char **argv)
                     machine.reg(002) = 04000;
                     machine.memory(04003) = Word48();
                 },
-                "07455 BOUNDSLIST finish loop", 24) == 07460,
-            "07455 directly pushes the completed list");
+                "07455 BOUNDSLIST finish loop", 32) == 03235,
+            "07455 merges the completed-list push with restoration");
     require(compare_image_entry(
                 07460,
                 [](Machine &machine) {
@@ -12577,8 +12614,8 @@ int main(int argc, char **argv)
                     machine.memory(04001) =
                         Word48((std::uint64_t{5} << 24));
                 },
-                "10402 COREUSED free-list scan", 72) == 010415,
-            "10402 directly pushes the first result");
+                "10402 COREUSED free-list scan", 80) == 010352,
+            "10402 merges its result push with the shared return");
     require(compare_image_entry(
                 010415,
                 [](Machine &machine) {
@@ -12602,15 +12639,15 @@ int main(int argc, char **argv)
 
     require(compare_image_entry(
                 010421, [](Machine &) {},
-                "10421 FNCOMP frame", 16) == 010423,
-            "10421 directly executes the first POP_ACC call");
+                "10421 FNCOMP frame", 40) == 010443,
+            "10421 merges both operand pops with validation");
     require(compare_image_entry(
                 010423,
                 [](Machine &machine) {
                     machine.accumulator() = machine.memory(010454);
                 },
-                "10423 FNCOMP first function", 20) == 010426,
-            "10423 directly executes the second POP_ACC call");
+                "10423 FNCOMP first function", 32) == 010443,
+            "10423 merges the second POP_ACC call with validation");
     require(compare_image_entry(
                 010423,
                 [](Machine &machine) {
@@ -12632,8 +12669,8 @@ int main(int argc, char **argv)
                     machine.reg(002) = 010421;
                     machine.reg(016) = 04000;
                 },
-                "10431 FNCOMP descriptor", 32) == 010436,
-            "10431 directly pushes the composition descriptor");
+                "10431 FNCOMP descriptor", 40) == 011464,
+            "10431 merges descriptor push with helper allocation");
     require(compare_image_entry(
                 010436,
                 [](Machine &machine) {
@@ -12757,8 +12794,8 @@ int main(int argc, char **argv)
             "15742 calls the selected character converter through r4");
     require(compare_image_entry(
                 015743, [](Machine &) {},
-                "15743 packed destination traversal", 48) == 015744,
-            "15743 directly advances the packed destination descriptor");
+                "15743 packed destination traversal", 52) == 015741,
+            "15743 merges descriptor advancement with its loop edge");
     require(compare_image_entry(
                 015744,
                 [](Machine &machine) {
@@ -12944,17 +12981,17 @@ int main(int argc, char **argv)
                 "17505 scan", 32) == 016313,
             "17505 preserves the character-sequence boundary");
     require(compare_classifier(
-                017516, [](Machine &) {}, "17516 continuation", 4)
-                == 017517,
-            "17516 directly executes the first 03301 leaf call");
+                017516, [](Machine &) {}, "17516 continuation", 16)
+                == 02767,
+            "17516 merges the first 03301 leaf with evaluator dispatch");
     require(compare_classifier(
                 017517, [](Machine &) {}, "17517 continuation", 4)
                 == 02767,
             "17517 preserves the first 02767 boundary");
     require(compare_classifier(
-                017520, [](Machine &) {}, "17520 continuation", 4)
-                == 017521,
-            "17520 directly executes the second 03301 leaf call");
+                017520, [](Machine &) {}, "17520 continuation", 16)
+                == 02767,
+            "17520 merges the second 03301 leaf with evaluator dispatch");
     require(compare_classifier(
                 017521, [](Machine &) {}, "17521 continuation", 4)
                 == 02767,

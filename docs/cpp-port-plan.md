@@ -8,10 +8,15 @@ not an independently designed POP-2 parser or interpreter.
 - Preserve original POPLAN routine boundaries and use their octal entry
   addresses in C++ names.
 - A translated original `VJM ... (r15)` call may invoke a proven `r15` leaf
-  directly in C++. The callee remains a distinct semantic routine with its
-  dispatcher entry intact; disabled leaves still stop at their octal entry for
-  instruction interpretation. Plain jumps and inlined instruction sequences
-  do not use this optimization.
+  directly in C++ and continue immediately in the translated routine at its
+  known return address. Both the leaf and continuation retain their dispatcher
+  entries for independent entry; disabled leaves still stop at their octal
+  entry for instruction interpretation. Plain jumps and inlined instruction
+  sequences do not use this optimization.
+- When that return continuation has no other semantic caller and no independent
+  listing transfer, its body is inlined at the leaf-call site. The standalone
+  entry remains available to semantic dispatch so raw leaf fallback and direct
+  entry at the historical address keep working.
 - Preserve 48-bit tagged values, dictionary records, function descriptors,
   generated objects, stack direction, and activation/environment layout.
 - Derive compiler phases and calls from the original listing and traces.
@@ -337,6 +342,23 @@ fallback in `15712..15762`. Translating the `FNPART` getter at
 boundaries, removes those final five steps. The expanded standard-function
 fixture now has zero immutable-image fallback. The earlier zero-fallback
 statement applies to the pre-expansion fixture.
+
+The next resident-primitive expansion translates `IDENTPROPS`
+(`10161..10203`), the `UPDATER` getter (`10564..10566`), `STACKLENGTH`
+(`13451..13453`), `LISTREAD` (`15314..15321`), and `NUMBERREAD`
+(`15354..15375`). Their original stack, identifier validator, item-reader,
+negation, and diagnostic transfers remain intact. Known stack-leaf calls
+run directly with per-address disable guards; ordinary tail jumps still
+dispatch separately. Original branch and call-return entries remain available
+to the instruction interpreter and semantic dispatcher.
+
+The newly expanded standard-function fixture agrees with historical POPLAN
+and instruction-only C++. Its CPU/routine trace has zero fallback steps in
+these five regions. Invalid-token and EOF reader probes are tested separately;
+this measurement does not claim that diagnostic machinery is fully translated.
+Focused tests compare complete architectural state for 25 entries across 16
+input variants, plus disabled stack-leaf boundaries. Earlier profile counts
+above describe their original fixtures, not this expansion.
 
 ## Port Order
 

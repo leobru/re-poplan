@@ -394,6 +394,11 @@ public:
 
     // Static quine paths retained as address-named semantic boundaries.
     std::uint16_t p01000();
+    std::uint16_t p10161(std::uint16_t entry = 010161);
+    std::uint16_t p10564(std::uint16_t entry = 010564);
+    std::uint16_t p13451(std::uint16_t entry = 013451);
+    std::uint16_t p15314(std::uint16_t entry = 015314);
+    std::uint16_t p15354(std::uint16_t entry = 015354);
     std::uint16_t p01002();
     std::uint16_t p03305();
     std::uint16_t p03310();
@@ -1616,17 +1621,6 @@ private:
         std::array<Word48, 02000> &data) const;
     bool dispatch_translated_routine();
     bool translated_routine_disabled(std::uint16_t address) const;
-
-    template<std::uint16_t Address, auto Routine>
-    std::uint16_t call_r15_leaf()
-    {
-        static_assert(Address <= 077777, "BESM address must fit in 15 bits");
-        if (translated_routine_disabled(Address)) {
-            return Address;
-        }
-        (this->*Routine)();
-        return registers_[015];
-    }
 
     Word48 accumulator_;
     Word48 remainder_;
