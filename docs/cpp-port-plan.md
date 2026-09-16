@@ -10,12 +10,12 @@ not an independently designed POP-2 parser or interpreter.
 - A translated original `VJM ... (r15)` call may invoke a proven `r15` leaf
   directly in C++ and continue immediately in the translated routine at its
   known return address. Both the leaf and continuation retain their dispatcher
-  entries for independent entry; disabled leaves still stop at their octal
-  entry for instruction interpretation. Plain jumps and inlined instruction
+  entries for independent entry. Disabled addresses are checked only at machine
+  dispatch, never during nested C++ calls. Plain jumps and inlined instruction
   sequences do not use this optimization.
 - When that return continuation has no other semantic caller and no independent
   listing transfer, its body is inlined at the leaf-call site. The standalone
-  entry remains available to semantic dispatch so raw leaf fallback and direct
+  entry remains available to semantic dispatch so interpreted returns and direct
   entry at the historical address keep working.
 - Preserve 48-bit tagged values, dictionary records, function descriptors,
   generated objects, stack direction, and activation/environment layout.
@@ -348,7 +348,7 @@ The next resident-primitive expansion translates `IDENTPROPS`
 (`13451..13453`), `LISTREAD` (`15314..15321`), and `NUMBERREAD`
 (`15354..15375`). Their original stack, identifier validator, item-reader,
 negation, and diagnostic transfers remain intact. Known stack-leaf calls
-run directly with per-address disable guards; ordinary tail jumps still
+run directly without disable checks; ordinary tail jumps still
 dispatch separately. Original branch and call-return entries remain available
 to the instruction interpreter and semantic dispatcher.
 
@@ -357,10 +357,18 @@ and instruction-only C++. Its CPU/routine trace has zero fallback steps in
 these five regions. Invalid-token and EOF reader probes are tested separately;
 this measurement does not claim that diagnostic machinery is fully translated.
 Focused tests compare complete architectural state for 25 entries across 16
-input variants, plus disabled stack-leaf boundaries. Earlier profile counts
+input variants, plus dispatcher-only disabling of stack leaves. Earlier profile counts
 above describe their original fixtures, not this expansion.
 
 ## Port Order
+
+`POPLAN_DISABLE_TRANSLATED_ROUTINES` applies only when the machine dispatcher
+reaches a listed address. Nested semantic calls execute unconditionally and
+continue within their caller's step, even if the callee's address is disabled.
+To interpret a nested call, disable its caller as well, or use
+`POPLAN_INTERPRET_ONLY=1`. Standalone, computed, and ordinary jump entries still
+honor address disabling. Removing the 418 nested checks does not change enabled
+execution, routine tracing, or dispatch counts.
 
 The local ALU-mode cleanup removes 874 redundant group selections from the
 semantic implementations (863 in `machine.cpp`, 11 in `poplan.cpp`). It removes
@@ -381,14 +389,14 @@ The extraction loop at `07633..07640` stays in C++ across enabled `03275`
 calls; stack setup calls and known-return continuations are similarly fused.
 Evaluator, character-sequence, computed, and error transfers remain independent
 boundaries. Original call-return and branch entries remain dispatchable,
-including when `03275`, `03303`, or `16254` is disabled.
+including returns from independently interpreted `03275`, `03303`, or `16254`.
 
 For the probe `NUMBERREAD()=>` followed by `ABC`, this expansion reduces raw
 steps from 712 to 14: zero in the three converted clusters, ten in the guarded
 `07773..07777` prologue, and four at `03041..03042`. These are measurements of
 this diagnostic probe, not replacements for the historical corpus counts.
 Nested-diagnostic handling remains outside this expansion. Full-state fixtures
-exercise the continuations and disabled-leaf returns; the standard-function
+exercise the continuations and nested calls with disabled leaf addresses; the standard-function
 test also checks diagnostic output and the absence of raw target-cluster steps.
 
 ### 1. Tagged Machine State

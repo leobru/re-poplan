@@ -259,7 +259,7 @@ Translated original `VJM ... (r15)` sites now call the following proven
 `13217`, `16145`, `16254`, `16421`, `17614`, `20263`, `20660`, `20673`,
 `20674`, `21075`, `21107`, `21443`, and `25660`. Their dispatcher entries are
 retained for external, computed, untranslated, and explicitly disabled calls.
-An enabled nested leaf and its known translated return continuation complete
+A nested leaf and its known translated return continuation complete
 within the caller's machine step, chaining further when that continuation ends
 in another proven leaf call. `translated_routine_count` and
 `POPLAN_ROUTINE_TRACE` therefore record only the caller's semantic dispatch.
@@ -269,7 +269,8 @@ produced them and have not been rewritten.
 Of those known return continuations, 267 with a single semantic predecessor,
 no independent listing label, and no independent quine or `zone1224` routine
 dispatch have their bodies inlined at the call site. Their standalone semantic
-entries remain intact for direct entry and disabled-leaf fallback. Continuations
+entries remain intact for direct entry and interpreted returns. Disabling an
+address affects machine dispatch only, not nested C++ calls. Continuations
 with another C++ caller or a listing transfer remain ordinary calls.
 
 The quine has 98 direct `vjm` targets. All 98 now have executable semantic

@@ -2426,25 +2426,26 @@ int main(int argc, char **argv)
         }
         disabled->disable_translated_routine(leaf);
 
+        // Disabling an address affects machine dispatch, not nested C++ calls.
+        auto external = std::make_unique<Machine>(*disabled);
+        external->start(leaf);
+        auto raw_external = std::make_unique<Machine>(*external);
+        raw_external->set_translated_routines_enabled(false);
+        external->step();
+        raw_external->step();
+        require(external->translated_routine_count() == 0,
+                label + " disabled standalone leaf uses the interpreter");
+        require_same_architectural_state(*external, *raw_external,
+                                         label + " standalone fallback");
+
         require(enabled->step() == poplan::ExecutionStatus::running,
                 label + " enabled call keeps running");
-        require(disabled->step() == poplan::ExecutionStatus::running
-                    && disabled->program_counter() == leaf,
-                label + " disabled call stops at the leaf entry");
+        require(disabled->step() == poplan::ExecutionStatus::running,
+                label + " disabled nested call keeps running natively");
         require(enabled->translated_routine_count() == 1
                     && disabled->translated_routine_count() == 1,
                 label + " counts only the caller dispatch");
 
-        disabled->set_translated_routines_enabled(false);
-        for (unsigned steps = 0;
-             (disabled->program_counter() != enabled->program_counter()
-              || disabled->right_half()) && steps != 64;
-             ++steps) {
-            require(disabled->step() == poplan::ExecutionStatus::running,
-                    label + " disabled leaf interprets normally");
-        }
-        require(disabled->translated_routine_count() == 1,
-                label + " raw leaf adds no semantic dispatch");
         require_same_architectural_state(*enabled, *disabled, label);
     };
 
@@ -9198,19 +9199,8 @@ int main(int argc, char **argv)
         require(native->console_output() == raw->console_output(),
                 "diagnostic entry preserves console output");
         if (disabled) {
-            require(native->program_counter() == disabled,
-                    "disabled diagnostic leaf stops at its original boundary");
-            // Interpret the leaf on both sides and compare its return state.
-            const auto link = native->reg(015);
-            for (Machine *m : {native.get(), raw.get()}) {
-                unsigned steps = 0;
-                do {
-                    require(m->step() == poplan::ExecutionStatus::running,
-                            "disabled leaf runs through raw instructions");
-                    require(++steps < 2000, "disabled leaf returns");
-                } while (m->program_counter() != link || m->right_half());
-            }
-            require_same_architectural_state(*native, *raw, "disabled leaf return");
+            require(native->program_counter() != disabled,
+                    "disabled diagnostic leaf executes within its caller");
         }
     };
     for (auto entry : {03101, 03102, 03103, 03104, 03105, 03112, 03116,

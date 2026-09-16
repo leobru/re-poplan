@@ -985,9 +985,6 @@ std::uint16_t Machine::p03313()
 std::uint16_t Machine::p03325()
 {
     registers_[015] = 03326;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 03327;
@@ -1059,16 +1056,10 @@ std::uint16_t Machine::p03336()
 std::uint16_t Machine::p03374()
 {
     registers_[015] = 03375;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 03376;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             // 03376..03402 compares the second POP value with the first, saved at
@@ -1097,9 +1088,6 @@ std::uint16_t Machine::p03375()
 {
     hardware_push_acc();
     registers_[015] = 03376;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         // 03376..03402 compares the second POP value with the first, saved at
@@ -1218,9 +1206,6 @@ std::uint16_t Machine::p03526()
     registers_[016] = registers_[011];
     registers_[013] = 05507;
     registers_[015] = 03530;
-    if (translated_routine_disabled(03516)) {
-        return 03516;
-    }
     p03516();
     return p03530();
 }
@@ -1247,9 +1232,6 @@ std::uint16_t Machine::p03532()
     }
 
     registers_[015] = 03534;
-    if (translated_routine_disabled(03516)) {
-        return 03516;
-    }
     p03516();
     {
         accumulator_ = memory_[address_add(registers_[016], 1)];
@@ -1306,9 +1288,6 @@ std::uint16_t Machine::p03544(std::uint16_t entry)
                 return 03632;
             }
             registers_[015] = 03546;
-            if (translated_routine_disabled(04426)) {
-                return 04426;
-            }
             p04426();
             return p03544(03546);
 
@@ -2152,9 +2131,6 @@ std::uint16_t Machine::p17516()
 {
     registers_[016] = 03637;
     registers_[015] = 017517;
-    if (translated_routine_disabled(03301)) {
-        return 03301;
-    }
     p03301();
     {
         registers_[016] = 02103;
@@ -2174,9 +2150,6 @@ std::uint16_t Machine::p17520()
 {
     registers_[016] = 017557;
     registers_[015] = 017521;
-    if (translated_routine_disabled(03301)) {
-        return 03301;
-    }
     p03301();
     {
         registers_[016] = 01567;
@@ -2557,9 +2530,6 @@ std::uint16_t Machine::p17655()
     remainder_ = Word48();
     registers_[016] = 025575;
     registers_[015] = 017700;
-    if (translated_routine_disabled(016254)) {
-        return 016254;
-    }
     p16254();
     {
         alu_mode_ = 007;
@@ -3782,9 +3752,6 @@ std::uint16_t Machine::p04350()
     accumulator_ = memory_[registers_[003]];
     select_alu_group(rau_logical);
     registers_[015] = 04351;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 07667;
@@ -3805,9 +3772,6 @@ std::uint16_t Machine::p04352()
     accumulator_ = memory_[address_add(registers_[007], 01007)];
     select_alu_group(rau_logical);
     registers_[015] = 04353;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 07601;
@@ -4128,9 +4092,6 @@ std::uint16_t Machine::p04571()
 {
     if (registers_[016] != 0) {
         registers_[015] = 04576;
-        if (translated_routine_disabled(04426)) {
-            return 04426;
-        }
         p04426();
         return p04576();
     }
@@ -4743,9 +4704,6 @@ std::uint16_t Machine::p05034()
 {
     registers_[016] = 017577;
     registers_[015] = 05035;
-    if (translated_routine_disabled(017614)) {
-        return 017614;
-    }
     p17614();
     return p05035();
 }
@@ -5085,9 +5043,6 @@ std::uint16_t Machine::p05230()
     memory_[address_add(registers_[001], 0154)] = accumulator_;
     registers_[004] = memory_[01000].address();
     registers_[015] = 05240;
-    if (translated_routine_disabled(020263)) {
-        return 020263;
-    }
     p20263();
     {
         accumulator_ = memory_[address_add(registers_[001], 0136)];
@@ -5180,9 +5135,6 @@ std::uint16_t Machine::p05254()
         return p05255();
     }
     registers_[015] = 05255;
-    if (translated_routine_disabled(020660)) {
-        return 020660;
-    }
     p20660();
     return p05255();
 }
@@ -5353,9 +5305,6 @@ std::uint16_t Machine::p05316()
         accumulator_ = memory_[registers_[002]];
         select_alu_group(rau_logical);
         registers_[015] = 05316;
-        if (translated_routine_disabled(016145)) {
-            return 016145;
-        }
         p16145();
         return p05316();
     }
@@ -5400,9 +5349,6 @@ std::uint16_t Machine::p05335()
         return p05336();
     }
     registers_[015] = 05336;
-    if (translated_routine_disabled(020673)) {
-        return 020673;
-    }
     p20673_return();
     return p05336();
 }
@@ -5575,9 +5521,6 @@ std::uint16_t Machine::p05430()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 05433;
-    if (translated_routine_disabled(05447)) {
-        return 05447;
-    }
     p05447();
     {
         // A successful 05447 result selects the size-specific continuation.
@@ -5606,9 +5549,6 @@ std::uint16_t Machine::p05434()
     accumulator_ = memory_[address_add(registers_[017], -1)];
     select_alu_group(rau_logical);
     registers_[015] = 05435;
-    if (translated_routine_disabled(05447)) {
-        return 05447;
-    }
     p05447();
     return p05435();
 }
@@ -5632,9 +5572,6 @@ std::uint16_t Machine::p05440()
     // Preserve the historical out-of-memory diagnostic boundary.
     registers_[016] = 05442;
     registers_[015] = 05441;
-    if (translated_routine_disabled(020674)) {
-        return 020674;
-    }
     p20674();
     {
         return 020715;
@@ -6237,9 +6174,6 @@ std::uint16_t Machine::p01043()
 std::uint16_t Machine::p01045()
 {
     registers_[015] = 01046;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[007], 0717)] = accumulator_;
@@ -6313,9 +6247,6 @@ std::uint16_t Machine::p03315()
 std::uint16_t Machine::p03316()
 {
     registers_[015] = 03317;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 03310;
@@ -6371,9 +6302,6 @@ std::uint16_t Machine::p03317()
 std::uint16_t Machine::p03350()
 {
     registers_[015] = 03351;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 03314;
@@ -6390,9 +6318,6 @@ std::uint16_t Machine::p03351()
 std::uint16_t Machine::p03357()
 {
     registers_[015] = 03360;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 03314;
@@ -6409,9 +6334,6 @@ std::uint16_t Machine::p03360()
 std::uint16_t Machine::p03403()
 {
     registers_[015] = 03404;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 03310;
@@ -6452,9 +6374,6 @@ std::uint16_t Machine::p03404()
 std::uint16_t Machine::p03407()
 {
     registers_[015] = 03410;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 03411;
@@ -6472,16 +6391,10 @@ std::uint16_t Machine::p07134()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 07135;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 07136;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -6495,9 +6408,6 @@ std::uint16_t Machine::p07135()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 07136;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -6576,9 +6486,6 @@ std::uint16_t Machine::p07265()
 std::uint16_t Machine::p10152()
 {
     registers_[015] = 010153;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[014] = 010052;
@@ -6598,9 +6505,6 @@ std::uint16_t Machine::p10152()
             return address_add(registers_[014], 0136);
         }
         registers_[015] = 010157;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             const std::uint16_t modifier = memory_[010206].address();
@@ -6629,9 +6533,6 @@ std::uint16_t Machine::p10153()
         return address_add(registers_[014], 0136);
     }
     registers_[015] = 010157;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         const std::uint16_t modifier = memory_[010206].address();
@@ -6668,9 +6569,6 @@ std::uint16_t Machine::p10330()
 std::uint16_t Machine::p10527()
 {
     registers_[015] = 010530;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 010531;
@@ -6709,9 +6607,6 @@ std::uint16_t Machine::p10542()
     accumulator_ = memory_[registers_[016]];
     select_alu_group(rau_logical);
     registers_[015] = 010544;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p10544();
 }
@@ -6778,9 +6673,6 @@ std::uint16_t Machine::p11027()
     accumulator_ = memory_[011040];
     select_alu_group(rau_logical);
     registers_[015] = 011031;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[013] = 01200;
@@ -6813,9 +6705,6 @@ std::uint16_t Machine::p11034()
 std::uint16_t Machine::p11035()
 {
     registers_[015] = 011036;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[02067];
@@ -6848,9 +6737,6 @@ std::uint16_t Machine::p12040()
     registers_[001] = 012055;
     hardware_push_acc();
     registers_[015] = 012042;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     return p12042();
 }
@@ -6879,9 +6765,6 @@ std::uint16_t Machine::p16610()
     memory_[address_add(registers_[001], 074334)] = accumulator_;
     registers_[007] = registers_[015];
     registers_[015] = 016612;
-    if (translated_routine_disabled(016421)) {
-        return 016421;
-    }
     p16421_lookup_tagged_byte();
     {
         const Word48 old = accumulator_;
@@ -6940,9 +6823,6 @@ std::uint16_t Machine::p16627()
 std::uint16_t Machine::p16630()
 {
     registers_[015] = 016631;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[003], 2)] = accumulator_;
@@ -7436,9 +7316,6 @@ std::uint16_t Machine::p06536()
     if (accumulator_.raw() == 0) {
         registers_[013] = 05504;
         registers_[015] = 06545;
-        if (translated_routine_disabled(03516)) {
-            return 03516;
-        }
         p03516();
         return p06545();
     }
@@ -7813,9 +7690,6 @@ std::uint16_t Machine::p07652()
     accumulator_ = memory_[address_add(registers_[005], 0315)];
     select_alu_group(rau_logical);
     registers_[015] = 07661;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p07661();
 }
@@ -7846,9 +7720,6 @@ std::uint16_t Machine::p07664()
 std::uint16_t Machine::p07667()
 {
     registers_[015] = 07670;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -7960,9 +7831,6 @@ std::uint16_t Machine::p07704()
     accumulator_ = memory_[address_add(registers_[005], 0326)];
     select_alu_group(rau_logical);
     registers_[015] = 07706;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 1;
@@ -8009,9 +7877,6 @@ std::uint16_t Machine::p07712()
         accumulator_ = memory_[address_add(registers_[005], 0327)];
         select_alu_group(rau_logical);
         registers_[015] = 07727;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 1;
@@ -8065,9 +7930,6 @@ std::uint16_t Machine::p07722()
     accumulator_ = memory_[address_add(registers_[005], 0322)];
     select_alu_group(rau_logical);
     registers_[015] = 07724;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 1;
@@ -8123,9 +7985,6 @@ std::uint16_t Machine::p07734()
         remainder_ = selected;
         select_alu_group(rau_logical);
         registers_[015] = 07737;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         return p07737();
     }
@@ -8228,9 +8087,6 @@ std::uint16_t Machine::p11647()
     its(016);
     its(016);
     registers_[015] = 011651;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -3)] = accumulator_;
@@ -8398,16 +8254,10 @@ std::uint16_t Machine::p11500()
 std::uint16_t Machine::p11524()
 {
     registers_[015] = 011525;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 011526;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             hardware_push_acc();
@@ -8421,9 +8271,6 @@ std::uint16_t Machine::p11525()
 {
     hardware_push_acc();
     registers_[015] = 011526;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -8444,9 +8291,6 @@ std::uint16_t Machine::p11527()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 011530;
-    if (translated_routine_disabled(011500)) {
-        return 011500;
-    }
     p11500();
     {
         return p03314();
@@ -8781,9 +8625,6 @@ std::uint16_t Machine::p13113()
     accumulator_ = memory_[address_add(registers_[001], 0432)];
     select_alu_group(rau_logical);
     registers_[015] = 013115;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01567];
@@ -8832,9 +8673,6 @@ std::uint16_t Machine::p13121()
     memory_[address_add(registers_[001], 0465)] = accumulator_;
     accumulator_ = memory_[address_add(registers_[001], 0463)];
     registers_[015] = 013125;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01567];
@@ -9060,9 +8898,6 @@ std::uint16_t Machine::p07773_prstri()
     its(005);
     hardware_push_acc();
     registers_[015] = 07775;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     registers_[005] = 07514;
     hardware_push_acc();
@@ -9128,21 +8963,12 @@ std::uint16_t Machine::p07773_prstri()
 std::uint16_t Machine::p12630()
 {
     registers_[015] = 012631;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 012632;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[015] = 012633;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 registers_[016] = 07667;
@@ -9156,15 +8982,9 @@ std::uint16_t Machine::p12630()
 std::uint16_t Machine::p12631()
 {
     registers_[015] = 012632;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[015] = 012633;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 07667;
@@ -9177,9 +8997,6 @@ std::uint16_t Machine::p12631()
 std::uint16_t Machine::p12632()
 {
     registers_[015] = 012633;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 07667;
@@ -9202,29 +9019,17 @@ std::uint16_t Machine::p12635()
     hardware_push_acc();
     registers_[001] = 012635;
     registers_[015] = 012640;
-    if (translated_routine_disabled(013217)) {
-        return 013217;
-    }
     p13217();
     {
         registers_[015] = 012641;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[001], 0503)] = accumulator_;
             registers_[015] = 012642;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
             {
                 memory_[address_add(registers_[001], 0502)] = accumulator_;
                 registers_[015] = 012643;
-                if (translated_routine_disabled(03277)) {
-                    return 03277;
-                }
                 p03277_pop_acc();
                 {
                     memory_[address_add(registers_[001], 0451)] = accumulator_;
@@ -9250,23 +9055,14 @@ std::uint16_t Machine::p12635()
 std::uint16_t Machine::p12640()
 {
     registers_[015] = 012641;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 0503)] = accumulator_;
         registers_[015] = 012642;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[001], 0502)] = accumulator_;
             registers_[015] = 012643;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
             {
                 memory_[address_add(registers_[001], 0451)] = accumulator_;
@@ -9292,16 +9088,10 @@ std::uint16_t Machine::p12641()
 {
     memory_[address_add(registers_[001], 0503)] = accumulator_;
     registers_[015] = 012642;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 0502)] = accumulator_;
         registers_[015] = 012643;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[001], 0451)] = accumulator_;
@@ -9326,9 +9116,6 @@ std::uint16_t Machine::p12642()
 {
     memory_[address_add(registers_[001], 0502)] = accumulator_;
     registers_[015] = 012643;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 0451)] = accumulator_;
@@ -9559,9 +9346,6 @@ std::uint16_t Machine::p13104()
 std::uint16_t Machine::p13105()
 {
     registers_[015] = 013106;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01567];
@@ -9854,9 +9638,6 @@ std::uint16_t Machine::p16022()
     accumulator_ = Word48(registers_[016]);
     hardware_push_acc();
     registers_[015] = 016026;
-    if (translated_routine_disabled(021107)) {
-        return 021107;
-    }
     p21107();
     {
         registers_[017] = address_add(registers_[017], -1);
@@ -10063,9 +9844,6 @@ std::uint16_t Machine::p16210()
 std::uint16_t Machine::p16215()
 {
     registers_[015] = 016216;
-    if (translated_routine_disabled(021075)) {
-        return 021075;
-    }
     p21075();
     {
         registers_[010] = 016005;
@@ -10250,9 +10028,6 @@ std::uint16_t Machine::p16477()
 std::uint16_t Machine::p16502()
 {
     registers_[015] = 016503;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[003], 1));
@@ -10276,9 +10051,6 @@ std::uint16_t Machine::p16742()
     select_alu_group(rau_logical);
     registers_[007] = registers_[015];
     registers_[015] = 016744;
-    if (translated_routine_disabled(016421)) {
-        return 016421;
-    }
     p16421_lookup_tagged_byte();
     {
         const Word48 lookup_code = accumulator_;
@@ -10307,9 +10079,6 @@ std::uint16_t Machine::p16347()
     accumulator_ = memory_[registers_[003]];
     select_alu_group(rau_logical);
     registers_[015] = 016350;
-    if (translated_routine_disabled(016421)) {
-        return 016421;
-    }
     p16421_lookup_tagged_byte();
     {
         registers_[015] = accumulator_.address();
@@ -10381,9 +10150,6 @@ std::uint16_t Machine::p16373_push_record_head()
 std::uint16_t Machine::p16374_push_record_value()
 {
     registers_[015] = 016376;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p16376();
 }
@@ -10393,9 +10159,6 @@ std::uint16_t Machine::p16375_push_alternate_record_value()
     accumulator_ = memory_[address_add(registers_[001], 074471)];
     select_alu_group(rau_logical);
     registers_[015] = 016376;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p16376();
 }
@@ -10451,9 +10214,6 @@ std::uint16_t Machine::p16417()
 std::uint16_t Machine::p16420()
 {
     registers_[015] = 016376;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p16376();
 }
@@ -10732,9 +10492,6 @@ std::uint16_t Machine::p20077()
     its(015);
     its(015);
     registers_[015] = 020101;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 020073;
@@ -10809,9 +10566,6 @@ std::uint16_t Machine::p21464()
     accumulator_ = memory_[021535];
     select_alu_group(rau_logical);
     registers_[015] = 021473;
-    if (translated_routine_disabled(05211)) {
-        return 05211;
-    }
     p05211();
     {
         memory_[021533] = accumulator_;
@@ -10830,9 +10584,6 @@ std::uint16_t Machine::p21464()
         accumulator_ = memory_[021535];
         select_alu_group(rau_logical);
         registers_[015] = 021476;
-        if (translated_routine_disabled(05207)) {
-            return 05207;
-        }
         p05207();
         {
             const Word48 left = accumulator_;
@@ -10876,9 +10627,6 @@ std::uint16_t Machine::p21473()
     accumulator_ = memory_[021535];
     select_alu_group(rau_logical);
     registers_[015] = 021476;
-    if (translated_routine_disabled(05207)) {
-        return 05207;
-    }
     p05207();
     {
         const Word48 left = accumulator_;
@@ -10929,9 +10677,6 @@ std::uint16_t Machine::p21476()
 std::uint16_t Machine::p21501()
 {
     registers_[015] = 021502;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(021534);
@@ -11368,9 +11113,6 @@ std::uint16_t Machine::p15743()
 {
     registers_[016] = 015753;
     registers_[015] = 015744;
-    if (translated_routine_disabled(021443)) {
-        return 021443;
-    }
     p21443_advance_descriptor();
     {
         registers_[001] = address_add(registers_[001], -1);
@@ -11524,17 +11266,11 @@ std::uint16_t Machine::p03014_dispatch_error()
     // as a POP integer to the function descriptor stored at 01633.
     accumulator_ = memory_[03176];
     registers_[015] = 03035;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     accumulator_ = memory_[03204];
     accumulator_ =
         Word48(accumulator_.raw() ^ memory_[03155].raw());
     registers_[015] = 03037;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     accumulator_ = memory_[01633];
     registers_[015] = 03041;
@@ -11547,16 +11283,10 @@ std::uint16_t Machine::p03051_unpack_error()
     // r17 use the BESM hardware stack to retain the code while POP_ACC fetches
     // the object; WTC supplies the low 15 bits as the new r16.
     registers_[015] = 03052;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     hardware_push_acc();
 
     registers_[015] = 03053;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     const Word48 source_object = accumulator_;
 
@@ -11600,9 +11330,6 @@ std::uint16_t Machine::p03057_begin_error_format()
 
     accumulator_ = memory_[03164];
     registers_[015] = 03071;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     accumulator_ = memory_[address_add(registers_[002], 0367)];
     registers_[015] = 03072;
@@ -11644,9 +11371,6 @@ std::uint16_t Machine::p13362()
     memory_[address_add(registers_[001], 065)] = accumulator_;
     accumulator_ = memory_[address_add(registers_[001], 050)];
     registers_[015] = 013367;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[002], 0367)];
@@ -11848,9 +11572,6 @@ std::uint16_t Machine::p07475_cuchin()
     // 07475..07504: consume CUCHIN's argument and normalize the distinguished
     // 0136 value to character/control code 0012 before entering 21255.
     registers_[015] = 07476;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     registers_[010] = 07472;
     memory_[07513] = accumulator_;
@@ -11879,9 +11600,6 @@ std::uint16_t Machine::p07533()
     registers_[016] = 07545;
     xts(address_add(registers_[016], -1));
     registers_[015] = 07536;
-    if (translated_routine_disabled(021443)) {
-        return 021443;
-    }
     p21443_advance_descriptor();
     {
         registers_[013] = 07514;
@@ -11993,9 +11711,6 @@ std::uint16_t Machine::p11553()
     its(004);
     its(004);
     registers_[015] = 011556;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[001] = 011102;
@@ -12084,9 +11799,6 @@ std::uint16_t Machine::p11564()
     memory_[address_add(registers_[016], 4)] = accumulator_;
     registers_[003] = registers_[016];
     registers_[015] = 011571;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[003], 7)] = accumulator_;
@@ -12124,9 +11836,6 @@ std::uint16_t Machine::p11564()
             ^ memory_[address_add(registers_[001], 0676)].raw());
         remainder_ = operand;
         registers_[015] = 011601;
-        if (translated_routine_disabled(03413)) {
-            return 03413;
-        }
         p03413_numeric_update();
         {
             registers_[017] = address_add(registers_[017], -1);
@@ -12183,9 +11892,6 @@ std::uint16_t Machine::p11571()
         ^ memory_[address_add(registers_[001], 0676)].raw());
     remainder_ = operand;
     registers_[015] = 011601;
-    if (translated_routine_disabled(03413)) {
-        return 03413;
-    }
     p03413_numeric_update();
     {
         registers_[017] = address_add(registers_[017], -1);
@@ -12233,15 +11939,9 @@ std::uint16_t Machine::p11604()
     registers_[016] = target;
     memory_[target] = accumulator_;
     registers_[015] = 011607;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         registers_[015] = 011610;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 6;
@@ -12254,9 +11954,6 @@ std::uint16_t Machine::p11604()
 std::uint16_t Machine::p11607()
 {
     registers_[015] = 011610;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 6;
@@ -12288,16 +11985,10 @@ std::uint16_t Machine::p11611()
     registers_[016] = target;
     memory_[target] = accumulator_;
     registers_[015] = 011615;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         registers_[002] = registers_[010];
         registers_[015] = 011616;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 6;
@@ -12311,9 +12002,6 @@ std::uint16_t Machine::p11615()
 {
     registers_[002] = registers_[010];
     registers_[015] = 011616;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 6;
@@ -12346,9 +12034,6 @@ std::uint16_t Machine::p11617()
     registers_[016] = target;
     memory_[target] = accumulator_;
     registers_[015] = 011623;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         memory_[address_add(registers_[002], -3)] = accumulator_;
@@ -12397,9 +12082,6 @@ std::uint16_t Machine::p11673_begin_generated_update()
     its(016);
     its(016);
     registers_[015] = 011675;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         // 11675..11700 records the first POP value and validates the generated
@@ -12420,9 +12102,6 @@ std::uint16_t Machine::p11673_begin_generated_update()
         }
 
         registers_[015] = 011701;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             // 11701..11702 saves the second POP value and enters the translated
@@ -12455,9 +12134,6 @@ std::uint16_t Machine::p11675_continue_generated_update()
     }
 
     registers_[015] = 011701;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         // 11701..11702 saves the second POP value and enters the translated
@@ -12506,9 +12182,6 @@ std::uint16_t Machine::p11703_update_generated_value()
         ^ memory_[address_add(registers_[010], 0272)].raw());
     memory_[address_add(registers_[017], -6)] = accumulator_;
     registers_[015] = 011710;
-    if (translated_routine_disabled(03413)) {
-        return 03413;
-    }
     p03413_numeric_update();
     {
         // 11710..11716 performs the remaining tagged arithmetic in NTR 3 mode.
@@ -12675,9 +12348,6 @@ std::uint16_t Machine::p11727_continue_generated_rebinding()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 011731;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         // 11731..11745 combines two selected byte fields in the generated record
@@ -12811,9 +12481,6 @@ std::uint16_t Machine::p16321_dispatch_character()
         accumulator_.raw() ^ memory_[016335].raw());
     memory_[016337] = accumulator_;
     registers_[015] = 016323;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     accumulator_ = memory_[01567];
     registers_[015] = 016325;
@@ -12878,9 +12545,6 @@ std::uint16_t Machine::p16412()
     accumulator_ = memory_[address_add(registers_[003], 1)];
     select_alu_group(rau_logical);
     registers_[015] = 016413;
-    if (translated_routine_disabled(016421)) {
-        return 016421;
-    }
     p16421_lookup_tagged_byte();
     {
         if (registers_[002] != 0) {
@@ -13030,9 +12694,6 @@ std::uint16_t Machine::p16465_store_record_evaluation()
 {
     registers_[016] = registers_[003];
     registers_[015] = 016466;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         // XTA (r17), STI r15 restores the saved link and then the original ACC.
@@ -13060,9 +12721,6 @@ std::uint16_t Machine::p16467()
     xts(registers_[003]);
     registers_[016] = 016555;
     registers_[015] = 016471;
-    if (translated_routine_disabled(021443)) {
-        return 021443;
-    }
     p21443_advance_descriptor();
     {
         accumulator_ = memory_[address_add(registers_[001], 074502)];
@@ -13164,9 +12822,6 @@ std::uint16_t Machine::p16532_push_record_head()
     accumulator_ = memory_[registers_[003]];
     select_alu_group(rau_logical);
     registers_[015] = 016533;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         const Word48 head = accumulator_;
@@ -13194,9 +12849,6 @@ std::uint16_t Machine::p16532_push_record_head()
         }
 
         registers_[015] = 016537;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             if (registers_[007] == 0) {
@@ -13210,9 +12862,6 @@ std::uint16_t Machine::p16532_push_record_head()
                 ^ memory_[address_add(registers_[001], 074475)].raw());
             remainder_ = index;
             registers_[015] = 016541;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 registers_[016] = 01723;
@@ -13250,9 +12899,6 @@ std::uint16_t Machine::p16533_select_record_path()
     }
 
     registers_[015] = 016537;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         if (registers_[007] == 0) {
@@ -13266,9 +12912,6 @@ std::uint16_t Machine::p16533_select_record_path()
             ^ memory_[address_add(registers_[001], 074475)].raw());
         remainder_ = index;
         registers_[015] = 016541;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 01723;
@@ -13291,9 +12934,6 @@ std::uint16_t Machine::p16537_push_record_index()
         ^ memory_[address_add(registers_[001], 074475)].raw());
     remainder_ = index;
     registers_[015] = 016541;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 01723;
@@ -13312,9 +12952,6 @@ std::uint16_t Machine::p16541_evaluate_record_index()
 std::uint16_t Machine::p16542_pop_record_index()
 {
     registers_[015] = 016543;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -7)] = accumulator_;
@@ -13338,17 +12975,11 @@ std::uint16_t Machine::p16544_push_record_index_again()
         ^ memory_[address_add(registers_[001], 074475)].raw());
     remainder_ = index;
     registers_[015] = 016546;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[017], -7)];
         select_alu_group(rau_logical);
         registers_[015] = 016547;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 02173;
@@ -13363,9 +12994,6 @@ std::uint16_t Machine::p16546_push_saved_record_value()
     accumulator_ = memory_[address_add(registers_[017], -7)];
     select_alu_group(rau_logical);
     registers_[015] = 016547;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 02173;
@@ -13426,9 +13054,6 @@ std::uint16_t Machine::p16643()
         ^ memory_[address_add(registers_[001], 074475)].raw());
     remainder_ = saved;
     registers_[015] = 016376;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p16376();
 }
@@ -13759,18 +13384,12 @@ std::uint16_t Machine::p16076()
     hardware_push_acc();
     registers_[016] = accumulator_.address();
     registers_[015] = 016104;
-    if (translated_routine_disabled(021075)) {
-        return 021075;
-    }
     p21075();
     {
         accumulator_ = memory_[address_add(registers_[017], -1)];
         select_alu_group(rau_logical);
         registers_[016] = accumulator_.address();
         registers_[015] = 016106;
-        if (translated_routine_disabled(021107)) {
-            return 021107;
-        }
         p21107();
         {
             registers_[010] = 016005;
@@ -13788,9 +13407,6 @@ std::uint16_t Machine::p16104()
     select_alu_group(rau_logical);
     registers_[016] = accumulator_.address();
     registers_[015] = 016106;
-    if (translated_routine_disabled(021107)) {
-        return 021107;
-    }
     p21107();
     {
         registers_[010] = 016005;
@@ -14543,9 +14159,6 @@ std::uint16_t Machine::p20511()
     memory_[address_add(registers_[001], 070)] = accumulator_;
     registers_[016] = 020536;
     registers_[015] = 020514;
-    if (translated_routine_disabled(020674)) {
-        return 020674;
-    }
     p20674();
     {
         registers_[016] = 020550;
@@ -14658,9 +14271,6 @@ std::uint16_t Machine::p07761()
     accumulator_ = memory_[address_add(registers_[005], 0334)];
     select_alu_group(rau_logical);
     registers_[015] = 07764;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01567];
@@ -14683,9 +14293,6 @@ std::uint16_t Machine::p07766()
     accumulator_ = memory_[address_add(registers_[005], 0243)];
     select_alu_group(rau_logical);
     registers_[015] = 07767;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 07773;
@@ -14706,9 +14313,6 @@ std::uint16_t Machine::p07770()
     accumulator_ = memory_[address_add(registers_[005], 0334)];
     select_alu_group(rau_logical);
     registers_[015] = 07771;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01567];
@@ -15328,17 +14932,11 @@ std::uint16_t Machine::p21202()
     registers_[017] = address_add(registers_[017], 1);
     registers_[001] = 021202;
     registers_[015] = 021204;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[registers_[017]] = accumulator_;
         registers_[017] = address_add(registers_[017], 1);
         registers_[015] = 021205;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             registers_[015] = 021206;
@@ -15352,9 +14950,6 @@ std::uint16_t Machine::p21204()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 021205;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 021206;
@@ -15371,25 +14966,16 @@ std::uint16_t Machine::p21205()
 std::uint16_t Machine::p21206()
 {
     registers_[015] = 021207;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 013)];
         select_alu_group(rau_logical);
         registers_[015] = 021210;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
             select_alu_group(rau_logical);
             registers_[015] = 021211;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[010611];
@@ -15406,17 +14992,11 @@ std::uint16_t Machine::p21207()
     accumulator_ = memory_[address_add(registers_[001], 013)];
     select_alu_group(rau_logical);
     registers_[015] = 021210;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[015] = 021211;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[010611];
@@ -15432,9 +15012,6 @@ std::uint16_t Machine::p21210()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 021211;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[010611];
@@ -15486,23 +15063,14 @@ std::uint16_t Machine::p21222()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 021224;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 024)] = accumulator_;
         registers_[015] = 021225;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[001], 025)] = accumulator_;
             registers_[015] = 021226;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
             {
                 memory_[registers_[017]] = accumulator_;
@@ -15533,16 +15101,10 @@ std::uint16_t Machine::p21224()
 {
     memory_[address_add(registers_[001], 024)] = accumulator_;
     registers_[015] = 021225;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 025)] = accumulator_;
         registers_[015] = 021226;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[registers_[017]] = accumulator_;
@@ -15572,9 +15134,6 @@ std::uint16_t Machine::p21225()
 {
     memory_[address_add(registers_[001], 025)] = accumulator_;
     registers_[015] = 021226;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[registers_[017]] = accumulator_;
@@ -15625,17 +15184,11 @@ std::uint16_t Machine::p21226()
 std::uint16_t Machine::p21231()
 {
     registers_[015] = 021232;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 025)];
         select_alu_group(rau_logical);
         registers_[015] = 021233;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
@@ -15658,9 +15211,6 @@ std::uint16_t Machine::p21232()
     accumulator_ = memory_[address_add(registers_[001], 025)];
     select_alu_group(rau_logical);
     registers_[015] = 021233;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -15778,9 +15328,6 @@ std::uint16_t Machine::p25346_begin_character_output()
     xts(character_address);
     registers_[016] = 025417;
     registers_[015] = 025350;
-    if (translated_routine_disabled(021443)) {
-        return 021443;
-    }
     p21443_advance_descriptor();
     {
         // 25350..25354: count the packed byte, request the external continuation
@@ -16292,16 +15839,10 @@ std::uint16_t Machine::p25532()
 
     registers_[016] = 017560;
     registers_[015] = 025543;
-    if (translated_routine_disabled(017614)) {
-        return 017614;
-    }
     p17614();
     {
         registers_[016] = 017577;
         registers_[015] = 025544;
-        if (translated_routine_disabled(017614)) {
-            return 017614;
-        }
         p17614();
         {
             registers_[010] = 025532;
@@ -16331,9 +15872,6 @@ std::uint16_t Machine::p25543()
 {
     registers_[016] = 017577;
     registers_[015] = 025544;
-    if (translated_routine_disabled(017614)) {
-        return 017614;
-    }
     p17614();
     {
         registers_[010] = 025532;
@@ -16437,9 +15975,6 @@ std::uint16_t Machine::p25641()
     yta(0);
     multiply(memory_[025666]);
     registers_[015] = 025647;
-    if (translated_routine_disabled(025660)) {
-        return 025660;
-    }
     p25660();
     {
         const Word48 first_digit = accumulator_;
@@ -16455,18 +15990,12 @@ std::uint16_t Machine::p25641()
         yta(0);
         multiply(memory_[025666]);
         registers_[015] = 025653;
-        if (translated_routine_disabled(025660)) {
-            return 025660;
-        }
         p25660();
         {
             shift_accumulator(24);
             memory_[address_add(registers_[017], -3)] = accumulator_;
             accumulator_ = memory_[025673];
             registers_[015] = 025655;
-            if (translated_routine_disabled(025660)) {
-                return 025660;
-            }
             p25660();
             {
                 const Word48 last_digit = accumulator_;
@@ -16500,18 +16029,12 @@ std::uint16_t Machine::p25647()
     yta(0);
     multiply(memory_[025666]);
     registers_[015] = 025653;
-    if (translated_routine_disabled(025660)) {
-        return 025660;
-    }
     p25660();
     {
         shift_accumulator(24);
         memory_[address_add(registers_[017], -3)] = accumulator_;
         accumulator_ = memory_[025673];
         registers_[015] = 025655;
-        if (translated_routine_disabled(025660)) {
-            return 025660;
-        }
         p25660();
         {
             const Word48 last_digit = accumulator_;
@@ -16535,9 +16058,6 @@ std::uint16_t Machine::p25653()
     memory_[address_add(registers_[017], -3)] = accumulator_;
     accumulator_ = memory_[025673];
     registers_[015] = 025655;
-    if (translated_routine_disabled(025660)) {
-        return 025660;
-    }
     p25660();
     {
         const Word48 last_digit = accumulator_;
@@ -16661,9 +16181,6 @@ std::uint16_t Machine::p03206_prepare_ordinary_call()
             its(012);
             hardware_push_acc();
             registers_[015] = 03230;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
 
             registers_[010] = 03206;
@@ -16718,9 +16235,6 @@ std::uint16_t Machine::p03235_bind_environment()
                 its(013);
                 xts(registers_[013]);
                 registers_[015] = 03250;
-                if (translated_routine_disabled(03275)) {
-                    return 03275;
-                }
                 p03275_push_acc();
 
                 registers_[010] = 03206;
@@ -16770,16 +16284,10 @@ std::uint16_t Machine::p03337()
     // the first POP value through the preserved 03277 boundary.
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 03340;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 03341;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -16793,9 +16301,6 @@ std::uint16_t Machine::p03340()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 03341;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -16890,9 +16395,6 @@ std::uint16_t Machine::p20124_build_activation()
             registers_[017], static_cast<int>(registers_[002]) - 3);
         accumulator_ = memory_[source];
         registers_[015] = 020135;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         if (registers_[002] == 0) {
             break;
@@ -16925,15 +16427,9 @@ std::uint16_t Machine::p03424()
 {
     registers_[016] = 03451;
     registers_[015] = 03425;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         registers_[015] = 03426;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             registers_[013] = 03310;
@@ -16972,16 +16468,10 @@ std::uint16_t Machine::p03424()
             hardware_pop_acc();
             select_alu_group(rau_logical);
             registers_[015] = 03435;
-            if (translated_routine_disabled(03413)) {
-                return 03413;
-            }
             p03413_numeric_update();
             {
                 stx(address_add(registers_[013], 0141));
                 registers_[015] = 03436;
-                if (translated_routine_disabled(03275)) {
-                    return 03275;
-                }
                 p03275_push_acc();
                 {
                     registers_[013] = 03310;
@@ -16997,9 +16487,6 @@ std::uint16_t Machine::p03424()
 std::uint16_t Machine::p03425()
 {
     registers_[015] = 03426;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 03310;
@@ -17038,16 +16525,10 @@ std::uint16_t Machine::p03425()
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[015] = 03435;
-        if (translated_routine_disabled(03413)) {
-            return 03413;
-        }
         p03413_numeric_update();
         {
             stx(address_add(registers_[013], 0141));
             registers_[015] = 03436;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 registers_[013] = 03310;
@@ -17097,16 +16578,10 @@ std::uint16_t Machine::p03426()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 03435;
-    if (translated_routine_disabled(03413)) {
-        return 03413;
-    }
     p03413_numeric_update();
     {
         stx(address_add(registers_[013], 0141));
         registers_[015] = 03436;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[013] = 03310;
@@ -17121,9 +16596,6 @@ std::uint16_t Machine::p03435()
 {
     stx(address_add(registers_[013], 0141));
     registers_[015] = 03436;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[013] = 03310;
@@ -17209,9 +16681,6 @@ std::uint16_t Machine::p04131()
 std::uint16_t Machine::p04134()
 {
     registers_[015] = 04135;
-    if (translated_routine_disabled(03305)) {
-        return 03305;
-    }
     p03305();
     {
         xts(02267);
@@ -17240,9 +16709,6 @@ std::uint16_t Machine::p04142()
     its(003);
     hardware_push_acc();
     registers_[015] = 04144;
-    if (translated_routine_disabled(03305)) {
-        return 03305;
-    }
     p03305();
     {
         registers_[002] = 03536;
@@ -17255,9 +16721,6 @@ std::uint16_t Machine::p04142()
         accumulator_ = memory_[02047];
         select_alu_group(rau_logical);
         registers_[015] = 04147;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[014] = memory_[02267].address();
@@ -17276,9 +16739,6 @@ std::uint16_t Machine::p04142()
                 return address_add(registers_[002], 0421);
             }
             registers_[015] = 04154;
-            if (translated_routine_disabled(03447)) {
-                return 03447;
-            }
             p03447();
             {
                 registers_[003] = accumulator_.address();
@@ -17303,9 +16763,6 @@ std::uint16_t Machine::p04144()
     accumulator_ = memory_[02047];
     select_alu_group(rau_logical);
     registers_[015] = 04147;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[014] = memory_[02267].address();
@@ -17324,9 +16781,6 @@ std::uint16_t Machine::p04144()
             return address_add(registers_[002], 0421);
         }
         registers_[015] = 04154;
-        if (translated_routine_disabled(03447)) {
-            return 03447;
-        }
         p03447();
         {
             registers_[003] = accumulator_.address();
@@ -17356,9 +16810,6 @@ std::uint16_t Machine::p04147()
         return address_add(registers_[002], 0421);
     }
     registers_[015] = 04154;
-    if (translated_routine_disabled(03447)) {
-        return 03447;
-    }
     p03447();
     {
         registers_[003] = accumulator_.address();
@@ -17491,9 +16942,6 @@ std::uint16_t Machine::p07011()
     its(014);
     hardware_push_acc();
     registers_[015] = 07013;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -17552,16 +17000,10 @@ std::uint16_t Machine::p07013()
 std::uint16_t Machine::p07022()
 {
     registers_[015] = 07023;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 07024;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             hardware_push_acc();
@@ -17603,9 +17045,6 @@ std::uint16_t Machine::p07023()
 {
     hardware_push_acc();
     registers_[015] = 07024;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -17711,9 +17150,6 @@ std::uint16_t Machine::p07042()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 07043;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[017] = address_add(registers_[017], -2);
@@ -17762,9 +17198,6 @@ std::uint16_t Machine::p12131()
 std::uint16_t Machine::p12133()
 {
     registers_[015] = 012134;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 01133)];
@@ -17785,9 +17218,6 @@ std::uint16_t Machine::p12134()
 std::uint16_t Machine::p12135()
 {
     registers_[015] = 012136;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         xts(address_add(registers_[003], 1));
@@ -17824,9 +17254,6 @@ std::uint16_t Machine::p12142()
     accumulator_ = memory_[address_add(registers_[007], 01137)];
     select_alu_group(rau_logical);
     registers_[015] = 012143;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -17872,9 +17299,6 @@ std::uint16_t Machine::p12147()
 std::uint16_t Machine::p12151()
 {
     registers_[015] = 012152;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 01133)];
@@ -17924,9 +17348,6 @@ std::uint16_t Machine::p12246()
     xts(address_add(registers_[001], 034));
     hardware_push_acc();
     registers_[015] = 012251;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 033)] = accumulator_;
@@ -17949,9 +17370,6 @@ std::uint16_t Machine::p12252()
         return address_add(registers_[001], 026);
     }
     registers_[015] = 012253;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 034)] = accumulator_;
@@ -18036,9 +17454,6 @@ std::uint16_t Machine::p12270()
     accumulator_ = memory_[address_add(registers_[001], 034)];
     select_alu_group(rau_logical);
     registers_[015] = 012271;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -18128,16 +17543,10 @@ std::uint16_t Machine::p14656()
 {
     registers_[016] = 014217;
     registers_[015] = 014657;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         registers_[016] = 014216;
         registers_[015] = 014660;
-        if (translated_routine_disabled(03303)) {
-            return 03303;
-        }
         p03303_store_stack_top();
         {
             registers_[003] = 014216;
@@ -18151,9 +17560,6 @@ std::uint16_t Machine::p14657()
 {
     registers_[016] = 014216;
     registers_[015] = 014660;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         registers_[003] = 014216;
@@ -18235,9 +17641,6 @@ std::uint16_t Machine::p14716()
 {
     registers_[016] = 015224;
     registers_[015] = 014717;
-    if (translated_routine_disabled(021443)) {
-        return 021443;
-    }
     p21443_advance_descriptor();
     {
         return address_add(registers_[001], 077575);
@@ -18262,9 +17665,6 @@ std::uint16_t Machine::p14677()
     accumulator_ = memory_[address_add(registers_[001], 077105)];
     select_alu_group(rau_logical);
     registers_[015] = 014700;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         memory_[address_add(registers_[001], 077106)] = accumulator_;
@@ -18458,9 +17858,6 @@ std::uint16_t Machine::p14662()
 std::uint16_t Machine::p11053()
 {
     registers_[015] = 011054;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -18489,17 +17886,11 @@ std::uint16_t Machine::p11102()
     its(004);
     its(004);
     registers_[015] = 011105;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[001] = 011102;
         memory_[address_add(registers_[001], 0317)] = accumulator_;
         registers_[015] = 011107;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 017353;
@@ -18514,9 +17905,6 @@ std::uint16_t Machine::p11105()
     registers_[001] = 011102;
     memory_[address_add(registers_[001], 0317)] = accumulator_;
     registers_[015] = 011107;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 017353;
@@ -18542,9 +17930,6 @@ std::uint16_t Machine::p11110()
 std::uint16_t Machine::p11111()
 {
     registers_[015] = 011112;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[002] = accumulator_.address();
@@ -18592,23 +17977,14 @@ std::uint16_t Machine::p11114()
     memory_[address_add(registers_[016], 7)] = accumulator_;
     registers_[003] = registers_[016];
     registers_[015] = 011123;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[003], 010)] = accumulator_;
         registers_[010] = registers_[003];
         registers_[015] = 011125;
-        if (translated_routine_disabled(011266)) {
-            return 011266;
-        }
         p11266();
         {
             registers_[015] = 011126;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = Word48(registers_[002]);
@@ -18625,15 +18001,9 @@ std::uint16_t Machine::p11123()
     memory_[address_add(registers_[003], 010)] = accumulator_;
     registers_[010] = registers_[003];
     registers_[015] = 011125;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         registers_[015] = 011126;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = Word48(registers_[002]);
@@ -18647,9 +18017,6 @@ std::uint16_t Machine::p11123()
 std::uint16_t Machine::p11125()
 {
     registers_[015] = 011126;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = Word48(registers_[002]);
@@ -18706,15 +18073,9 @@ std::uint16_t Machine::p11132()
     registers_[016] = target;
     memory_[target] = accumulator_;
     registers_[015] = 011137;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         registers_[015] = 011140;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[001], 0673)];
@@ -18748,9 +18109,6 @@ std::uint16_t Machine::p11132()
 std::uint16_t Machine::p11137()
 {
     registers_[015] = 011140;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 0673)];
@@ -18972,18 +18330,12 @@ std::uint16_t Machine::p11165()
 
     registers_[004] = registers_[010];
     registers_[015] = 011201;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         const std::uint16_t modifier =
             memory_[address_add(registers_[001], 0320)].address();
         memory_[address_add(registers_[002], modifier)] = accumulator_;
         registers_[015] = 011203;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 014;
@@ -18999,9 +18351,6 @@ std::uint16_t Machine::p11201()
         memory_[address_add(registers_[001], 0320)].address();
     memory_[address_add(registers_[002], modifier)] = accumulator_;
     registers_[015] = 011203;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 014;
@@ -19143,9 +18492,6 @@ std::uint16_t Machine::p11204()
     select_alu_group(rau_multiplicative);
     memory_[address_add(registers_[001], 0325)] = accumulator_;
     registers_[015] = 011234;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         memory_[address_add(registers_[004], 2)] = accumulator_;
@@ -19235,18 +18581,12 @@ std::uint16_t Machine::p11247()
     memory_[target] = accumulator_;
     registers_[004] = registers_[010];
     registers_[015] = 011254;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         const std::uint16_t modifier =
             memory_[address_add(registers_[001], 0320)].address();
         memory_[address_add(registers_[002], modifier)] = accumulator_;
         registers_[015] = 011256;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[016] = 6;
@@ -19262,9 +18602,6 @@ std::uint16_t Machine::p11254()
         memory_[address_add(registers_[001], 0320)].address();
     memory_[address_add(registers_[002], modifier)] = accumulator_;
     registers_[015] = 011256;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 6;
@@ -19297,9 +18634,6 @@ std::uint16_t Machine::p11257()
     registers_[016] = target;
     memory_[target] = accumulator_;
     registers_[015] = 011264;
-    if (translated_routine_disabled(011266)) {
-        return 011266;
-    }
     p11266();
     {
         memory_[address_add(registers_[004], 2)] = accumulator_;
@@ -19362,9 +18696,6 @@ std::uint16_t Machine::p11274()
     registers_[002] = registers_[014];
     memory_[address_add(registers_[017], -3)] = accumulator_;
     registers_[015] = 011300;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[registers_[002]];
@@ -19398,9 +18729,6 @@ std::uint16_t Machine::p11304()
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     registers_[015] = 011305;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         if (registers_[001] != 0) {
@@ -19434,9 +18762,6 @@ std::uint16_t Machine::p11330()
     registers_[002] = registers_[015];
     registers_[003] = registers_[016];
     registers_[015] = 011334;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 0317)] = accumulator_;
@@ -19458,9 +18783,6 @@ std::uint16_t Machine::p11330()
             address_add(registers_[003], registers_[015]), -1)];
         select_alu_group(rau_logical);
         registers_[015] = 011340;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             sti(003);
@@ -19493,9 +18815,6 @@ std::uint16_t Machine::p11334()
         address_add(registers_[003], registers_[015]), -1)];
     select_alu_group(rau_logical);
     registers_[015] = 011340;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         sti(003);
@@ -19525,9 +18844,6 @@ std::uint16_t Machine::p11343()
     registers_[002] = registers_[015];
     registers_[003] = registers_[016];
     registers_[015] = 011347;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 0317)] = accumulator_;
@@ -19547,9 +18863,6 @@ std::uint16_t Machine::p11343()
         }
         registers_[002] = registers_[015];
         registers_[015] = 011353;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(
@@ -19583,9 +18896,6 @@ std::uint16_t Machine::p11347()
     }
     registers_[002] = registers_[015];
     registers_[015] = 011353;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(
@@ -19665,9 +18975,6 @@ std::uint16_t Machine::p06410()
         return 06421;
     }
     registers_[015] = 06414;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -19712,9 +19019,6 @@ std::uint16_t Machine::p11432()
     registers_[001] = 011432;
     registers_[002] = 0;
     registers_[015] = 011435;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -3)] = accumulator_;
@@ -19828,9 +19132,6 @@ std::uint16_t Machine::p07604()
 {
     hardware_push_acc();
     registers_[015] = 07605;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 07514;
@@ -19894,9 +19195,6 @@ std::uint16_t Machine::p07613()
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     registers_[015] = 07614;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = 01567;
@@ -19930,9 +19228,6 @@ std::uint16_t Machine::p07616()
 std::uint16_t Machine::p07142()
 {
     registers_[015] = 07143;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], 1)] = accumulator_;
@@ -19967,9 +19262,6 @@ std::uint16_t Machine::p07142()
 std::uint16_t Machine::p07064()
 {
     registers_[015] = 07065;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 07066;
@@ -19992,9 +19284,6 @@ std::uint16_t Machine::p07066()
 std::uint16_t Machine::p07100()
 {
     registers_[015] = 07101;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 07102;
@@ -20188,9 +19477,6 @@ std::uint16_t Machine::p10725()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010727;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -20307,16 +19593,10 @@ std::uint16_t Machine::p06634()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06635;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 06636;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -20330,9 +19610,6 @@ std::uint16_t Machine::p06635()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06636;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -20352,9 +19629,6 @@ std::uint16_t Machine::p07165()
 {
     registers_[016] = 02333;
     registers_[015] = 07166;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         accumulator_ = Word48(registers_[007]);
@@ -20399,9 +19673,6 @@ std::uint16_t Machine::p07173()
     select_alu_group(rau_logical);
     memory_[address_add(registers_[005], 01127)] = accumulator_;
     registers_[015] = 07177;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[005], 01137)] = accumulator_;
@@ -20467,9 +19738,6 @@ std::uint16_t Machine::p07245()
     accumulator_ = memory_[address_add(registers_[005], 01137)];
     select_alu_group(rau_logical);
     registers_[015] = 07246;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[002], 1)];
@@ -20490,9 +19758,6 @@ std::uint16_t Machine::p07246()
 std::uint16_t Machine::p07247()
 {
     registers_[015] = 07250;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 07251;
@@ -20554,9 +19819,6 @@ std::uint16_t Machine::p07332()
 {
     registers_[007] = registers_[015];
     registers_[015] = 07333;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[005], 01133)];
@@ -20679,9 +19941,6 @@ std::uint16_t Machine::p07335()
 std::uint16_t Machine::p07361()
 {
     registers_[015] = 07362;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[016] = 02207;
@@ -20748,9 +20007,6 @@ std::uint16_t Machine::p07370()
 {
     registers_[016] = 07204;
     registers_[015] = 07371;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         registers_[016] = 01603;
@@ -20769,9 +20025,6 @@ std::uint16_t Machine::p07371()
 std::uint16_t Machine::p07372()
 {
     registers_[015] = 07373;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         const Word48 value = accumulator_;
@@ -20810,9 +20063,6 @@ std::uint16_t Machine::p04520()
     accumulator_ = memory_[01637];
     select_alu_group(rau_logical);
     registers_[015] = 04522;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01423];
@@ -20843,9 +20093,6 @@ std::uint16_t Machine::p11503()
 std::uint16_t Machine::p11506()
 {
     registers_[015] = 011507;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 011506;
@@ -20904,16 +20151,10 @@ std::uint16_t Machine::p11507()
 std::uint16_t Machine::p11531()
 {
     registers_[015] = 011532;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 011533;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             hardware_push_acc();
@@ -20927,9 +20168,6 @@ std::uint16_t Machine::p11532()
 {
     hardware_push_acc();
     registers_[015] = 011533;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -20948,9 +20186,6 @@ std::uint16_t Machine::p11533()
 std::uint16_t Machine::p11534()
 {
     registers_[015] = 011535;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 03235;
@@ -21005,31 +20240,19 @@ std::uint16_t Machine::p10745()
 {
     registers_[002] = 010737;
     registers_[015] = 010746;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[002], 062)] = accumulator_;
         registers_[015] = 010747;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[002], 026)] = accumulator_;
             memory_[address_add(registers_[002], 046)] = accumulator_;
             registers_[015] = 010751;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
             {
                 memory_[address_add(registers_[002], 022)] = accumulator_;
                 registers_[015] = 010752;
-                if (translated_routine_disabled(03277)) {
-                    return 03277;
-                }
                 p03277_pop_acc();
                 {
                     memory_[address_add(registers_[002], 032)] = accumulator_;
@@ -21039,9 +20262,6 @@ std::uint16_t Machine::p10745()
                     accumulator_ = memory_[address_add(registers_[002], 021)];
                     select_alu_group(rau_logical);
                     registers_[015] = 010755;
-                    if (translated_routine_disabled(03275)) {
-                        return 03275;
-                    }
                     p03275_push_acc();
                     {
                         accumulator_ = memory_[address_add(registers_[007], 0617)];
@@ -21059,24 +20279,15 @@ std::uint16_t Machine::p10746()
 {
     memory_[address_add(registers_[002], 062)] = accumulator_;
     registers_[015] = 010747;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[002], 026)] = accumulator_;
         memory_[address_add(registers_[002], 046)] = accumulator_;
         registers_[015] = 010751;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[002], 022)] = accumulator_;
             registers_[015] = 010752;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
             {
                 memory_[address_add(registers_[002], 032)] = accumulator_;
@@ -21086,9 +20297,6 @@ std::uint16_t Machine::p10746()
                 accumulator_ = memory_[address_add(registers_[002], 021)];
                 select_alu_group(rau_logical);
                 registers_[015] = 010755;
-                if (translated_routine_disabled(03275)) {
-                    return 03275;
-                }
                 p03275_push_acc();
                 {
                     accumulator_ = memory_[address_add(registers_[007], 0617)];
@@ -21106,16 +20314,10 @@ std::uint16_t Machine::p10747()
     memory_[address_add(registers_[002], 026)] = accumulator_;
     memory_[address_add(registers_[002], 046)] = accumulator_;
     registers_[015] = 010751;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[002], 022)] = accumulator_;
         registers_[015] = 010752;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             memory_[address_add(registers_[002], 032)] = accumulator_;
@@ -21125,9 +20327,6 @@ std::uint16_t Machine::p10747()
             accumulator_ = memory_[address_add(registers_[002], 021)];
             select_alu_group(rau_logical);
             registers_[015] = 010755;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[address_add(registers_[007], 0617)];
@@ -21143,9 +20342,6 @@ std::uint16_t Machine::p10751()
 {
     memory_[address_add(registers_[002], 022)] = accumulator_;
     registers_[015] = 010752;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[002], 032)] = accumulator_;
@@ -21155,9 +20351,6 @@ std::uint16_t Machine::p10751()
         accumulator_ = memory_[address_add(registers_[002], 021)];
         select_alu_group(rau_logical);
         registers_[015] = 010755;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[007], 0617)];
@@ -21177,9 +20370,6 @@ std::uint16_t Machine::p10752()
     accumulator_ = memory_[address_add(registers_[002], 021)];
     select_alu_group(rau_logical);
     registers_[015] = 010755;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 0617)];
@@ -21215,16 +20405,10 @@ std::uint16_t Machine::p16665()
 std::uint16_t Machine::p16666()
 {
     registers_[015] = 016667;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[003], 2)] = accumulator_;
         registers_[015] = 016670;
-        if (translated_routine_disabled(016421)) {
-            return 016421;
-        }
         p16421_lookup_tagged_byte();
         {
             const Word48 old_accumulator = accumulator_;
@@ -21246,9 +20430,6 @@ std::uint16_t Machine::p16667()
 {
     memory_[address_add(registers_[003], 2)] = accumulator_;
     registers_[015] = 016670;
-    if (translated_routine_disabled(016421)) {
-        return 016421;
-    }
     p16421_lookup_tagged_byte();
     {
         const Word48 old_accumulator = accumulator_;
@@ -21435,9 +20616,6 @@ std::uint16_t Machine::p17450()
 {
     registers_[016] = registers_[003];
     registers_[015] = 017451;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     return p17451();
 }
@@ -21474,9 +20652,6 @@ std::uint16_t Machine::p25701()
         return 025714;
     }
     registers_[015] = 025702;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 030)] = accumulator_;
@@ -21602,9 +20777,6 @@ std::uint16_t Machine::p25730()
     accumulator_ = memory_[address_add(registers_[017], -5)];
     select_alu_group(rau_logical);
     registers_[015] = 025734;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[02543];
@@ -21625,9 +20797,6 @@ std::uint16_t Machine::p25734()
 std::uint16_t Machine::p25736()
 {
     registers_[015] = 025737;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[002] = accumulator_.address();
@@ -21664,18 +20833,12 @@ std::uint16_t Machine::p25742()
     accumulator_ = memory_[address_add(registers_[017], -5)];
     select_alu_group(rau_logical);
     registers_[015] = 025745;
-    if (translated_routine_disabled(05207)) {
-        return 05207;
-    }
     p05207();
     {
         memory_[registers_[003]] = accumulator_;
         accumulator_ = memory_[address_add(registers_[017], -5)];
         select_alu_group(rau_logical);
         registers_[015] = 025747;
-        if (translated_routine_disabled(05211)) {
-            return 05211;
-        }
         p05211();
         {
             memory_[address_add(registers_[017], -5)] = accumulator_;
@@ -21690,9 +20853,6 @@ std::uint16_t Machine::p25745()
     accumulator_ = memory_[address_add(registers_[017], -5)];
     select_alu_group(rau_logical);
     registers_[015] = 025747;
-    if (translated_routine_disabled(05211)) {
-        return 05211;
-    }
     p05211();
     {
         memory_[address_add(registers_[017], -5)] = accumulator_;
@@ -21788,9 +20948,6 @@ std::uint16_t Machine::p13454()
     registers_[007] = 01200;
     xts(address_add(registers_[001], 047));
     registers_[015] = 013460;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 0367)];
@@ -21813,15 +20970,9 @@ std::uint16_t Machine::p13461()
     accumulator_ = memory_[address_add(registers_[001], 050)];
     select_alu_group(rau_logical);
     registers_[015] = 013462;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[015] = 013463;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[007], 0367)];
@@ -21835,9 +20986,6 @@ std::uint16_t Machine::p13461()
 std::uint16_t Machine::p13462()
 {
     registers_[015] = 013463;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 0367)];
@@ -21866,9 +21014,6 @@ std::uint16_t Machine::p13464()
 std::uint16_t Machine::p13465()
 {
     registers_[015] = 013466;
-    if (translated_routine_disabled(03305)) {
-        return 03305;
-    }
     p03305();
     {
         remainder_ = accumulator_;
@@ -21896,9 +21041,6 @@ std::uint16_t Machine::p13470()
 {
     registers_[002] = address_add(registers_[002], -1);
     registers_[015] = 013471;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -21930,9 +21072,6 @@ std::uint16_t Machine::p13474()
     accumulator_ = memory_[address_add(registers_[001], 051)];
     select_alu_group(rau_logical);
     registers_[015] = 013476;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 0367)];
@@ -21955,9 +21094,6 @@ std::uint16_t Machine::p13500()
     accumulator_ = memory_[address_add(registers_[001], 047)];
     select_alu_group(rau_logical);
     registers_[015] = 013501;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[007], 0367)];
@@ -22096,9 +21232,6 @@ std::uint16_t Machine::p15344()
     accumulator_ = memory_[address_add(registers_[007], 01057)];
     select_alu_group(rau_logical);
     registers_[015] = 015345;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[017] = address_add(registers_[017], -1);
@@ -22127,9 +21260,6 @@ std::uint16_t Machine::p15345()
 std::uint16_t Machine::p03310()
 {
     registers_[015] = 03311;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 03310;
@@ -22168,9 +21298,6 @@ std::uint16_t Machine::p03311()
 std::uint16_t Machine::p03371()
 {
     registers_[015] = 03372;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 03310;
@@ -22211,9 +21338,6 @@ std::uint16_t Machine::p03372()
 std::uint16_t Machine::p03442()
 {
     registers_[015] = 03443;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 03310;
@@ -22282,9 +21406,6 @@ std::uint16_t Machine::p04227()
 std::uint16_t Machine::p04437()
 {
     registers_[015] = 04440;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[registers_[017]] = accumulator_;
@@ -22292,17 +21413,11 @@ std::uint16_t Machine::p04437()
         accumulator_ = memory_[01637];
         select_alu_group(rau_logical);
         registers_[015] = 04442;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
             select_alu_group(rau_logical);
             registers_[015] = 04443;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[01427];
@@ -22321,17 +21436,11 @@ std::uint16_t Machine::p04440()
     accumulator_ = memory_[01637];
     select_alu_group(rau_logical);
     registers_[015] = 04442;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[015] = 04443;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[01427];
@@ -22347,9 +21456,6 @@ std::uint16_t Machine::p04442()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 04443;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[01427];
@@ -22375,9 +21481,6 @@ std::uint16_t Machine::p12036()
     memory_[registers_[017]] = accumulator_;
     registers_[017] = address_add(registers_[017], 1);
     registers_[015] = 012042;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     return p12042();
 }
@@ -22386,9 +21489,6 @@ std::uint16_t Machine::p12042()
 {
     hardware_push_acc();
     registers_[015] = 012043;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -22532,9 +21632,6 @@ std::uint16_t Machine::p12057()
 std::uint16_t Machine::p12063()
 {
     registers_[015] = 012064;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -22597,16 +21694,10 @@ std::uint16_t Machine::p12070()
 std::uint16_t Machine::p12071()
 {
     registers_[015] = 012072;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 012073;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             hardware_push_acc();
@@ -22679,9 +21770,6 @@ std::uint16_t Machine::p12072()
 {
     hardware_push_acc();
     registers_[015] = 012073;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -22909,23 +21997,14 @@ std::uint16_t Machine::p12200()
     accumulator_ = memory_[address_add(registers_[001], 042)];
     memory_[address_add(registers_[014], 3)] = accumulator_;
     registers_[015] = 012210;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 012211;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             hardware_push_acc();
             registers_[015] = 012212;
-            if (translated_routine_disabled(03277)) {
-                return 03277;
-            }
             p03277_pop_acc();
             {
                 stx(address_add(registers_[001], 051));
@@ -22935,9 +22014,6 @@ std::uint16_t Machine::p12200()
                 memory_[address_add(second, 3)] = accumulator_;
                 accumulator_ = memory_[address_add(registers_[001], 047)];
                 registers_[015] = 012215;
-                if (translated_routine_disabled(03275)) {
-                    return 03275;
-                }
                 p03275_push_acc();
                 {
                     accumulator_ = memory_[address_add(registers_[001], 044)];
@@ -22954,16 +22030,10 @@ std::uint16_t Machine::p12210()
 {
     hardware_push_acc();
     registers_[015] = 012211;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 012212;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[001], 051));
@@ -22973,9 +22043,6 @@ std::uint16_t Machine::p12210()
             memory_[address_add(second, 3)] = accumulator_;
             accumulator_ = memory_[address_add(registers_[001], 047)];
             registers_[015] = 012215;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[address_add(registers_[001], 044)];
@@ -22991,9 +22058,6 @@ std::uint16_t Machine::p12211()
 {
     hardware_push_acc();
     registers_[015] = 012212;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[001], 051));
@@ -23003,9 +22067,6 @@ std::uint16_t Machine::p12211()
         memory_[address_add(second, 3)] = accumulator_;
         accumulator_ = memory_[address_add(registers_[001], 047)];
         registers_[015] = 012215;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[001], 044)];
@@ -23025,9 +22086,6 @@ std::uint16_t Machine::p12212()
     memory_[address_add(second, 3)] = accumulator_;
     accumulator_ = memory_[address_add(registers_[001], 047)];
     registers_[015] = 012215;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 044)];
@@ -23050,9 +22108,6 @@ std::uint16_t Machine::p12217()
     accumulator_ = memory_[address_add(registers_[001], 047)];
     select_alu_group(rau_logical);
     registers_[015] = 012220;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[010] = 3;
@@ -23136,9 +22191,6 @@ std::uint16_t Machine::p20073()
     its(015);
     its(015);
     registers_[015] = 020075;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 020073;
@@ -23185,9 +22237,6 @@ std::uint16_t Machine::p20075()
 std::uint16_t Machine::p10052()
 {
     registers_[015] = 010053;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[014] = 010052;
@@ -23218,9 +22267,6 @@ std::uint16_t Machine::p10052()
 std::uint16_t Machine::p06600()
 {
     registers_[015] = 06601;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[016] = 06600;
@@ -23281,9 +22327,6 @@ std::uint16_t Machine::p06601()
 std::uint16_t Machine::p06605()
 {
     registers_[015] = 06606;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[016] = 06600;
@@ -23316,9 +22359,6 @@ std::uint16_t Machine::p06606()
 std::uint16_t Machine::p06611()
 {
     registers_[015] = 06612;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[016] = 06600;
@@ -23376,16 +22416,10 @@ std::uint16_t Machine::p06620()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06621;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 06622;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -23399,9 +22433,6 @@ std::uint16_t Machine::p06621()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06622;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -23421,16 +22452,10 @@ std::uint16_t Machine::p06626()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06627;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 06630;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -23444,9 +22469,6 @@ std::uint16_t Machine::p06627()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06630;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -23466,16 +22488,10 @@ std::uint16_t Machine::p06642()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 06643;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 06644;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -23489,9 +22505,6 @@ std::uint16_t Machine::p06643()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 06644;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -23511,16 +22524,10 @@ std::uint16_t Machine::p07125()
 {
     registers_[017] = address_add(registers_[017], 2);
     registers_[015] = 07126;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], -1)] = accumulator_;
         registers_[015] = 07127;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             stx(address_add(registers_[017], -2));
@@ -23534,9 +22541,6 @@ std::uint16_t Machine::p07126()
 {
     memory_[address_add(registers_[017], -1)] = accumulator_;
     registers_[015] = 07127;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         stx(address_add(registers_[017], -2));
@@ -23561,9 +22565,6 @@ std::uint16_t Machine::p07130()
 std::uint16_t Machine::p07131()
 {
     registers_[015] = 07132;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 07133;
@@ -23586,16 +22587,10 @@ std::uint16_t Machine::p07133()
 std::uint16_t Machine::p07410()
 {
     registers_[015] = 07411;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 07412;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             registers_[014] = 01200;
@@ -23619,9 +22614,6 @@ std::uint16_t Machine::p07411()
 {
     hardware_push_acc();
     registers_[015] = 07412;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[014] = 01200;
@@ -23689,16 +22681,10 @@ std::uint16_t Machine::p07417()
 std::uint16_t Machine::p07421()
 {
     registers_[015] = 07422;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
         registers_[015] = 07423;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             registers_[014] = 01200;
@@ -23722,9 +22708,6 @@ std::uint16_t Machine::p07422()
 {
     hardware_push_acc();
     registers_[015] = 07423;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[014] = 01200;
@@ -23769,24 +22752,15 @@ std::uint16_t Machine::p07433()
     registers_[001] = 07426;
     registers_[002] = 01200;
     registers_[015] = 07436;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         xts(address_add(registers_[002], 01007));
         registers_[015] = 07437;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
             select_alu_group(rau_logical);
             registers_[015] = 07440;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[address_add(registers_[002], 0467)];
@@ -23802,17 +22776,11 @@ std::uint16_t Machine::p07436()
 {
     xts(address_add(registers_[002], 01007));
     registers_[015] = 07437;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[015] = 07440;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[002], 0467)];
@@ -23828,9 +22796,6 @@ std::uint16_t Machine::p07437()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 07440;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[002], 0467)];
@@ -23852,9 +22817,6 @@ std::uint16_t Machine::p07441()
 {
     // 07441L is a padded UTC 0 left half.
     registers_[015] = 07442;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 042)] = accumulator_;
@@ -23883,9 +22845,6 @@ std::uint16_t Machine::p07441()
             accumulator_ = memory_[address_add(registers_[001], 043)];
             select_alu_group(rau_logical);
             registers_[015] = 07460;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             return p07460();
         }
@@ -23929,9 +22888,6 @@ std::uint16_t Machine::p07442()
         accumulator_ = memory_[address_add(registers_[001], 043)];
         select_alu_group(rau_logical);
         registers_[015] = 07460;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         return p07460();
     }
@@ -23969,9 +22925,6 @@ std::uint16_t Machine::p07455()
         accumulator_ = memory_[address_add(registers_[001], 043)];
         select_alu_group(rau_logical);
         registers_[015] = 07460;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         return p07460();
     }
@@ -24043,9 +22996,6 @@ std::uint16_t Machine::p10060()
     remainder_ = Word48();
     select_alu_group(rau_multiplicative);
     registers_[015] = 010063;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[014] = 010052;
@@ -24084,9 +23034,6 @@ std::uint16_t Machine::p10067()
     accumulator_ = memory_[address_add(registers_[014], 0135)];
     select_alu_group(rau_logical);
     registers_[015] = 010070;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         return 03235;
@@ -24102,16 +23049,10 @@ std::uint16_t Machine::p10071()
 {
     registers_[016] = 010206;
     registers_[015] = 010072;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         registers_[016] = 010207;
         registers_[015] = 010073;
-        if (translated_routine_disabled(03303)) {
-            return 03303;
-        }
         p03303_store_stack_top();
         {
             registers_[015] = 010052;
@@ -24192,9 +23133,6 @@ std::uint16_t Machine::p10072()
 {
     registers_[016] = 010207;
     registers_[015] = 010073;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         registers_[015] = 010052;
@@ -24350,9 +23288,6 @@ std::uint16_t Machine::p10113()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010115;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[014] = 010052;
@@ -24420,9 +23355,6 @@ std::uint16_t Machine::p10123()
 {
     registers_[005] = address_add(registers_[005], -1);
     registers_[015] = 010124;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[014] = 010052;
@@ -24505,9 +23437,6 @@ std::uint16_t Machine::p10124()
 std::uint16_t Machine::p10134()
 {
     registers_[015] = 010135;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -24528,9 +23457,6 @@ std::uint16_t Machine::p10135()
 std::uint16_t Machine::p10144()
 {
     registers_[015] = 010145;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = accumulator_.address();
@@ -24594,9 +23520,6 @@ std::uint16_t Machine::p10210()
 std::uint16_t Machine::p10257()
 {
     registers_[015] = 010260;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[017], 1)] = accumulator_;
@@ -24643,9 +23566,6 @@ std::uint16_t Machine::p10264()
 std::uint16_t Machine::p10266()
 {
     registers_[015] = 010267;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -24659,9 +23579,6 @@ std::uint16_t Machine::p10266()
             return 010275;
         }
         registers_[015] = 010273;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             registers_[017] = address_add(registers_[017], -1);
@@ -24685,9 +23602,6 @@ std::uint16_t Machine::p10267()
         return 010275;
     }
     registers_[015] = 010273;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[017] = address_add(registers_[017], -1);
@@ -24726,9 +23640,6 @@ std::uint16_t Machine::p10300()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010302;
-    if (translated_routine_disabled(03303)) {
-        return 03303;
-    }
     p03303_store_stack_top();
     {
         hardware_pop_acc();
@@ -24758,9 +23669,6 @@ std::uint16_t Machine::p10305()
     its(007);
     hardware_push_acc();
     registers_[015] = 010307;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[001] = accumulator_.address();
@@ -24824,9 +23732,6 @@ std::uint16_t Machine::p10334()
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     registers_[015] = 010335;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[016] = registers_[007];
@@ -24863,9 +23768,6 @@ std::uint16_t Machine::p10337()
     } while (registers_[007] != 0);
     registers_[007] = registers_[016];
     registers_[015] = 010343;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         accumulator_ = memory_[address_add(registers_[017], -3)];
@@ -24879,9 +23781,6 @@ std::uint16_t Machine::p10337()
         remainder_ = index;
         select_alu_group(rau_logical);
         registers_[015] = 010346;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
@@ -24906,9 +23805,6 @@ std::uint16_t Machine::p10343()
     remainder_ = index;
     select_alu_group(rau_logical);
     registers_[015] = 010346;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -24931,9 +23827,6 @@ std::uint16_t Machine::p10346()
 std::uint16_t Machine::p10350()
 {
     registers_[015] = 010351;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[015] = 010352;
@@ -24956,9 +23849,6 @@ std::uint16_t Machine::p10352()
 std::uint16_t Machine::p10365()
 {
     registers_[015] = 010366;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -25088,9 +23978,6 @@ std::uint16_t Machine::p10402()
     remainder_ = used_cells;
     select_alu_group(rau_logical);
     registers_[015] = 010415;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -25132,9 +24019,6 @@ std::uint16_t Machine::p10421()
     its(002);
     hardware_push_acc();
     registers_[015] = 010423;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -25151,9 +24035,6 @@ std::uint16_t Machine::p10421()
             return 010443;
         }
         registers_[015] = 010426;
-        if (translated_routine_disabled(03277)) {
-            return 03277;
-        }
         p03277_pop_acc();
         {
             hardware_push_acc();
@@ -25191,9 +24072,6 @@ std::uint16_t Machine::p10423()
         return 010443;
     }
     registers_[015] = 010426;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         hardware_push_acc();
@@ -25249,9 +24127,6 @@ std::uint16_t Machine::p10431()
         ^ memory_[address_add(registers_[002], 033)].raw());
     remainder_ = allocation;
     registers_[015] = 010436;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[002], 034)];
@@ -25293,9 +24168,6 @@ std::uint16_t Machine::p10443()
 std::uint16_t Machine::p10463()
 {
     registers_[015] = 010464;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[013] = 010456;
@@ -25367,9 +24239,6 @@ std::uint16_t Machine::p10473()
 std::uint16_t Machine::p10535()
 {
     registers_[015] = 010536;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 010527;
@@ -25394,9 +24263,6 @@ std::uint16_t Machine::p10535()
         accumulator_ = memory_[registers_[016]];
         select_alu_group(rau_logical);
         registers_[015] = 010544;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         return p10544();
     }
@@ -25426,9 +24292,6 @@ std::uint16_t Machine::p10536()
     accumulator_ = memory_[registers_[016]];
     select_alu_group(rau_logical);
     registers_[015] = 010544;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     return p10544();
 }
@@ -25499,9 +24362,6 @@ std::uint16_t Machine::p10615()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010617;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 010557;
@@ -25520,17 +24380,11 @@ std::uint16_t Machine::p10615()
         remainder_ = comparison;
         select_alu_group(rau_logical);
         registers_[015] = 010622;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
             select_alu_group(rau_logical);
             registers_[015] = 010623;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[02167];
@@ -25560,17 +24414,11 @@ std::uint16_t Machine::p10617()
     remainder_ = comparison;
     select_alu_group(rau_logical);
     registers_[015] = 010622;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[015] = 010623;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[02167];
@@ -25586,9 +24434,6 @@ std::uint16_t Machine::p10622()
     hardware_pop_acc();
     select_alu_group(rau_logical);
     registers_[015] = 010623;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[02167];
@@ -25632,9 +24477,6 @@ std::uint16_t Machine::p10645()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010647;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 010557;
@@ -25654,9 +24496,6 @@ std::uint16_t Machine::p10645()
         remainder_ = comparison;
         select_alu_group(rau_logical);
         registers_[015] = 010652;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             hardware_pop_acc();
@@ -25664,9 +24503,6 @@ std::uint16_t Machine::p10645()
             registers_[016] = accumulator_.address();
             accumulator_ = memory_[address_add(registers_[016], 4)];
             registers_[015] = 010654;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[02167];
@@ -25697,9 +24533,6 @@ std::uint16_t Machine::p10647()
     remainder_ = comparison;
     select_alu_group(rau_logical);
     registers_[015] = 010652;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         hardware_pop_acc();
@@ -25707,9 +24540,6 @@ std::uint16_t Machine::p10647()
         registers_[016] = accumulator_.address();
         accumulator_ = memory_[address_add(registers_[016], 4)];
         registers_[015] = 010654;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[02167];
@@ -25727,9 +24557,6 @@ std::uint16_t Machine::p10652()
     registers_[016] = accumulator_.address();
     accumulator_ = memory_[address_add(registers_[016], 4)];
     registers_[015] = 010654;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[02167];
@@ -25750,9 +24577,6 @@ std::uint16_t Machine::p10654()
 std::uint16_t Machine::p10656()
 {
     registers_[015] = 010657;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 010557;
@@ -25804,9 +24628,6 @@ std::uint16_t Machine::p10663()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010665;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 010557;
@@ -25856,9 +24677,6 @@ std::uint16_t Machine::p10672()
     select_alu_group(rau_logical);
     hardware_push_acc();
     registers_[015] = 010674;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         registers_[010] = 010557;
@@ -26016,17 +24834,11 @@ std::uint16_t Machine::p20724()
     memory_[address_add(registers_[001], 0114)] = accumulator_;
     accumulator_ = memory_[address_add(registers_[001], 075)];
     registers_[015] = 020732;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 076)];
         select_alu_group(rau_logical);
         registers_[015] = 020733;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[02133];
@@ -26042,9 +24854,6 @@ std::uint16_t Machine::p20732()
     accumulator_ = memory_[address_add(registers_[001], 076)];
     select_alu_group(rau_logical);
     registers_[015] = 020733;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[02133];
@@ -26071,9 +24880,6 @@ std::uint16_t Machine::p20735()
 std::uint16_t Machine::p20736()
 {
     registers_[015] = 020737;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         if (registers_[002] != 0) {
@@ -26130,29 +24936,17 @@ std::uint16_t Machine::p20747()
     accumulator_ = memory_[0];
     select_alu_group(rau_logical);
     registers_[015] = 020751;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[015] = 020752;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             registers_[015] = 020753;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[address_add(registers_[001], 0110)];
                 select_alu_group(rau_logical);
                 registers_[015] = 020754;
-                if (translated_routine_disabled(03275)) {
-                    return 03275;
-                }
                 p03275_push_acc();
                 {
                     accumulator_ = memory_[address_add(registers_[001], 0111)];
@@ -26168,23 +24962,14 @@ std::uint16_t Machine::p20747()
 std::uint16_t Machine::p20751()
 {
     registers_[015] = 020752;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         registers_[015] = 020753;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[001], 0110)];
             select_alu_group(rau_logical);
             registers_[015] = 020754;
-            if (translated_routine_disabled(03275)) {
-                return 03275;
-            }
             p03275_push_acc();
             {
                 accumulator_ = memory_[address_add(registers_[001], 0111)];
@@ -26199,17 +24984,11 @@ std::uint16_t Machine::p20751()
 std::uint16_t Machine::p20752()
 {
     registers_[015] = 020753;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 0110)];
         select_alu_group(rau_logical);
         registers_[015] = 020754;
-        if (translated_routine_disabled(03275)) {
-            return 03275;
-        }
         p03275_push_acc();
         {
             accumulator_ = memory_[address_add(registers_[001], 0111)];
@@ -26225,9 +25004,6 @@ std::uint16_t Machine::p20753()
     accumulator_ = memory_[address_add(registers_[001], 0110)];
     select_alu_group(rau_logical);
     registers_[015] = 020754;
-    if (translated_routine_disabled(03275)) {
-        return 03275;
-    }
     p03275_push_acc();
     {
         accumulator_ = memory_[address_add(registers_[001], 0111)];
@@ -26248,9 +25024,6 @@ std::uint16_t Machine::p20754()
 std::uint16_t Machine::p20755()
 {
     registers_[015] = 020756;
-    if (translated_routine_disabled(03277)) {
-        return 03277;
-    }
     p03277_pop_acc();
     {
         memory_[address_add(registers_[001], 0110)] = accumulator_;
@@ -26507,7 +25280,6 @@ std::uint16_t Machine::p10161(std::uint16_t entry)
 {
     if (entry == 010161) {
         registers_[015] = 010162;
-        if (translated_routine_disabled(03277)) return 03277;
         p03277_pop_acc();
         entry = 010162;
     }
@@ -26591,7 +25363,6 @@ std::uint16_t Machine::p13451(std::uint16_t entry)
 {
     if (entry == 013451) {
         registers_[015] = 013452;
-        if (translated_routine_disabled(03305)) return 03305;
         p03305();
         entry = 013452;
     }
@@ -26682,7 +25453,6 @@ std::uint16_t Machine::p15354(std::uint16_t entry)
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[015] = 015373;
-        if (translated_routine_disabled(03275)) return 03275;
         p03275_push_acc();
         entry = 015373;
     }
@@ -26706,18 +25476,16 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
     };
     const auto push = [&](std::uint16_t link) {
         registers_[015] = link;
-        if (translated_routine_disabled(03275)) return false;
         p03275_push_acc();
-        return true;
     };
     switch (entry) {
     case 03101:
         load(address_add(registers_[001], 0160));
-        if (!push(03102)) return 03275;
+        push(03102);
         [[fallthrough]];
     case 03102:
         load(address_add(registers_[001], 0153));
-        if (!push(03103)) return 03275;
+        push(03103);
         [[fallthrough]];
     case 03103:
         load(address_add(registers_[002], 01377));
@@ -26725,7 +25493,7 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
         return 02750;
     case 03104:
         load(address_add(registers_[001], 0152));
-        if (!push(03105)) return 03275;
+        push(03105);
         [[fallthrough]];
     case 03105:
         load(address_add(registers_[002], 0367));
@@ -26740,7 +25508,6 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
         memory_[address_add(registers_[001], 0156)] = accumulator_;
         load(address_add(registers_[001], 0160));
         registers_[015] = 03116;
-        if (translated_routine_disabled(016254)) return 016254;
         p16254();
         [[fallthrough]];
     case 03116:
@@ -26761,7 +25528,7 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
         return 016313;
     case 03122:
         load(address_add(registers_[001], 0152));
-        if (!push(03123)) return 03275;
+        push(03123);
         [[fallthrough]];
     case 03123:
         load(address_add(registers_[002], 0367));
@@ -26770,11 +25537,11 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
     case 03124:
     source_object:
         load(address_add(registers_[001], 0157));
-        if (!push(03125)) return 03275;
+        push(03125);
         [[fallthrough]];
     case 03125:
         load(address_add(registers_[001], 0154));
-        if (!push(03126)) return 03275;
+        push(03126);
         [[fallthrough]];
     case 03126:
         load(address_add(registers_[002], 01377));
@@ -26782,7 +25549,7 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
         return 02750;
     case 03127:
         load(address_add(registers_[001], 0151));
-        if (!push(03130)) return 03275;
+        push(03130);
         [[fallthrough]];
     case 03130:
         load(address_add(registers_[002], 0367));
@@ -26796,7 +25563,7 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
         load(0);
         memory_[address_add(registers_[001], 0170)] = accumulator_;
         load(address_add(registers_[001], 0157));
-        if (!push(03135)) return 03275;
+        push(03135);
         [[fallthrough]];
     case 03135:
         load(address_add(registers_[002], 0703));
@@ -26806,7 +25573,7 @@ std::uint16_t Machine::p03101(std::uint16_t entry)
         load(address_add(registers_[002], 0317));
         memory_[address_add(registers_[002], 0367)] = accumulator_;
         load(address_add(registers_[001], 0152));
-        if (!push(03140)) return 03275;
+        push(03140);
         [[fallthrough]];
     case 03140:
         load(address_add(registers_[002], 0367));
@@ -26857,13 +25624,11 @@ std::uint16_t Machine::p07622(std::uint16_t entry)
         its(002);
         registers_[016] = 07760;
         registers_[015] = 07625;
-        if (translated_routine_disabled(03303)) return 03303;
         p03303_store_stack_top();
         [[fallthrough]];
     case 07625:
         registers_[016] = 07757;
         registers_[015] = 07626;
-        if (translated_routine_disabled(03303)) return 03303;
         p03303_store_stack_top();
         [[fallthrough]];
     case 07626:
@@ -26890,7 +25655,6 @@ std::uint16_t Machine::p07622(std::uint16_t entry)
             ^ memory_[address_add(registers_[016], 0323)].raw());
         select_alu_group(rau_logical);
         registers_[015] = 07636;
-        if (translated_routine_disabled(03275)) return 03275;
         p03275_push_acc();
         [[fallthrough]];
     case 07636:
@@ -26929,9 +25693,7 @@ std::uint16_t Machine::p10002(std::uint16_t entry)
     };
     const auto push = [&](std::uint16_t link) {
         registers_[015] = link;
-        if (translated_routine_disabled(03275)) return false;
         p03275_push_acc();
-        return true;
     };
     switch (entry) {
     case 010002:
@@ -26948,11 +25710,11 @@ std::uint16_t Machine::p10002(std::uint16_t entry)
     case 010005:
     next_character:
         hardware_push_acc();
-        if (!push(010006)) return 03275;
+        push(010006);
         [[fallthrough]];
     case 010006:
         load(address_add(registers_[017], -2));
-        if (!push(010007)) return 03275;
+        push(010007);
         [[fallthrough]];
     case 010007:
         load(02173);
