@@ -362,6 +362,28 @@ above describe their original fixtures, not this expansion.
 
 ## Port Order
 
+The next coverage-led batch adds elapsed-time `POPTIM` at `06476..06502`,
+the `CARRYON` token loop at `10235..10251`, and the observed `POPMESS` no-argument
+constructor paths at `12304..12323`, `12417..12425`, `12433..12444`, and
+`12512..12516`, including the `12377..12403` validation path. Constructors
+continue to use the original live table at `12547`, not a host-side command map.
+Argument-bearing device paths at `12324` and `12404` remain interpreter fallbacks.
+
+`POPMESS([LPO])` supplies the function at `07514`. Its character handling and
+descriptor/counter updates through `07532`, its `07534` flush continuation, and
+`07542` error handoff are native, reusing the existing `07533`/`07536` flush code.
+The full-buffer jump to `07533` stays an independent boundary. Other known-return
+leaf continuations run within their caller without nested disable checks.
+
+The expanded standard-function fixture includes `POPTIM()>=0`, `CARRYON(CHARIN)`
+through `END`, `[TO]`/`[CI]` function construction, and LPO ordinary/flush
+characters. Full-state tests replay their actual frames and validation errors
+against instruction-only execution, plus controlled missing-END and full-buffer
+fixtures. Timer arithmetic is compared using the oracle's sampled jiffy value
+at `06500`, avoiding clock-boundary races. CPU/routine trace checks require no
+fallback in the successful target clusters; they do not assert complete device
+I/O coverage. Earlier corpus measurements remain historical.
+
 `POPLAN_DISABLE_TRANSLATED_ROUTINES` applies only when the machine dispatcher
 reaches a listed address. Nested semantic calls execute unconditionally and
 continue within their caller's step, even if the callee's address is disabled.

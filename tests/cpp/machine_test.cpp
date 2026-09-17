@@ -8992,6 +8992,95 @@ int main(int argc, char **argv)
         return continuation;
     };
 
+    // Replay real reader/device frames instruction by instruction, comparing
+    // every new semantic entry to the raw continuation from the same snapshot.
+    // The timer's nondeterministic E63 sample is taken by the oracle; 06500
+    // checks its complete arithmetic suffix with that exact sampled value.
+    const std::vector<std::uint16_t> frontier_entries = {
+        06500, 06502, 010235, 010236, 010237, 010240, 010241, 010242,
+        010243, 010251, 07514, 07515, 07523, 07527, 07530, 07534, 07542,
+        012304, 012314, 012320, 012377, 012417, 012420, 012424,
+        012433, 012435, 012437, 012441, 012443, 012444, 012512};
+    std::vector<bool> frontier_seen(frontier_entries.size(), false);
+    bool full_buffer_checked = false;
+    auto replay = std::make_unique<Machine>();
+    std::istringstream frontier_image(image_bytes);
+    replay->load_image(frontier_image);
+    replay->boot_static_image();
+    replay->set_translated_routines_enabled(false);
+    std::istringstream frontier_input(
+        "POPTIM()>=0=>\n"
+        "CARRYON(CHARIN);A B END;99=>\n"
+        "ISFUNC(POPMESS([TO]))=>\n"
+        "ISFUNC(POPMESS([CI]))=>\n"
+        "VARS LPTEST;POPMESS([LPO])->LPTEST;\n"
+        "LPTEST(65);LPTEST(10);LPTEST(94);99=>\n"
+        "LPTEST(\"A\");\n"
+        "POPMESS([]);\nPOPMESS([ABC]);\nPOPMESS([1]);\nPOPMESS([TO ABC]);\n");
+    bool frontier_finished = false;
+    for (unsigned steps = 0; steps != 1000000; ++steps) {
+        for (std::size_t index = 0; index != frontier_entries.size(); ++index) {
+            if (replay->right_half() || replay->program_counter() != frontier_entries[index])
+                continue;
+            auto native = std::make_unique<Machine>(*replay);
+            auto raw = std::make_unique<Machine>(*replay);
+            native->set_translated_routines_enabled(true);
+            const auto count = native->translated_routine_count();
+            compare_one_semantic_step(*native, *raw, {},
+                "frontier replay " + std::to_string(frontier_entries[index]), 4000);
+            require(native->translated_routine_count() == count + 1,
+                    "frontier continuations and nested leaves use one dispatch");
+            require(native->console_output() == raw->console_output()
+                        && native->console_output_record_ends() == raw->console_output_record_ends(),
+                    "frontier preserves console records");
+            frontier_seen[index] = true;
+            if (frontier_entries[index] == 07515 && !full_buffer_checked) {
+                auto full = std::make_unique<Machine>(*replay);
+                full->set_translated_routines_enabled(true);
+                full->memory(07575) = full->memory(07545);
+                auto full_raw = std::make_unique<Machine>(*full);
+                full_raw->set_translated_routines_enabled(false);
+                require(compare_one_semantic_step(*full, *full_raw, {},
+                            "LPO full-buffer handoff", 100) == 07533,
+                        "LPO preserves its independent flush boundary");
+                compare_one_semantic_step(*full, *full_raw, {},
+                                         "LPO full-buffer flush", 200);
+                full_buffer_checked = true;
+            }
+        }
+        const auto status = replay->step();
+        if (status == poplan::ExecutionStatus::halted) {
+            frontier_finished = true;
+            break;
+        }
+        if (status == poplan::ExecutionStatus::input_required) {
+            std::string line;
+            if (!std::getline(frontier_input, line)) {
+                frontier_finished = true;
+                break;
+            }
+            replay->queue_console_input(poplan::encode_gost_text(line));
+        }
+    }
+    require(frontier_finished, "frontier instruction-only replay completes");
+    require(full_buffer_checked, "LPO full-buffer path checked");
+    for (std::size_t i = 0; i != frontier_entries.size(); ++i) {
+        if (frontier_entries[i] == 010251) continue; // Controlled EOF fixture below.
+        require(frontier_seen[i], "frontier entry covered " + std::to_string(frontier_entries[i]));
+    }
+    for (auto entry : {010243, 010251}) {
+        auto native = std::make_unique<Machine>(*replay);
+        native->set_translated_routines_enabled(true);
+        native->accumulator() = native->memory(02177);
+        native->start(entry);
+        auto raw = std::make_unique<Machine>(*native);
+        raw->set_translated_routines_enabled(false);
+        require(compare_one_semantic_step(*native, *raw, {},
+                    "CARRYON missing END", 20) == 03014,
+                "CARRYON retains diagnostic 00600");
+        require(native->reg(016) == 0600, "CARRYON missing END code");
+    }
+
     // Mode-write cleanup must not depend on a caller's incoming group or
     // normalization, rounding, and overflow flags. Use a fully raw oracle.
     for (auto entry : {03330, 05316, 06424, 016672, 016677, 016722, 017047}) {

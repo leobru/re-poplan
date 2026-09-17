@@ -2,6 +2,20 @@
 
 ## Resident primitive expansion
 
+### Timer, token-reader and device-constructor coverage
+
+| Entries | Established behavior and coverage |
+| --- | --- |
+| `06476`, `06500`, `06502` | `POPTIM`: E63/004 elapsed jiffies, original tag conversion/division and `03275` result tail. |
+| `10235..10251` | `CARRYON`: constructs the item reader through `02767`, consumes tokens until the dictionary `END` value at `10250`, and preserves missing-END diagnostic `00600`. `CARRYON(CHARIN);A B END;99=>` prints `99`. |
+| `12304..12323`, `12417..12425`, `12433..12444`, `12512..12516` | `POPMESS`: observed `[TO]`, `[CI]`, `[LPO]` construction and list validation, using the resident command table and `16254` search. The `12377..12403` validation path is also native; argument-bearing commands remain outside this batch. |
+| `07514..07532`, `07534`, `07542` | The LPO function returned by `POPMESS([LPO])`: character validation, `21275` encoding, `21443` descriptor advancement and existing `07533`/`07536` flushing. Ordinary `CUCHOUT` calls do not establish coverage of this entry. |
+
+Successful probes agree with historical POPLAN and instruction-only execution.
+Focused differentials retain complete machine state, including full-buffer and
+invalid-argument branches. This expands workload coverage without reclassifying
+zero-filled storage or generated instructions as resident routines.
+
 ### Diagnostic continuation expansion
 
 The `NUMBERREAD` invalid-token probe additionally exercises native diagnostic

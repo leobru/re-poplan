@@ -119,9 +119,9 @@ REFERENCE_REPLACEMENTS = {
 
 REFERENCE_MISSING = {"NONUNIQUE", "UNIQUE", "ENDDATA", "DELITEM", "NEXT"}
 
-# CHARIN consumes the compiler's live input stream and POPMESS is explicitly
-# operating-system dependent. Their recognition is checked statically.
-STATIC_ONLY = {"CHARIN", "POPMESS"}
+# CHARIN is now exercised through CARRYON's live-stream reader. POPMESS's
+# no-argument CI/TO/LPO constructors are safe without external device setup.
+STATIC_ONLY = set()
 
 
 def image_words() -> list[int]:

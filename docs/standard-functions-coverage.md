@@ -99,17 +99,19 @@ intentionally failing program.
 
 ## Executable coverage
 
-`tests/inputs/standard-functions-coverage.pop2` invokes 55 of the 57 direct
+`tests/inputs/standard-functions-coverage.pop2` exercises all 57 direct
 matches and exercises every replacement facility with appropriate integer,
 real, structure, function, or text-item operands. It covers references,
 pairs, static and dynamic lists, records, strips, arrays, words, function
 properties and updaters, partial application, character/text adapters,
 printing, macros, `POPVAL`, and `SETPOP`.
 
-`CHARIN` is left as a static recognition check because calling it consumes the
-compiler's live source stream. `POPMESS` is also static-only because the
-reference explicitly makes its file/device contract operating-system
-dependent. The executable output is required to match historical `dispak`,
+`CHARIN` is exercised through `CARRYON(CHARIN); A B END; 99=>`, which consumes
+the live input stream through the `END` token and resumes compilation.
+`POPMESS` is exercised through its no-argument `[TO]`, `[CI]`, and `[LPO]`
+constructors. The returned LPO function receives ordinary and flush characters;
+argument-bearing file/device operations remain outside this fixture.
+The executable output is required to match historical `dispak`,
 hybrid C++ execution, and instruction-only C++ execution.
 
 The executable fixture now explicitly distinguishes lists, words, and links

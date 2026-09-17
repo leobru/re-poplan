@@ -25744,4 +25744,299 @@ std::uint16_t Machine::p10002(std::uint16_t entry)
     throw MachineError("invalid 10002 entry");
 }
 
+std::uint16_t Machine::p06476(std::uint16_t entry)
+{
+    if (entry == 06476) {
+        registers_[010] = 06444;
+        alu_mode_ = 006;
+        // 06477: E63/004 uses elapsed execution time in 20 ms jiffies.
+        registers_[016] = 4;
+        accumulator_ = Word48(std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - execution_started_at_).count() / 20);
+        entry = 06500;
+    }
+    if (entry == 06500) {
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[01637].raw());
+        select_alu_group(rau_logical);
+        arithmetic_add(memory_[0], false, false);
+        divide(memory_[address_add(registers_[010], 0133)]);
+    }
+    // 06502 is an ordinary tail jump, not a nested leaf call.
+    registers_[015] = 03235;
+    return 03275;
+}
+
+std::uint16_t Machine::p10235(std::uint16_t entry)
+{
+    switch (entry) {
+    case 010235:
+        registers_[016] = 02333;
+        registers_[015] = 010236;
+        p03303_store_stack_top();
+        [[fallthrough]];
+    case 010236:
+        registers_[016] = 02333;
+        registers_[015] = 010237;
+        p03301();
+        [[fallthrough]];
+    case 010237:
+        registers_[016] = 01713;
+        registers_[015] = 010240;
+        return 02767;
+    case 010240:
+        registers_[016] = 02337;
+        registers_[015] = 010241;
+        p03303_store_stack_top();
+        [[fallthrough]];
+    case 010241:
+    next_item:
+        registers_[016] = 02337;
+        registers_[015] = 010242;
+        return 02767;
+    case 010242:
+        registers_[015] = 010243;
+        p03277_pop_acc();
+        [[fallthrough]];
+    case 010243:
+        registers_[016] = 01200;
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[02177].raw());
+        select_alu_group(rau_logical);
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) goto missing_end;
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[02177].raw());
+        registers_[010] = 010250;
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[010250].raw());
+        remainder_ = accumulator_;
+        if (accumulator_condition()) goto next_item;
+        accumulator_ = memory_[02337];
+        registers_[015] = 010220;
+        return 03275;
+    case 010251:
+    missing_end:
+        registers_[016] = 0600;
+        return 03014;
+    }
+    throw MachineError("invalid 10235 entry");
+}
+
+std::uint16_t Machine::p07514(std::uint16_t entry)
+{
+    const auto load = [&](std::uint16_t address) {
+        accumulator_ = memory_[address];
+        select_alu_group(rau_logical);
+    };
+    const auto exclusive_or = [&](std::uint16_t address) {
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[address].raw());
+        select_alu_group(rau_logical);
+    };
+    switch (entry) {
+    case 07514:
+        registers_[015] = 07515;
+        p03277_pop_acc();
+        [[fallthrough]];
+    case 07515:
+        hardware_push_acc();
+        registers_[013] = 07514;
+        exclusive_or(010031);
+        registers_[015] = 03235;
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) goto flush;
+        load(address_add(registers_[017], -1));
+        exclusive_or(010032);
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) goto flush;
+        load(07545);
+        exclusive_or(07575);
+        registers_[015] = 07523;
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) {
+            // Preserve the independent full-buffer flush transfer at 07533.
+            return 07533;
+        }
+        [[fallthrough]];
+    case 07523:
+    character:
+        load(address_add(registers_[017], -1));
+        accumulator_ = accumulator_ & memory_[address_add(registers_[013], 0317)];
+        remainder_ = Word48();
+        exclusive_or(address_add(registers_[013], 0320));
+        registers_[016] = 014700;
+        remainder_ = accumulator_;
+        if (accumulator_condition()) {
+            const auto target = address_add(registers_[013], 026);
+            if (target != 07542) return target;
+            goto invalid_character;
+        }
+        hardware_pop_acc();
+        select_alu_group(rau_logical);
+        registers_[015] = 07527;
+        return 021275;
+    case 07527:
+        registers_[016] = 07545;
+        registers_[015] = 07530;
+        p21443_advance_descriptor();
+        [[fallthrough]];
+    case 07530:
+        registers_[013] = 07514;
+        accumulator_ = cyclic_add(memory_[07600], memory_[010035]);
+        remainder_ = Word48();
+        select_alu_group(rau_multiplicative);
+        memory_[07600] = accumulator_;
+        return 03235;
+    case 07534:
+    flush:
+        accumulator_ = Word48(registers_[015]);
+        select_alu_group(rau_logical);
+        registers_[016] = 07545;
+        xts(07544);
+        registers_[015] = 07536;
+        p21443_advance_descriptor();
+        {
+            const auto target = p07536();
+            if (target == 07523) goto character;
+            return target;
+        }
+    case 07542:
+    invalid_character:
+        hardware_pop_acc();
+        select_alu_group(rau_logical);
+        return 03014;
+    }
+    throw MachineError("invalid 07514 entry");
+}
+
+std::uint16_t Machine::p12304(std::uint16_t entry)
+{
+    const auto cell = [&](int offset) { return address_add(registers_[001], offset); };
+    const auto load = [&](std::uint16_t address) {
+        accumulator_ = memory_[address];
+        select_alu_group(rau_logical);
+    };
+    const auto mask = [&](int offset) {
+        accumulator_ = accumulator_ & memory_[cell(offset)];
+        remainder_ = Word48();
+        select_alu_group(rau_logical);
+    };
+    const auto exclusive_or = [&](int offset) {
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[cell(offset)].raw());
+        select_alu_group(rau_logical);
+    };
+    switch (entry) {
+    case 012304:
+        accumulator_ = Word48(registers_[001]);
+        select_alu_group(rau_logical);
+        its(002); its(003); its(004); its(005); its(007);
+        hardware_push_acc();
+        registers_[001] = 012304;
+        load(registers_[006]);
+        memory_[cell(0322)] = accumulator_;
+        registers_[006] = address_add(registers_[006], 1);
+        memory_[cell(0320)] = accumulator_;
+        load(0);
+        memory_[cell(0316)] = accumulator_;
+        registers_[015] = 012314;
+        return 012433;
+    case 012314:
+        registers_[016] = accumulator_.address();
+        mask(0217);
+        exclusive_or(0220);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(registers_[016]);
+        registers_[016] = 012547;
+        registers_[015] = 012320;
+        p16254();
+        [[fallthrough]];
+    case 012320:
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        registers_[004] = registers_[016];
+        load(address_add(registers_[004], 1));
+        registers_[002] = accumulator_.address();
+        mask(0221);
+        remainder_ = accumulator_;
+        if (accumulator_condition())
+            return memory_[address_add(registers_[004], 1)].address();
+        if (registers_[002] != 0) return 012324;
+        [[fallthrough]];
+    case 012417:
+        load(cell(0320));
+        registers_[015] = 012420;
+        return 017045;
+    case 012420:
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) return cell(0120);
+        load(address_add(registers_[004], 1));
+        shift_accumulator(24);
+        exclusive_or(0237);
+        memory_[address_add(registers_[006], -1)] = accumulator_;
+        registers_[006] = address_add(registers_[006], -1);
+        return cell(0206);
+    case 012424:
+        registers_[016] = 012046;
+        load(cell(0322));
+        return 03014;
+    case 012433:
+        its(015);
+        hardware_push_acc();
+        load(cell(0320));
+        registers_[015] = 012435;
+        return 017045;
+    case 012435:
+        remainder_ = accumulator_;
+        if (accumulator_condition()) {
+            registers_[017] = address_add(registers_[017], -2);
+            return cell(073); // 12444 -> 12377, arity/empty-list path.
+        }
+        load(cell(0320));
+        registers_[015] = 012437;
+        return 017013;
+    case 012437:
+        memory_[address_add(registers_[017], -2)] = accumulator_;
+        load(cell(0320));
+        registers_[015] = 012441;
+        return 017021;
+    case 012441:
+        memory_[cell(0320)] = accumulator_;
+        load(cell(0316));
+        accumulator_ = cyclic_add(accumulator_, memory_[cell(0223)]);
+        remainder_ = Word48();
+        select_alu_group(rau_multiplicative);
+        stx(cell(0316));
+        [[fallthrough]];
+    case 012443:
+        sti(015);
+        return registers_[015];
+    case 012444:
+        registers_[017] = address_add(registers_[017], -2);
+        return cell(073);
+    case 012377:
+        load(registers_[007]);
+        shift_accumulator(24);
+        alu_mode_ = 003;
+        reverse_subtract(memory_[cell(0316)]);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(address_add(registers_[004], 1));
+        mask(0222);
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) return memory_[registers_[007]].address();
+        return 012404;
+    case 012512:
+        load(0);
+        memory_[cell(0322)] = accumulator_;
+        stx(cell(0323));
+        sti(007); sti(005); sti(004); sti(003); sti(002);
+        registers_[001] = accumulator_.address();
+        return 03235;
+    }
+    throw MachineError("invalid 12304 entry");
+}
+
 } // namespace poplan
