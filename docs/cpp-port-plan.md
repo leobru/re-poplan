@@ -362,6 +362,23 @@ above describe their original fixtures, not this expansion.
 
 ## Port Order
 
+The r6 POP value stack now has a private, value-oriented C++ interface:
+address/peek, push/pop, drop, and reset. Its backing store remains BESM memory,
+and r6 remains the sole stack pointer; no host container or cached view needs
+synchronization when machines are cloned or execution returns to the interpreter.
+These helpers have no ACC, RMR, ALU-mode, link-register, or dispatch effects.
+Address-named routines retain those architectural effects explicitly. Popped
+cells are not cleared, addresses wrap at 15 bits, and there are no new bounds
+checks. Hardware-stack spills and overlapping activation copies retain their
+original ordering. This is an interface refactor, not a measured speedup or a
+change to historical instruction/dispatch counts.
+
+The [coverage-expansion harness](coverage-expansion.md) now probes the
+argument-bearing POPMESS paths and reader/error recovery before further
+conversion. Run `make coverage-expansion` for fresh baseline deltas and ranked
+fallback regions. Known raw/native diagnostic-text differences are retained as
+experiments, not hidden by output normalization.
+
 The next coverage-led batch adds elapsed-time `POPTIM` at `06476..06502`,
 the `CARRYON` token loop at `10235..10251`, and the observed `POPMESS` no-argument
 constructor paths at `12304..12323`, `12417..12425`, `12433..12444`, and

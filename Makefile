@@ -34,6 +34,10 @@ dictionary: $(DICTIONARY)
 
 coverage-corpus: $(COVERAGE_CORPUS)
 
+.PHONY: coverage-expansion
+coverage-expansion: cpp image listing coverage-corpus
+	python3 tools/coverage-expansion.py --historical
+
 cpp:
 	cmake -S . -B $(CPP_BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
 	cmake --build $(CPP_BUILD_DIR)

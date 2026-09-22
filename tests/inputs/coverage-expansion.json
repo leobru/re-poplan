@@ -1,0 +1,134 @@
+[
+  {
+    "name": "ti",
+    "input": "ISFUNC(POPMESS([TI]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mi-address",
+    "input": "ISFUNC(POPMESS([MI 8:570000]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mi-word-address",
+    "input": "ISFUNC(POPMESS([MI ABC]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mo-word-address",
+    "input": "ISFUNC(POPMESS([MO ABC]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mi-offset",
+    "input": "ISFUNC(POPMESS([MI 8:570000 0]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mi-word-offset",
+    "input": "ISFUNC(POPMESS([MI 8:570000 ABC]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mi-bounds",
+    "input": "ISFUNC(POPMESS([MI 8:570000 0 8:570001 0 94]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "mi-excess",
+    "input": "ISFUNC(POPMESS([MI 8:570000 0 8:570001 0 94 1]))=>\n2+2=>\n",
+    "expected": "** 1\n** 4\n"
+  },
+  {
+    "name": "pto",
+    "input": "ISFUNC(POPMESS([PTO]))=>\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "mi-missing",
+    "input": "POPMESS([MI]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "mo-missing",
+    "input": "POPMESS([MO]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "close-missing",
+    "input": "POPMESS([CLOSE]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "close-number",
+    "input": "POPMESS([CLOSE 1]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "close-to",
+    "input": "POPMESS([% \"CLOSE\", POPMESS([TO]) %]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "close-ci",
+    "input": "POPMESS([% \"CLOSE\", POPMESS([CI]) %]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "empty",
+    "input": "POPMESS([]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "unknown",
+    "input": "POPMESS([ABC]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "nonword",
+    "input": "POPMESS([1]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "to-excess",
+    "input": "POPMESS([TO ABC]);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12046"
+  },
+  {
+    "name": "nonlist",
+    "input": "POPMESS(1);\n2+2=>\n",
+    "diagnostic_mismatch": true,
+    "diagnostic": "12020"
+  },
+  {
+    "name": "carryon-eof",
+    "input": "CARRYON(CHARIN);A B\n",
+    "expected": ""
+  },
+  {
+    "name": "numberread-eof",
+    "input": "NUMBERREAD()=>\n",
+    "expected": ""
+  },
+  {
+    "name": "constructor-eof",
+    "input": "POPMESS([MI\n",
+    "expected": ""
+  },
+  {
+    "name": "numberread-recovery",
+    "input": "NUMBERREAD()=>\nABC\n2+2=>\n",
+    "diagnostic": "05010"
+  }
+]

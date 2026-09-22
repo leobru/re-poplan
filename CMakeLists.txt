@@ -65,4 +65,9 @@ if(BUILD_TESTING)
                 ${CMAKE_SOURCE_DIR}/build/poplan.bin
                 ${CMAKE_SOURCE_DIR}
     )
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME poplan-coverage-expansion
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/coverage-expansion.py
+            --regression --executable $<TARGET_FILE:poplan>
+            --output ${CMAKE_BINARY_DIR}/coverage-expansion)
 endif()

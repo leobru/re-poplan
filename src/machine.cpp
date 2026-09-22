@@ -934,18 +934,50 @@ void Machine::stx(std::uint16_t address)
     select_alu_group(rau_logical);
 }
 
+std::uint16_t Machine::value_stack_address(int offset) const
+{
+    return address_add(registers_[006], offset);
+}
+
+Word48 Machine::value_stack_peek(int offset) const
+{
+    return memory_[value_stack_address(offset)];
+}
+
+void Machine::value_stack_push(Word48 value)
+{
+    const auto address = value_stack_address(-1);
+    memory_[address] = value;
+    registers_[006] = address;
+}
+
+Word48 Machine::value_stack_pop()
+{
+    const Word48 value = value_stack_peek();
+    value_stack_drop();
+    return value;
+}
+
+void Machine::value_stack_drop(unsigned count)
+{
+    registers_[006] = value_stack_address(static_cast<int>(count & 077777));
+}
+
+void Machine::value_stack_reset(std::uint16_t address)
+{
+    registers_[006] = address & 077777;
+}
+
 void Machine::p03275_push_acc()
 {
     // 03275: utm -1(6); atx (6)
-    registers_[06] = address_add(registers_[06], -1);
-    memory_[registers_[06]] = accumulator_;
+    value_stack_push(accumulator_);
 }
 
 void Machine::p03277_pop_acc()
 {
     // 03277: xta (6); utm 1(6)
-    accumulator_ = memory_[registers_[06]];
-    registers_[06] = address_add(registers_[06], 1);
+    accumulator_ = value_stack_pop();
     select_alu_group(rau_logical);
 }
 
@@ -963,8 +995,8 @@ std::uint16_t Machine::p03303_store_stack_top()
 {
     // XTS (r6) preserves the incoming accumulator on the hardware stack;
     // STX (r16) stores the POP top and restores that accumulator.
-    xts(registers_[006]);
-    registers_[006] = address_add(registers_[006], 1);
+    xts(value_stack_address());
+    value_stack_drop();
     stx(registers_[016]);
     return registers_[015];
 }
@@ -5156,7 +5188,7 @@ std::uint16_t Machine::p05255()
 
 std::uint16_t Machine::p05261()
 {
-    registers_[006] = memory_[017011].address();
+    value_stack_reset(memory_[017011].address());
     registers_[016] = 020571;
     accumulator_ = memory_[registers_[016]];
     select_alu_group(rau_logical);
@@ -10793,8 +10825,7 @@ std::uint16_t Machine::p21544()
         accumulator_.raw()
         ^ memory_[address_add(registers_[001], 065)].raw());
     remainder_ = old_accumulator;
-    memory_[address_add(registers_[006], -1)] = accumulator_;
-    registers_[006] = address_add(registers_[006], -1);
+    value_stack_push(accumulator_);
     registers_[016] = 012234;
     registers_[015] = 021550;
     return 02767;
@@ -10809,8 +10840,7 @@ std::uint16_t Machine::p21550()
     accumulator_ = memory_[address_add(registers_[016], 4)];
     memory_[address_add(registers_[001], 072)] = accumulator_;
 
-    accumulator_ = memory_[registers_[006]];
-    registers_[006] = address_add(registers_[006], 1);
+    accumulator_ = value_stack_pop();
     const std::uint16_t descriptor =
         memory_[address_add(registers_[001], 072)].address();
     memory_[address_add(descriptor, 2)] = accumulator_;
@@ -10862,8 +10892,7 @@ std::uint16_t Machine::p21565()
         }
         accumulator_ = memory_[registers_[002]];
         select_alu_group(rau_logical);
-        memory_[address_add(registers_[006], -1)] = accumulator_;
-        registers_[006] = address_add(registers_[006], -1);
+        value_stack_push(accumulator_);
         const std::uint16_t descriptor =
             memory_[address_add(registers_[001], 070)].address();
         accumulator_ = memory_[address_add(descriptor, 3)];
@@ -10962,8 +10991,7 @@ std::uint16_t Machine::p15667_popdat()
     registers_[010] = 015667;
     accumulator_ = memory_[address_add(registers_[010], 016)];
     select_alu_group(rau_logical);
-    memory_[address_add(registers_[006], -1)] = accumulator_;
-    registers_[006] = address_add(registers_[006], -1);
+    value_stack_push(accumulator_);
     registers_[016] = 01723;
     registers_[015] = 015672;
     return 02767;
@@ -10972,7 +11000,7 @@ std::uint16_t Machine::p15667_popdat()
 std::uint16_t Machine::p15672_finish_popdat()
 {
     registers_[010] = 015667;
-    accumulator_ = memory_[registers_[006]];
+    accumulator_ = value_stack_peek();
     select_alu_group(rau_logical);
     registers_[014] = accumulator_.address();
 
@@ -10991,8 +11019,7 @@ std::uint16_t Machine::p15672_finish_popdat()
         ^ memory_[address_add(registers_[010], 022)].raw());
     remainder_ = time;
     select_alu_group(rau_logical);
-    memory_[address_add(registers_[006], -1)] = accumulator_;
-    registers_[006] = address_add(registers_[006], -1);
+    value_stack_push(accumulator_);
     return 03235;
 }
 
@@ -11018,7 +11045,7 @@ std::uint16_t Machine::p15714()
     registers_[004] = registers_[013];
     registers_[010] = 015712;
 
-    accumulator_ = memory_[registers_[006]];
+    accumulator_ = value_stack_peek();
     select_alu_group(rau_logical);
     registers_[012] = accumulator_.address();
     shift_accumulator(41);
@@ -11031,9 +11058,9 @@ std::uint16_t Machine::p15714()
     if (accumulator_condition()) {
         return 015750;
     }
-    registers_[006] = address_add(registers_[006], 1);
+    value_stack_drop();
 
-    accumulator_ = memory_[registers_[006]];
+    accumulator_ = value_stack_peek();
     select_alu_group(rau_logical);
     registers_[011] = accumulator_.address();
     shift_accumulator(41);
@@ -11046,7 +11073,7 @@ std::uint16_t Machine::p15714()
     if (accumulator_condition()) {
         return 015750;
     }
-    registers_[006] = address_add(registers_[006], 1);
+    value_stack_drop();
 
     registers_[012] = address_add(registers_[012], 1);
     registers_[011] = address_add(registers_[011], 1);
@@ -11138,7 +11165,7 @@ std::uint16_t Machine::p15745()
 
 std::uint16_t Machine::p15750()
 {
-    accumulator_ = memory_[registers_[006]];
+    accumulator_ = value_stack_peek();
     select_alu_group(rau_logical);
     registers_[016] = 011700;
     return 03014;
@@ -11160,7 +11187,7 @@ std::uint16_t Machine::p15756()
 {
     accumulator_ = Word48(registers_[015]);
     select_alu_group(rau_logical);
-    xts(registers_[006]);
+    xts(value_stack_address());
     registers_[015] = 015760;
     return registers_[011];
 }
@@ -11172,7 +11199,7 @@ std::uint16_t Machine::p15760()
         accumulator_.raw() ^ memory_[01637].raw());
     remainder_ = character;
     select_alu_group(rau_logical);
-    stx(registers_[006]);
+    stx(value_stack_address());
     registers_[015] = accumulator_.address();
     return registers_[015];
 }
@@ -11398,7 +11425,7 @@ std::uint16_t Machine::p13370()
     registers_[016] = 06407;
     memory_[registers_[016]] = accumulator_;
     memory_[address_add(registers_[002], 0643)] = accumulator_;
-    registers_[006] = memory_[017011].address();
+    value_stack_reset(memory_[017011].address());
     registers_[016] = 017353;
     registers_[015] = 013375;
     return 017330;
@@ -16416,7 +16443,7 @@ std::uint16_t Machine::p03305()
     // 03305..03307 converts r6 to a BESM number, subtracts it from the
     // constant at 17011, and returns in logical mode 7.
     alu_mode_ = 3;
-    accumulator_ = Word48(registers_[006]);
+    accumulator_ = Word48(value_stack_address());
     select_alu_group(rau_logical);
     reverse_subtract(memory_[017011]);
     alu_mode_ = 7;
@@ -25934,9 +25961,9 @@ std::uint16_t Machine::p12304(std::uint16_t entry)
         its(002); its(003); its(004); its(005); its(007);
         hardware_push_acc();
         registers_[001] = 012304;
-        load(registers_[006]);
+        load(value_stack_address());
         memory_[cell(0322)] = accumulator_;
-        registers_[006] = address_add(registers_[006], 1);
+        value_stack_drop();
         memory_[cell(0320)] = accumulator_;
         load(0);
         memory_[cell(0316)] = accumulator_;
@@ -25975,8 +26002,7 @@ std::uint16_t Machine::p12304(std::uint16_t entry)
         load(address_add(registers_[004], 1));
         shift_accumulator(24);
         exclusive_or(0237);
-        memory_[address_add(registers_[006], -1)] = accumulator_;
-        registers_[006] = address_add(registers_[006], -1);
+        value_stack_push(accumulator_);
         return cell(0206);
     case 012424:
         registers_[016] = 012046;

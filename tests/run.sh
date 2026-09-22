@@ -190,5 +190,7 @@ python3 -m unittest discover -s "$root/tests" -p 'test_*.py'
 cmake -S "$root" -B "$root/build/cpp" -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$root/build/cpp"
 ctest --test-dir "$root/build/cpp" --output-on-failure
+python3 "$root/tools/coverage-expansion.py" --regression --historical \
+    --output "$temporary/coverage-expansion"
 
 echo "POPLAN smoke tests passed"

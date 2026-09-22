@@ -2,6 +2,15 @@
 
 ## Resident primitive expansion
 
+### Coverage-only constructor frontier
+
+The 2026-09-17 [coverage expansion](docs/coverage-expansion.md) observes
+argument-bearing POPMESS execution at `12324..12336`, `12353..12376`,
+`12404..12416`, and `12426..12432`. These remain interpreter paths, not newly
+translated entries. The largest measured fallback region is `12353..12376`;
+`mi-address` supplies a small successful reproducer. Generated instructions and
+uncertain listing boundaries are excluded from the static-candidate ranking.
+
 ### Timer, token-reader and device-constructor coverage
 
 | Entries | Established behavior and coverage |

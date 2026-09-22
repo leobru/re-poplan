@@ -969,6 +969,13 @@ private:
     void xts(std::uint16_t address);
     void sti(std::size_t index);
     void stx(std::uint16_t address);
+    // POP value stack: shared BESM storage, no cached pointer or ALU effects.
+    std::uint16_t value_stack_address(int offset = 0) const;
+    Word48 value_stack_peek(int offset = 0) const;
+    void value_stack_push(Word48 value);
+    Word48 value_stack_pop();
+    void value_stack_drop(unsigned count = 1);
+    void value_stack_reset(std::uint16_t address);
     bool execute_generated_routine(std::uint16_t &continuation);
     std::uint16_t find_static_keyword(Word48 identifier) const;
     bool native_character_output_active() const;

@@ -8992,6 +8992,95 @@ int main(int argc, char **argv)
         return continuation;
     };
 
+    // The native value-stack interface shares storage with raw instructions.
+    // In particular, XTS/STX spills must survive even when their addresses alias.
+    auto stack_image = std::make_unique<Machine>();
+    std::istringstream stack_image_input(image_bytes);
+    stack_image->load_image(stack_image_input);
+    for (unsigned mode = 0; mode != 64; ++mode) {
+        for (auto entry : {03275, 03277, 03301, 03303}) {
+            for (unsigned layout = 0; layout != 4; ++layout) {
+                auto native = std::make_unique<Machine>(*stack_image);
+                native->reg(006) = layout == 0 ? 0 : layout == 1 ? 077777 : 06000;
+                native->reg(017) = layout == 2 ? 06000 : 06001;
+                native->reg(016) = layout == 3 ? 06001 : native->reg(006);
+                native->reg(015) = 04567;
+                native->accumulator() = Word48(06400000000000123ULL);
+                native->remainder() = Word48(07123456701234567ULL);
+                native->alu_mode() = mode;
+                native->memory(native->reg(006)) = Word48(06400000000000456ULL);
+                native->start(entry);
+                auto raw = std::make_unique<Machine>(*native);
+                raw->set_translated_routines_enabled(false);
+                compare_one_semantic_step(*native, *raw, {},
+                                         "value-stack wrapping/aliasing", 20);
+                require(native->translated_routine_count() == 1,
+                        "value-stack helpers introduce no nested dispatch");
+            }
+        }
+    }
+    for (bool second_invalid : {false, true}) {
+        auto native = std::make_unique<Machine>(*stack_image);
+        native->reg(006) = 06000;
+        native->reg(017) = 07000;
+        native->reg(013) = 021275;
+        native->memory(06000) = second_invalid
+            ? Word48((std::uint64_t{0162} << 41) | 04000) : Word48(04000);
+        native->memory(06001) = Word48(04100);
+        native->start(015714);
+        auto raw = std::make_unique<Machine>(*native);
+        raw->set_translated_routines_enabled(false);
+        require(compare_one_semantic_step(*native, *raw, {},
+                    "value-stack validation before consumption", 60) == 015750,
+                "invalid stack operand reaches original continuation");
+        require(native->reg(006) == (second_invalid ? 06001 : 06000),
+                "only validated operands are consumed");
+    }
+    for (auto top : {070000, 066013}) {
+        auto native = std::make_unique<Machine>(*stack_image);
+        native->memory(020142) = Word48(077777);
+        native->memory(020143) = Word48(1);
+        native->reg(017) = 066013;
+        native->reg(016) = 3;
+        native->reg(015) = 05555;
+        native->reg(002) = 01111;
+        native->reg(006) = top;
+        native->memory(066011) = Word48(06400000000000001ULL);
+        native->memory(066012) = Word48(06400000000000002ULL);
+        native->accumulator() = Word48(06400000000000003ULL);
+        native->start(020124);
+        auto raw = std::make_unique<Machine>(*native);
+        raw->set_translated_routines_enabled(false);
+        compare_one_semantic_step(*native, *raw, {},
+                                 "value-stack overlapping activation transfer", 200);
+    }
+    auto alternating = std::make_unique<Machine>(*stack_image);
+    alternating->reg(006) = 06000;
+    alternating->reg(015) = 04567;
+    auto alternating_raw = std::make_unique<Machine>(*alternating);
+    alternating_raw->set_translated_routines_enabled(false);
+    for (unsigned iteration = 0; iteration != 8; ++iteration) {
+        // Clone after each boundary: no helper retains pointers into its owner.
+        alternating = std::make_unique<Machine>(*alternating);
+        const auto entry = iteration % 2 == 0 ? 03275 : 03277;
+        alternating->accumulator() = Word48(iteration + 012345);
+        alternating_raw->accumulator() = alternating->accumulator();
+        alternating->start(entry);
+        alternating_raw->start(entry);
+        alternating->set_translated_routines_enabled(iteration % 3 != 0);
+        if (iteration % 3 == 0) {
+            do {
+                alternating->step();
+                alternating_raw->step();
+            } while (alternating->program_counter() != 04567);
+            require_same_architectural_state(*alternating, *alternating_raw,
+                                            "value-stack raw interoperation");
+        } else {
+            compare_one_semantic_step(*alternating, *alternating_raw, {},
+                                     "value-stack semantic interoperation", 20);
+        }
+    }
+
     // Replay real reader/device frames instruction by instruction, comparing
     // every new semantic entry to the raw continuation from the same snapshot.
     // The timer's nondeterministic E63 sample is taken by the oracle; 06500

@@ -59,7 +59,7 @@ def render(coverages: list[Coverage]) -> str:
     lines = [
         "# POPLAN Coverage Corpus",
         "",
-        "| Map | Words | Static words | Left halves | Right halves | Exclusive |",
+        "| Map | Words | Words below 36000 | Left halves | Right halves | Exclusive |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for coverage in coverages:
@@ -74,7 +74,7 @@ def render(coverages: list[Coverage]) -> str:
         [
             "",
             f"- Union word addresses: {len(union)}",
-            f"- Union static-image addresses below `36000`: {static_union}",
+            f"- Union addresses below `36000` (address band, not static-code proof): {static_union}",
             "",
         ]
     )

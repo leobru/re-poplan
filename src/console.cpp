@@ -423,6 +423,8 @@ int run_image_shell(Machine &machine, std::istream &input,
                       << " acc=" << std::setw(16)
                       << machine.accumulator().raw()
                       << " r15=" << std::setw(5) << machine.reg(015)
+                      << " word=" << std::setw(16)
+                      << machine.memory(machine.program_counter()).raw()
                       << '\n';
         }
         const std::uint16_t entry = machine.program_counter();
