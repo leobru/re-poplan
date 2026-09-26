@@ -1,5 +1,6 @@
 #include "poplan/console.hpp"
 #include "poplan/machine.hpp"
+#include "poplan/native.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -45,6 +46,9 @@ int run_default_image(poplan::Machine &machine, const char *argv0)
 int main(int argc, char **argv)
 {
     try {
+        if (argc == 2 && std::string(argv[1]) == "--native") {
+            return poplan::run_native_shell(std::cin, std::cout, std::cerr);
+        }
         poplan::Machine machine;
         if (argc == 1) {
             return run_default_image(machine, argv[0]);
@@ -55,7 +59,7 @@ int main(int argc, char **argv)
         if (argc == 3 && std::string(argv[1]) == "--image") {
             return run_image(machine, argv[2]);
         }
-        std::cerr << "usage: poplan [--image IMAGE | --io-demo]\n";
+        std::cerr << "usage: poplan [--image IMAGE | --io-demo | --native]\n";
         return 2;
     } catch (const std::exception &error) {
         std::cerr << "poplan: " << error.what() << '\n';

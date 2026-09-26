@@ -1,5 +1,6 @@
 #include "poplan/machine.hpp"
 #include "poplan/console.hpp"
+#include "poplan/native.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -521,7 +522,23 @@ bool Machine::accumulator_condition() const
     return true;
 }
 
-void Machine::normalize_and_round(std::int64_t mantissa, int exponent,
+namespace {
+// Shared numerical implementation. Native callers supply operation-local storage;
+// the reference backend supplies references to its architectural state.
+struct NumericScratch {
+    Word48 &accumulator_;
+    Word48 &remainder_;
+    std::uint8_t &alu_mode_;
+    void select_alu_group(std::uint8_t group) {
+        alu_mode_ = static_cast<std::uint8_t>((alu_mode_ & ~rau_group_mask) | group);
+    }
+    void normalize_and_round(std::int64_t, int, std::uint64_t, bool);
+    void multiply(Word48);
+    void arithmetic_add(Word48, bool, bool);
+    void divide(Word48);
+};
+
+void NumericScratch::normalize_and_round(std::int64_t mantissa, int exponent,
                                   std::uint64_t low, bool round)
 {
     std::uint64_t shifted_out = 0;
@@ -616,7 +633,7 @@ void Machine::normalize_and_round(std::int64_t mantissa, int exponent,
     }
 }
 
-void Machine::multiply(Word48 value)
+void NumericScratch::multiply(Word48 value)
 {
     if (accumulator_.raw() == 0 || value.raw() == 0) {
         accumulator_ = Word48();
@@ -637,7 +654,7 @@ void Machine::multiply(Word48 value)
     select_alu_group(rau_multiplicative);
 }
 
-void Machine::arithmetic_add(Word48 value, bool negate_accumulator,
+void NumericScratch::arithmetic_add(Word48 value, bool negate_accumulator,
                              bool negate_value)
 {
     MantissaExponent acc(accumulator_);
@@ -719,7 +736,7 @@ void Machine::arithmetic_add(Word48 value, bool negate_accumulator,
     select_alu_group(rau_additive);
 }
 
-void Machine::divide(Word48 value)
+void NumericScratch::divide(Word48 value)
 {
     if (((value.raw() ^ (value.raw() << 1)) & bit41) == 0) {
         throw MachineError("BESM-6 arithmetic division by zero");
@@ -733,8 +750,10 @@ void Machine::divide(Word48 value)
         quotient.exponent =
             dividend.exponent - divisor.exponent + 65;
     } else {
-        dividend.mantissa <<= 1;
-        divisor.mantissa <<= 1;
+        // Mantissas are signed 41-bit values; multiplication avoids the
+        // undefined C++17 left shift of a negative signed integer.
+        dividend.mantissa *= 2;
+        divisor.mantissa *= 2;
         if (std::llabs(dividend.mantissa)
             >= std::llabs(divisor.mantissa)) {
             dividend.normalize_right();
@@ -764,6 +783,82 @@ void Machine::divide(Word48 value)
     }
     normalize_and_round(quotient.mantissa, quotient.exponent, 0, false);
     select_alu_group(rau_multiplicative);
+}
+
+} // namespace
+
+void Machine::normalize_and_round(std::int64_t mantissa, int exponent,
+                                  std::uint64_t low, bool round)
+{
+    NumericScratch{accumulator_, remainder_, alu_mode_}
+        .normalize_and_round(mantissa, exponent, low, round);
+}
+
+void Machine::multiply(Word48 value)
+{
+    NumericScratch{accumulator_, remainder_, alu_mode_}.multiply(value);
+}
+
+void Machine::arithmetic_add(Word48 value, bool negate_accumulator,
+                             bool negate_value)
+{
+    NumericScratch{accumulator_, remainder_, alu_mode_}
+        .arithmetic_add(value, negate_accumulator, negate_value);
+}
+
+void Machine::divide(Word48 value)
+{
+    NumericScratch{accumulator_, remainder_, alu_mode_}.divide(value);
+}
+
+NativeNumberResult native_number_binary(NativeBinary operation,
+                                        Word48 left, Word48 right)
+{
+    // 06712 normalizes tagged integers with NTR 6 and addition of zero.
+    constexpr std::uint64_t integer_tag = 06400000000000000ULL;
+    constexpr std::uint64_t tag_mask = 07700000000000000ULL;
+    const bool left_integer = (left.raw() & tag_mask) == integer_tag;
+    const bool right_integer = (right.raw() & tag_mask) == integer_tag;
+    Word48 result = left;
+    Word48 remainder;
+    std::uint8_t mode = 006;
+    NumericScratch scratch{result, remainder, mode};
+    try {
+        if (right_integer) {
+            result = right;
+            scratch.arithmetic_add(Word48(), false, false);
+            right = result;
+        }
+        result = left;
+        if (left_integer) {
+            scratch.arithmetic_add(Word48(), false, false);
+        }
+        switch (operation) {
+        case NativeBinary::add: scratch.arithmetic_add(right, false, false); break;
+        case NativeBinary::subtract: scratch.arithmetic_add(right, false, true); break;
+        case NativeBinary::multiply: scratch.multiply(right); break;
+        case NativeBinary::divide: scratch.divide(right); break;
+        }
+        // 06736..06737 retags integer-only +, - and * with NTR 3.
+        if (left_integer && right_integer && operation != NativeBinary::divide) {
+            mode = 003;
+            scratch.arithmetic_add(Word48(integer_tag), false, false);
+        }
+        // 06727 range check, using the data constant at 06755.
+        const std::uint64_t sum = (result.raw() >> 1) + 0560000000000000ULL;
+        const std::uint64_t checked = (sum & Word48::mask) + (sum >> 48);
+        if ((checked & bit48) != 0) {
+            return {Word48(), "native arithmetic: POP diagnostic 13017"};
+        }
+        return {result, {}};
+    } catch (const MachineError &error) {
+        return {Word48(), error.what()};
+    }
+}
+
+std::string native_format_number(Word48 value)
+{
+    return format_prreal(value);
 }
 
 void Machine::elementary_function(std::uint16_t function)

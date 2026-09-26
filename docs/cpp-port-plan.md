@@ -3,6 +3,15 @@
 The target is a C++ reproduction of the complete BESM-6 POPLAN system. It is
 not an independently designed POP-2 parser or interpreter.
 
+## Separate image-independent backend
+
+The opt-in `--native` development path and its open implementation gates are
+tracked in [native-runtime.md](native-runtime.md). It currently supports only
+binary arithmetic probes. Native logical allocation/release and packed-name
+interning now have instruction-only differential tests, but are not yet connected
+to a full native reader/compiler. The fully native language runtime remains
+incomplete. The contract below continues to govern the independent machine reference backend.
+
 ## Compatibility Contract
 
 - Preserve original POPLAN routine boundaries and use their octal entry

@@ -1,4 +1,11 @@
 #include "poplan/machine.hpp"
+#include "poplan/native.hpp"
+
+#include <cstdlib>
+#include <istream>
+#include <iterator>
+#include <ostream>
+#include <stdexcept>
 
 #include "poplan/console.hpp"
 
@@ -856,6 +863,364 @@ std::uint16_t Machine::p03106_print_error_text()
     select_alu_group(rau_logical);
     registers_[015] = 03122;
     return 03122;
+}
+
+} // namespace poplan
+
+// Image-independent POP execution foundation. This code does not call Machine.
+namespace poplan {
+
+std::vector<NativeWord> native_bootstrap_dictionary()
+{
+    std::vector<NativeWord> words;
+    words.reserve(keyword_descriptors.size());
+    for (const auto &descriptor : keyword_descriptors) {
+        words.push_back({descriptor.record, descriptor.name,
+                         descriptor.class_word, descriptor.property_word, {}});
+    }
+    return words;
+}
+
+NativeAllocator::NativeAllocator(std::uint16_t first, std::uint16_t limit)
+    : first_(first), limit_(limit)
+{
+    if (first == 0 || first > limit || limit > 077777) {
+        throw std::invalid_argument("native allocator: invalid logical arena");
+    }
+    // 20660 constructs one common-list extent from the two allocation bounds.
+    if (first != limit) {
+        state_.common.push_back({first, static_cast<std::uint16_t>(limit - first)});
+    }
+}
+
+NativeAllocation NativeAllocator::try_allocate(std::uint32_t words)
+{
+    if (words > 077777) {
+        throw std::invalid_argument("native allocator: request exceeds 15 bits");
+    }
+    // 05430 returns immediately for zero; do not enter the initializing loop.
+    if (words == 0) {
+        return {NativeAllocation::Status::zero_size, {}};
+    }
+    const auto size = static_cast<std::uint16_t>(words);
+    NativeBlock result;
+    if (size < 021 && !state_.small[size].empty()) {
+        // 05451..05454: take the head of the exact-size chain.
+        result = state_.small[size].front();
+        state_.live.push_back(result);
+        state_.small[size].erase(state_.small[size].begin());
+    } else {
+        // 05463..05500: preserve list order, take the first sufficient extent,
+        // and split from its HIGH end. No best-fit search or coalescing occurs.
+        auto found = std::find_if(state_.common.begin(), state_.common.end(),
+            [size](const NativeBlock &block) { return block.words >= size; });
+        if (found == state_.common.end()) {
+            // This is 05462's failed attempt, not a final out-of-memory error.
+            return {NativeAllocation::Status::collection_required, {}};
+        }
+        const auto remainder = static_cast<std::uint16_t>(found->words - size);
+        result = {static_cast<std::uint16_t>(found->address + remainder), size};
+        state_.live.push_back(result);
+        if (remainder == 0) {
+            state_.common.erase(found);
+        } else {
+            found->words = remainder;
+        }
+    }
+    // Object storage must initialize each returned word to the unbound value
+    // (05455..05461). This metadata allocator does not own object payloads.
+    return {NativeAllocation::Status::allocated, result};
+}
+
+void NativeAllocator::release(NativeBlock block)
+{
+    // 03506's zero-size path leaves all lists unchanged.
+    if (block.words == 0) return;
+    const auto found = std::find_if(state_.live.begin(), state_.live.end(),
+        [block](const NativeBlock &live) {
+            return live.address == block.address && live.words == block.words;
+        });
+    if (found == state_.live.end()) {
+        // Native ownership violations are implementation errors, not POP errors.
+        throw std::logic_error("native allocator: release is not a live allocation");
+    }
+    // 03506/03516 push at the head. Small sizes 1..020 have distinct chains;
+    // size 021 and above prepend the common list, without merging neighbors.
+    auto &chain = block.words < 021 ? state_.small[block.words] : state_.common;
+    chain.insert(chain.begin(), block);
+    state_.live.erase(found);
+}
+
+NativeCoreUsage NativeAllocator::core_usage() const
+{
+    // 10402..10414 deliberately omits size-specific lists. Thus a release of
+    // a small object does not reduce COREUSED even though its space is reusable.
+    std::uint32_t common_free = 0;
+    for (const auto &block : state_.common) common_free += block.words;
+    return {static_cast<std::uint16_t>(limit_ - first_ - common_free),
+            static_cast<std::uint16_t>(common_free)};
+}
+
+std::uint8_t NativeDictionary::hash(Word48 name)
+{
+    // 01107..01121: successive masked left shifts followed by right shifts
+    // 40,39,...,35. Later samples include high bits of the following byte;
+    // replacing this with a simple weighted sum of bytes changes collisions.
+    std::uint64_t sum = 0;
+    for (unsigned index = 0; index < 6; ++index) {
+        const auto sample = ((name.raw() << (8 * index)) & Word48::mask)
+            >> (40 - index);
+        if (sample == 0) break;
+        sum += sample;
+    }
+    return static_cast<std::uint8_t>(sum & 0377);
+}
+
+const NativeWord &NativeDictionary::word(std::uint32_t handle) const
+{
+    const auto found = std::find_if(words_.begin(), words_.end(),
+        [handle](const NativeWord &word) { return word.handle == handle; });
+    if (found == words_.end()) {
+        throw std::logic_error("native dictionary: unknown word handle");
+    }
+    return *found;
+}
+
+NativeWord &NativeDictionary::mutable_word(std::uint32_t handle)
+{
+    // The public view is read-only so names and collision links cannot be
+    // accidentally mutated without the corresponding dictionary operation.
+    return const_cast<NativeWord &>(static_cast<const NativeDictionary &>(*this).word(handle));
+}
+
+NativeDictionary::NativeDictionary(NativeAllocator &allocator)
+    : allocator_(allocator), words_(native_bootstrap_dictionary())
+{
+    const auto check_arena = [](const auto &blocks) {
+        for (const auto &block : blocks) {
+            if (block.address < 02740 && block.address + block.words > 01400) {
+                throw std::invalid_argument("native dictionary: arena overlaps resident records");
+            }
+        }
+    };
+    check_arena(allocator.snapshot().common);
+    check_arena(allocator.snapshot().live);
+    for (const auto &chain : allocator.snapshot().small) check_arena(chain);
+    // Reconstruct heads from the resident data links, preserving the original
+    // collision order. Do not reorder records by name or descriptor address.
+    std::vector<std::uint32_t> linked;
+    for (const auto &record : words_) {
+        const auto next = record.properties.address();
+        if (next != 0) {
+            if (hash(record.packed_name) != hash(word(next).packed_name)) {
+                throw std::logic_error("native dictionary: inconsistent resident collision link");
+            }
+            linked.push_back(next);
+        }
+    }
+    for (const auto &record : words_) {
+        if (std::find(linked.begin(), linked.end(), record.handle) == linked.end()) {
+            auto &head = heads_[hash(record.packed_name)];
+            if (head != 0) {
+                throw std::logic_error("native dictionary: multiple resident bucket heads");
+            }
+            head = record.handle;
+        }
+    }
+    for (const auto &record : words_) {
+        if (lookup(record.packed_name) != record.handle) {
+            throw std::logic_error("native dictionary: unreachable resident word");
+        }
+    }
+}
+
+std::uint32_t NativeDictionary::lookup(Word48 name) const
+{
+    auto handle = heads_[hash(name)];
+    std::size_t remaining = words_.size();
+    while (handle != 0) {
+        if (remaining-- == 0) {
+            throw std::logic_error("native dictionary: cyclic collision chain");
+        }
+        const auto &record = word(handle);
+        if (record.packed_name == name) return handle;
+        handle = record.properties.address();
+    }
+    return 0;
+}
+
+NativeInternResult NativeDictionary::intern(Word48 name)
+{
+    const auto existing = lookup(name);
+    if (existing != 0) return {NativeInternResult::Status::found, existing};
+    // Reserve host metadata before changing logical allocation state.
+    words_.reserve(words_.size() + 1);
+    const auto allocation = allocator_.try_allocate(4); // 01137 / 01150
+    if (allocation.status != NativeAllocation::Status::allocated) {
+        return {NativeInternResult::Status::collection_required, 0};
+    }
+    const auto handle = allocation.block.address;
+    // 01154..01157 initializes name, property word and two unbound fields.
+    words_.push_back({handle, name, Word48(06500000000000000ULL),
+                      Word48(03000000000000000ULL), {}});
+    auto &head = heads_[hash(name)];
+    if (head == 0) {
+        head = handle; // 01140: previously empty hash bucket
+    } else {
+        auto tail = head;
+        while (word(tail).properties.address() != 0) {
+            tail = word(tail).properties.address();
+        }
+        auto &property = mutable_word(tail).properties;
+        property = Word48((property.raw() & ~std::uint64_t{077777}) | handle);
+    }
+    return {NativeInternResult::Status::created, handle};
+}
+
+NativeProgram native_compile_probe(const std::string &source)
+{
+    NativeProgram program;
+    std::size_t position = 0;
+    const auto space = [&] {
+        while (position < source.size()
+               && (source[position] == ' ' || source[position] == '\t'
+                   || source[position] == '\n' || source[position] == '\r')) {
+            ++position;
+        }
+    };
+    const auto integer = [&](Word48 &value) {
+        space();
+        const auto start = position;
+        std::uint64_t payload = 0;
+        // Decimal integer payload in PRREAL: signed 40 bits. Until the full
+        // scanner is ported, reject overflow rather than inventing promotion.
+        constexpr std::uint64_t maximum = (std::uint64_t{1} << 39) - 1;
+        while (position < source.size()
+               && source[position] >= '0' && source[position] <= '9') {
+            const unsigned digit = source[position] - '0';
+            if (payload > (maximum - digit) / 10) {
+                return false;
+            }
+            payload = payload * 10 + digit;
+            ++position;
+        }
+        value = Word48(06400000000000000ULL | payload);
+        return position != start;
+    };
+    const auto unsupported = [&] {
+        // Compile the entire probe before execution; unsupported text cannot
+        // leave partial output or cause a fallback into the reference backend.
+        program.operations.clear();
+        program.error = "native compiler incomplete at byte "
+            + std::to_string(position)
+            + ": supported development probe is INTEGER OP INTEGER =>";
+        return program;
+    };
+    space();
+    while (position < source.size()) {
+        Word48 left, right;
+        if (!integer(left)) return unsupported();
+        space();
+        if (position == source.size()) return unsupported();
+        NativeBinary binary;
+        std::uint16_t provenance;
+        switch (source[position++]) {
+        case '+': binary = NativeBinary::add; provenance = 06672; break;
+        case '-': binary = NativeBinary::subtract; provenance = 06702; break;
+        case '*': binary = NativeBinary::multiply; provenance = 06676; break;
+        case '/': binary = NativeBinary::divide; provenance = 06706; break;
+        default: return unsupported();
+        }
+        if (!integer(right)) return unsupported();
+        space();
+        if (source.compare(position, 2, "=>") != 0) return unsupported();
+        position += 2;
+        program.operations.push_back({NativeOperation::Kind::constant, left});
+        program.operations.push_back({NativeOperation::Kind::constant, right});
+        program.operations.push_back({NativeOperation::Kind::binary, {}, binary, provenance});
+        program.operations.push_back({NativeOperation::Kind::print, {}, {}, 012674});
+        space();
+    }
+    return program;
+}
+
+NativeExecutionResult native_execute(const NativeProgram &program,
+                                     std::ostream &output)
+{
+    NativeExecutionResult result;
+    if (!program.error.empty()) {
+        result.error = program.error;
+        return result;
+    }
+    std::vector<Word48> values;
+    // The linear probe has one explicit operation cursor. General activation
+    // frames and legacy code/activation accounting remain separate open gates.
+    for (std::size_t operation = 0; operation < program.operations.size(); ++operation) {
+        const auto &instruction = program.operations[operation];
+        ++result.operations;
+        switch (instruction.kind) {
+        case NativeOperation::Kind::constant:
+            values.push_back(instruction.constant);
+            break;
+        case NativeOperation::Kind::binary: {
+            if (values.size() < 2) {
+                result.error = "invalid native graph: binary stack underflow";
+                return result;
+            }
+            const Word48 right = values.back();
+            values.pop_back();
+            const auto number = native_number_binary(instruction.binary, values.back(), right);
+            if (!number.error.empty()) {
+                result.error = number.error;
+                return result;
+            }
+            values.back() = number.value;
+            break;
+        }
+        case NativeOperation::Kind::print:
+            if (values.empty()) {
+                result.error = "invalid native graph: print stack underflow";
+                return result;
+            }
+            output << "**";
+            for (const auto value : values) {
+                const auto text = native_format_number(value);
+                output << text;
+            }
+            output << '\n';
+            values.clear();
+            break;
+        }
+    }
+    return result;
+}
+
+int run_native_shell(std::istream &input, std::ostream &output, std::ostream &errors)
+{
+    for (const char *control : {"POPLAN_INTERPRET_ONLY", "POPLAN_DISABLE_TRANSLATED_ROUTINES",
+                               "POPLAN_CPU_TRACE", "POPLAN_CPU_DETAIL_TRACE",
+                               "POPLAN_ROUTINE_TRACE", "POPLAN_E70_TRACE"}) {
+        if (std::getenv(control) != nullptr) {
+            errors << "poplan: --native is incompatible with " << control << '\n';
+            return 2;
+        }
+    }
+    const std::string source{std::istreambuf_iterator<char>(input),
+                             std::istreambuf_iterator<char>()};
+    if (input.bad()) {
+        errors << "poplan: native input read failed\n";
+        return 1;
+    }
+    const auto result = native_execute(native_compile_probe(source), output);
+    if (!result.error.empty()) {
+        errors << "poplan: " << result.error << '\n';
+        return 1;
+    }
+    if (!output) {
+        errors << "poplan: native output write failed\n";
+        return 1;
+    }
+    return 0;
 }
 
 } // namespace poplan

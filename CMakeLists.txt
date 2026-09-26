@@ -34,6 +34,12 @@ if(BUILD_TESTING)
         COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin
     )
 
+    add_test(NAME poplan-native-allocator
+        COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-allocator)
+
+    add_test(NAME poplan-native-dictionary
+        COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-dictionary)
+
     add_executable(poplan_console_tests tests/cpp/console_test.cpp)
     target_link_libraries(poplan_console_tests PRIVATE poplan_core)
     add_test(NAME poplan-console-tests COMMAND poplan_console_tests)
@@ -70,4 +76,16 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/coverage-expansion.py
             --regression --executable $<TARGET_FILE:poplan>
             --output ${CMAKE_BINARY_DIR}/coverage-expansion)
+endif()
+
+if(BUILD_TESTING)
+    # Compile the same entry point with a CPU object that fails on any machine
+    # step or decode. The remaining core objects are shared with production.
+    add_executable(poplan_native_guard src/main.cpp src/machine_cpu.cpp)
+    target_compile_definitions(poplan_native_guard PRIVATE POPLAN_FORBID_MACHINE_EXECUTION)
+    target_link_libraries(poplan_native_guard PRIVATE poplan_core)
+    add_test(NAME poplan-native-probe
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/native-probe.py
+                $<TARGET_FILE:poplan> $<TARGET_FILE:poplan_native_guard>
+                ${CMAKE_SOURCE_DIR})
 endif()

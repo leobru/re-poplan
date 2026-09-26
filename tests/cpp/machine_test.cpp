@@ -1,5 +1,6 @@
 #include "poplan/console.hpp"
 #include "poplan/machine.hpp"
+#include "poplan/native.hpp"
 
 #include <cstdio>
 #include <ctime>
@@ -152,6 +153,301 @@ void write_word(std::ostream &output, std::uint64_t word)
     }
 }
 
+void test_native_allocator(const char *image_path)
+{
+    using poplan::Machine;
+    using poplan::NativeAllocation;
+    using poplan::NativeAllocator;
+    using poplan::NativeBlock;
+    using poplan::Word48;
+    constexpr std::uint16_t first = 040000;
+    constexpr std::uint16_t limit = 041000;
+    auto raw = std::make_unique<Machine>();
+    std::ifstream image(image_path, std::ios::binary);
+    require(bool(image), "allocator oracle image opens");
+    raw->load_image(image);
+    raw->memory(0) = Word48();
+    raw->set_translated_routines_enabled(false);
+    for (unsigned size = 0; size < 021; ++size) {
+        raw->memory(static_cast<std::uint16_t>(05502 + size)) = Word48();
+    }
+    raw->memory(017) = Word48(first);
+    raw->memory(017010) = Word48(limit);
+    const auto run = [&](std::uint16_t entry, std::uint16_t stop = 077700) {
+        raw->start(entry);
+        unsigned steps = 0;
+        while (raw->program_counter() != stop || raw->right_half()) {
+            require(++steps < 10000, "raw allocator reaches the requested boundary");
+            require(raw->step() == poplan::ExecutionStatus::running,
+                    "raw allocator remains runnable");
+        }
+        require(raw->translated_routine_count() == 0,
+                "allocator oracle executes only BESM instructions");
+    };
+    raw->reg(015) = 077700;
+    run(020660);
+    NativeAllocator allocator(first, limit);
+    const auto equal_blocks = [](const auto &a, const auto &b) {
+        if (a.size() != b.size()) return false;
+        for (std::size_t i = 0; i != a.size(); ++i) {
+            if (a[i].address != b[i].address || a[i].words != b[i].words) return false;
+        }
+        return true;
+    };
+    const auto unchanged = [&](const auto &before) {
+        const auto &after = allocator.snapshot();
+        require(equal_blocks(before.common, after.common)
+                    && equal_blocks(before.live, after.live),
+                "unsuccessful native allocation preserves common and live records");
+        for (unsigned size = 0; size < 021; ++size) {
+            require(equal_blocks(before.small[size], after.small[size]),
+                    "unsuccessful native allocation preserves every size bucket");
+        }
+    };
+    const auto check = [&] {
+        const auto &state = allocator.snapshot();
+        std::uint32_t accounted = 0;
+        const auto chain = [&](const auto &blocks, std::uint16_t root, bool common) {
+            auto address = raw->memory(root).address();
+            for (const auto &block : blocks) {
+                require(address == block.address, "native free-list order matches raw links");
+                if (common) {
+                    require((raw->memory(address).raw() >> 24) == block.words,
+                            "native common extent matches raw header size");
+                }
+                accounted += block.words;
+                address = raw->memory(address).address();
+            }
+            require(address == 0, "native and raw free chains end together");
+        };
+        chain(state.common, 05502, true);
+        for (unsigned size = 1; size < 021; ++size) {
+            chain(state.small[size], static_cast<std::uint16_t>(05502 + size), false);
+        }
+        for (const auto &block : state.live) accounted += block.words;
+        require(accounted == limit - first, "native allocator conserves all logical words");
+
+        // COREUSED pushes used first, retaining free on its hardware frame.
+        raw->reg(006) = 067000;
+        raw->reg(017) = 070001;
+        run(010402, 010415);
+        const auto usage = allocator.core_usage();
+        require(raw->memory(raw->reg(006)) == Word48(06400000000000000ULL | usage.used),
+                "native COREUSED used projection agrees with raw routine");
+        require(raw->memory(static_cast<std::uint16_t>(raw->reg(017) - 1))
+                    == Word48(06400000000000000ULL | usage.free),
+                "native COREUSED free projection agrees with raw routine");
+    };
+    const auto allocate = [&](std::uint16_t size) {
+        const auto before = allocator.snapshot();
+        const auto result = allocator.try_allocate(size);
+        raw->reg(015) = 077700;
+        raw->reg(017) = 070001;
+        raw->reg(016) = size;
+        raw->memory(070000) = Word48(size);
+        raw->accumulator() = Word48(size);
+        run(size == 0 ? 05430 : 05447);
+        if (result.status == NativeAllocation::Status::allocated) {
+            require(result.block.address == raw->reg(016) && result.block.words == size,
+                    "native allocation returns the raw logical address and requested extent");
+            for (unsigned word = 0; word < size; ++word) {
+                require(raw->memory(static_cast<std::uint16_t>(result.block.address + word))
+                            == Word48(06500000000000000ULL),
+                        "raw allocator initializes every payload word to unbound");
+            }
+        } else {
+            require(raw->reg(016) == 0, "raw allocation also returns no block");
+            require((size == 0) == (result.status == NativeAllocation::Status::zero_size),
+                    "zero-size success differs from collection-required failure");
+            unchanged(before);
+        }
+        check();
+        return result;
+    };
+    const auto release = [&](NativeBlock block) {
+        allocator.release(block);
+        raw->reg(015) = 077700;
+        raw->reg(017) = 070001;
+        raw->reg(016) = block.address;
+        raw->accumulator() = Word48(block.words);
+        run(03506);
+        check();
+    };
+    check();
+    allocate(0);
+    release({01234, 0});
+    const auto a = allocate(2).block;
+    const auto b = allocate(2).block;
+    const auto usage = allocator.core_usage();
+    release(a);
+    release(b);
+    require(allocator.core_usage().used == usage.used,
+            "small-block release deliberately does not reduce COREUSED");
+    require(allocate(2).block.address == b.address, "small free list reuses newest block first");
+    require(allocate(2).block.address == a.address, "small free list preserves its next block");
+    const auto c = allocate(021).block;
+    const auto d = allocate(040).block;
+    release(d);
+    release(c); // smaller common head must be skipped for a larger request
+    require(allocate(030).block.address == d.address + 010,
+            "first sufficient common block is split at its high end");
+    require(allocate(021).block.address == c.address, "exact common head is unlinked");
+    const auto e = allocate(020).block;
+    const auto f = allocate(022).block;
+    release(e);
+    release(f);
+    require(allocate(022).block.address == f.address, "021 cutoff separates common and small lists");
+    allocate(077777);
+    // Deterministic mixed sequences cover exact removal behind a predecessor,
+    // fragments, exhaustion, and release/reuse without sorting or coalescing.
+    std::uint32_t seed = 0x13579;
+    const std::uint16_t sizes[] = {0, 1, 2, 3, 020, 021, 022, 040, 0100, 0777};
+    for (unsigned i = 0; i < 240; ++i) {
+        seed = seed * 1664525U + 1013904223U;
+        const auto &live = allocator.snapshot().live;
+        if ((seed & 3) == 0 && !live.empty()) {
+            const auto block = live[(seed >> 8) % live.size()];
+            release(block);
+        } else {
+            allocate(sizes[(seed >> 8) % 10]);
+        }
+    }
+    const auto before = allocator.snapshot();
+    bool invalid_release = false;
+    try { allocator.release({first, 077777}); }
+    catch (const std::logic_error &) { invalid_release = true; }
+    require(invalid_release, "native allocator rejects invalid ownership as an implementation error");
+    unchanged(before);
+    bool invalid_size = false;
+    try { allocator.try_allocate(0100000); }
+    catch (const std::invalid_argument &) { invalid_size = true; }
+    require(invalid_size, "native allocator rejects host requests exceeding logical address width");
+    unchanged(before);
+    NativeAllocator empty(first, first);
+    require(empty.try_allocate(1).status == NativeAllocation::Status::collection_required,
+            "empty logical arena cannot allocate through host storage");
+}
+
+void test_native_dictionary(const char *image_path)
+{
+    using poplan::Machine;
+    using poplan::NativeAllocator;
+    using poplan::NativeDictionary;
+    using poplan::NativeInternResult;
+    using poplan::Word48;
+    auto raw = std::make_unique<Machine>();
+    std::ifstream image(image_path, std::ios::binary);
+    require(bool(image), "dictionary oracle image opens");
+    raw->load_image(image);
+    raw->memory(0) = Word48();
+    raw->set_translated_routines_enabled(false);
+    // The normal bootstrap initializes these descriptor constants; the
+    // packed image alone retains scratch/loader data at these locations.
+    raw->memory(01173) = Word48(0377);
+    raw->memory(01174) = Word48(1);
+    raw->memory(01175) = Word48(03000000000000000ULL);
+    raw->memory(01176) = Word48(06500000000000000ULL);
+    raw->memory(01177) = Word48(06440000000000000ULL);
+    constexpr std::uint16_t first = 040000, limit = 040400;
+    raw->memory(017) = Word48(first);
+    raw->memory(017010) = Word48(limit);
+    raw->memory(05502) = Word48(first);
+    raw->memory(first) = Word48(std::uint64_t{limit - first} << 24);
+    NativeAllocator allocator(first, limit);
+    NativeDictionary dictionary(allocator);
+    const auto check = [&] {
+        for (unsigned bucket = 0; bucket < 0400; ++bucket) {
+            auto packed = raw->memory(static_cast<std::uint16_t>(01200 + bucket / 2)).raw();
+            if (bucket % 2 == 0) packed >>= 24;
+            require(dictionary.heads()[bucket] == (packed & 077777),
+                    "native dictionary heads match both halves of the raw hash table");
+        }
+        for (const auto &word : dictionary.words()) {
+            const auto address = static_cast<std::uint16_t>(word.handle);
+            require(word.packed_name == raw->memory(address)
+                        && word.class_word == raw->memory(address + 1)
+                        && word.properties == raw->memory(address + 2),
+                    "native names, class metadata and collision properties match raw records");
+            require(dictionary.lookup(word.packed_name) == word.handle,
+                    "every native word remains reachable by its stable handle");
+            if (address >= first) {
+                require(raw->memory(address + 3) == Word48(06500000000000000ULL)
+                            && word.binding.kind == poplan::NativeValue::Kind::unbound,
+                        "new dictionary words begin with an unbound value");
+            }
+        }
+        require(allocator.core_usage().used == allocator.snapshot().live.size() * 4,
+                "each new native dictionary record costs exactly four logical words");
+    };
+    const auto intern = [&](Word48 name) {
+        const auto before = allocator.snapshot().live.size();
+        const auto found = dictionary.lookup(name);
+        const auto result = dictionary.intern(name);
+        raw->reg(015) = 077700;
+        raw->reg(017) = 070000;
+        raw->accumulator() = name;
+        raw->start(01107);
+        unsigned steps = 0;
+        while ((raw->program_counter() != 077700 && raw->program_counter() != 05523)
+               || raw->right_half()) {
+            require(++steps < 10000, "dictionary oracle reaches return or collection boundary");
+            require(raw->step() == poplan::ExecutionStatus::running,
+                    "dictionary oracle remains runnable");
+        }
+        require(raw->translated_routine_count() == 0, "dictionary oracle is instruction-only");
+        if (raw->program_counter() == 05523) {
+            require(result.status == NativeInternResult::Status::collection_required
+                        && result.handle == 0 && dictionary.lookup(name) == 0,
+                    "native dictionary suspends a missing-name allocation at the raw collection boundary");
+            require(before == allocator.snapshot().live.size(),
+                    "failed interning has no logical allocation effect");
+        } else {
+            require(result.status != NativeInternResult::Status::collection_required
+                        && raw->accumulator() == Word48(06440000000000000ULL | result.handle),
+                    "native interned identity equals raw word address");
+            require((found != 0) == (result.status == NativeInternResult::Status::found),
+                    "existing native interned word is distinguished from new creation");
+            require(allocator.snapshot().live.size() == before + (found == 0 ? 1 : 0),
+                    "repeat interning has no allocation cost");
+        }
+        check();
+        return result;
+    };
+    check();
+    const auto bootstrap = poplan::native_bootstrap_dictionary();
+    for (const auto &word : bootstrap) {
+        require(intern(word.packed_name).handle == word.handle,
+                "resident lookup returns the original descriptor identity without allocation");
+    }
+    intern(Word48("ABCDEF"));
+    intern(Word48("ABCDEF")); // reader-facing API consumes exactly six packed bytes
+    intern(Word48());
+    intern(Word48(0x80ff017fff01ULL));
+    bool exhausted = false;
+    for (unsigned index = 0; index < 80; ++index) {
+        std::string name = "N" + std::to_string(10000 + index);
+        std::uint64_t packed = 0;
+        for (const unsigned char byte : name) packed = (packed << 8) | byte;
+        const auto result = intern(Word48(packed));
+        if (result.status == NativeInternResult::Status::collection_required) {
+            exhausted = true;
+            break;
+        }
+        require(intern(Word48(packed)).handle == result.handle,
+                "dynamic collision-chain hit preserves native identity");
+    }
+    require(exhausted && allocator.core_usage().free == 0,
+            "dictionary reaches the same arena exhaustion threshold as raw allocation");
+    require(dictionary.lookup(Word48("ABCDEF")) != 0,
+            "earlier interned identities survive all host vector reallocations");
+    bool overlap_rejected = false;
+    try {
+        NativeAllocator overlapping(01400, 02000);
+        NativeDictionary invalid(overlapping);
+    } catch (const std::invalid_argument &) { overlap_rejected = true; }
+    require(overlap_rejected, "dynamic arena cannot reuse resident dictionary identities");
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -161,7 +457,89 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 3 && std::string(argv[2]) == "--native-dictionary") {
+        test_native_dictionary(argv[1]);
+        return 0;
+    }
+    if (argc == 3 && std::string(argv[2]) == "--native-allocator") {
+        test_native_allocator(argv[1]);
+        return 0;
+    }
     require(argc == 2, "the extracted POPLAN image path is supplied");
+
+    // Native numeric values are compared against instruction-only POP arithmetic,
+    // including operand normalization and integer retagging, not just host math.
+    {
+        auto original = std::make_unique<Machine>();
+        std::ifstream image(argv[1], std::ios::binary);
+        require(bool(image), "native primitive oracle image opens");
+        original->load_image(image);
+        original->memory(0) = Word48(); // bootstrap clears the loader word
+        const auto integer = [](std::int64_t value) {
+            return Word48(06400000000000000ULL
+                          | (static_cast<std::uint64_t>(value) & 00037777777777777ULL));
+        };
+        const std::vector<Word48> operands = {
+            integer(0), integer(1), integer(-1), integer(7), integer(-13),
+            integer(549755813887LL), integer(-549755813888LL),
+            Word48(04010000000000000ULL), Word48(04110000000000000ULL)
+        };
+        const poplan::NativeBinary operations[] = {
+            poplan::NativeBinary::add, poplan::NativeBinary::subtract,
+            poplan::NativeBinary::multiply, poplan::NativeBinary::divide
+        };
+        const std::uint16_t entries[] = {06733, 06740, 06744, 06750};
+        for (unsigned op = 0; op != 4; ++op) {
+            for (const auto left : operands) for (const auto right : operands) {
+                auto oracle = std::make_unique<Machine>(*original);
+                oracle->set_translated_routines_enabled(false);
+                oracle->reg(017) = 060001;
+                oracle->reg(015) = 077000;
+                oracle->memory(060000) = left;
+                oracle->accumulator() = right;
+                oracle->start(entries[op]);
+                bool failed = false;
+                try {
+                    unsigned steps = 0;
+                    while (oracle->program_counter() != 077000
+                           && oracle->program_counter() != 03014 && steps++ < 200) {
+                        oracle->step();
+                    }
+                    require(steps < 200, "native arithmetic oracle reaches its boundary");
+                    failed = oracle->program_counter() == 03014;
+                } catch (const MachineError &) { failed = true; }
+                const auto native = poplan::native_number_binary(operations[op], left, right);
+                require(failed == !native.error.empty(), "native arithmetic failure agrees with raw oracle: op=" + std::to_string(op)
+                        + " left=" + std::to_string(left.raw()) + " right=" + std::to_string(right.raw())
+                        + " native=" + native.error + " raw=" + std::to_string(failed)
+                        + " code=" + std::to_string(oracle->reg(016))
+                        + " result=" + std::to_string(oracle->accumulator().raw()));
+                if (!failed) {
+                    require(native.value == oracle->accumulator(),
+                            "native numeric bits agree with raw POP arithmetic");
+                }
+            }
+        }
+        std::ostringstream native_output;
+        const auto probe = poplan::native_execute(
+            poplan::native_compile_probe("2+2=>"), native_output);
+        require(probe.error.empty() && probe.operations == 4
+                    && native_output.str() == "** 4\n",
+                "native graph executes four POP operations independently of machine counts");
+        const auto unsupported = poplan::native_execute(
+            poplan::native_compile_probe("2+2=> FUNCTION"), native_output);
+        require(!unsupported.error.empty() && unsupported.operations == 0
+                    && native_output.str() == "** 4\n",
+                "unsupported source has no execution side effects");
+        const auto words = poplan::native_bootstrap_dictionary();
+        require(words.size() == 0270, "native bootstrap contains every resident descriptor");
+        for (const auto &word : words) {
+            require(word.packed_name == original->memory(static_cast<std::uint16_t>(word.handle)),
+                    "native bootstrap packed names agree with image data");
+            require(word.binding.kind == poplan::NativeValue::Kind::unbound,
+                    "native bootstrap never binds an executable historical address");
+        }
+    }
 
     static_assert(Word48("") == Word48(),
                   "an empty ASCII string packs as zero");

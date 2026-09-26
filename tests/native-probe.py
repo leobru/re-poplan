@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Native development slice, with independent raw and guarded execution."""
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+binary, guarded, root = map(Path, sys.argv[1:])
+sys.path.insert(0, str(root / 'tools'))
+import importlib.util
+spec = importlib.util.spec_from_file_location('normalize_output', root / 'tools/normalize-output.py')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+normalize = module.normalize
+
+controls = ('POPLAN_INTERPRET_ONLY', 'POPLAN_DISABLE_TRANSLATED_ROUTINES',
+            'POPLAN_CPU_TRACE', 'POPLAN_CPU_DETAIL_TRACE', 'POPLAN_ROUTINE_TRACE',
+            'POPLAN_E70_TRACE')
+env = {k: v for k, v in os.environ.items() if k not in controls}
+source = '2+2=>\n3-5=>\n7*8=>\n1/2=>\n'
+expected = '** 4\n**-2\n** 56\n** .50000000\n'
+
+def run(executable, args, text, cwd, environment=env):
+    return subprocess.run([str(executable), *args], input=text, text=True,
+                          capture_output=True, cwd=cwd, env=environment, timeout=30)
+
+with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
+    # No image or library is present in the working directory.
+    for executable in (binary, guarded):
+        result = run(executable, ['--native'], source, directory)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == expected, repr(result.stdout)
+        for text in ('2+2=> FUNCTION F; END;', '1+', '549755813888+1=>',
+                     '2+3*4=>', '1+2=> junk', '1.0+2=>'):
+            result = run(executable, ['--native'], text, directory)
+            assert result.returncode != 0 and not result.stdout, result
+            assert 'compiler incomplete' in result.stderr, result.stderr
+        result = run(executable, ['--native'], '1/0=>', directory)
+        assert result.returncode != 0 and not result.stdout, result
+        for control in controls:
+            result = run(executable, ['--native'], source, directory,
+                         dict(env, **{control: ''}))
+            assert result.returncode == 2 and control in result.stderr, result
+        for args in (['--native', '--image', 'absent.bin'], ['--native', '--io-demo']):
+            result = run(executable, args, source, directory)
+            assert result.returncode == 2 and not result.stdout, result
+    # The guard must actually reject the reference path, so a missing linkage
+    # or inactive assertion cannot make the native test pass vacuously.
+    result = run(guarded, ['--image', str(root / 'build/poplan.bin')], source, directory)
+    assert result.returncode != 0 and 'native isolation guard' in result.stderr, result
+    for environment in (env, dict(env, POPLAN_INTERPRET_ONLY='1')):
+        result = run(binary, ['--image', str(root / 'build/poplan.bin')], source, root, environment)
+        assert result.returncode == 0, result.stderr
+        assert normalize(result.stdout) == expected, repr(result.stdout)
+print('native probe, raw/hybrid comparison, CLI rejection and execution guard passed')

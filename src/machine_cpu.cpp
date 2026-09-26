@@ -50,6 +50,9 @@ struct Instruction {
 
 Instruction decode_instruction(std::uint32_t half)
 {
+#ifdef POPLAN_FORBID_MACHINE_EXECUTION
+    throw MachineError("native isolation guard: BESM execution attempted");
+#endif
     Instruction instruction;
     instruction.reg = static_cast<std::uint8_t>((half >> 20) & 017);
     if ((half & (std::uint32_t{1} << 19)) != 0) {
@@ -268,6 +271,9 @@ void Machine::boot_static_image()
 
 ExecutionStatus Machine::step()
 {
+#ifdef POPLAN_FORBID_MACHINE_EXECUTION
+    throw MachineError("native isolation guard: BESM execution attempted");
+#endif
     if (translated_routines_enabled_) {
         try {
             if (dispatch_translated_routine()) {
