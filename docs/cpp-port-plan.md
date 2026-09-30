@@ -7,7 +7,10 @@ not an independently designed POP-2 parser or interpreter.
 
 The opt-in `--native` development path and its open implementation gates are
 tracked in [native-runtime.md](native-runtime.md). It currently supports only
-binary arithmetic probes. Native logical allocation/release and packed-name
+numeric literal printing and single binary arithmetic probes. Real literals
+are parsed into IEEE double before BESM encoding, as explicitly requested;
+this differs from the reference scanner's digit-by-digit arithmetic.
+Native logical allocation/release and packed-name
 interning now have instruction-only differential tests, but are not yet connected
 to a full native reader/compiler. The fully native language runtime remains
 incomplete. The contract below continues to govern the independent machine reference backend.
@@ -370,6 +373,17 @@ input variants, plus dispatcher-only disabling of stack leaves. Earlier profile 
 above describe their original fixtures, not this expansion.
 
 ## Port Order
+
+Local shadow accumulators now replace temporary hardware-stack reloads in
+`21075`, `21107`, `11665`, `17150`, the arithmetic paths of `11647`/`11651`,
+and the `06727` arithmetic-finishing helper. Balanced temporary r17 updates
+are removed where safe, but the original spill writes remain in order:
+aliased operands and popped memory cells are observable. The divisor paths
+retain r17 updates around potentially throwing arithmetic, and the range-check
+helper still decrements r17 only on success. Cross-call saves, continuation
+entries, arithmetic/RMR/mode behavior and dispatch accounting are unchanged.
+This is a local operand-handling refactor, not replacement of the hardware stack
+or a measured speedup.
 
 The r6 POP value stack now has a private, value-oriented C++ interface:
 address/peek, push/pop, drop, and reset. Its backing store remains BESM memory,

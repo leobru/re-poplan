@@ -2,7 +2,10 @@
 
 Run `make coverage-expansion` to rebuild the image/listing and profile the
 baseline plus the probes in `tests/inputs/coverage-expansion.json`. Results are
-written to `build/coverage-expansion/report.md`. Each case has its own input,
+written to [the saved report](reports/coverage-expansion.md), outside the
+cleanable build tree. `--report PATH` overrides that destination. Raw artifacts
+remain under `build/coverage-expansion/` (`--output` overrides this directory).
+Each case has its own input,
 native/raw/historical output, normalized output, trace, historical coverage map,
 and JSON exit status. Historical runs use the repository wrapper with separate
 writable homes. No disk-output consumer is called.
@@ -14,7 +17,9 @@ the fallback ranking. Historical maps are saved separately, not conflated with
 C++ instruction coverage.
 
 `python3 tools/coverage-expansion.py --regression --historical` runs only the
-supported probes, without expensive tracing. CTest runs those probes against
+supported probes, without expensive tracing. It prints its summary to stdout
+unless `--report PATH` is specified, preserving the saved full profile.
+CTest runs those probes against
 native/raw C++; the smoke suite adds historical comparison. Full profiling has
 a 180-second timeout per process because instruction tracing is substantially
 slower than ordinary execution. Timeout, process failure, or unexpected output

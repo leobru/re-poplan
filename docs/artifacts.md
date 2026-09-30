@@ -1,7 +1,14 @@
 # Generated Artifacts
 
-Binary images, traces, listings, coverage maps, and emulator output are
-generated under `build/` and excluded from Git.
+Only artifacts reproducible through Make targets belong in `build/`, which
+is excluded from Git and removed by `make clean`. Keep coverage reports and
+lasting analysis under `docs/`, including the saved reports in `docs/reports/`.
+Explicit coverage targets update those reports; ordinary `make` does not.
+
+One-off experiment output and verification logs belong in ignored `artifacts/`
+(or a temporary directory), not `build/`. Existing native verification logs
+are retained under `artifacts/native-verification/`; their results and commands
+are recorded in [native-runtime.md](native-runtime.md).
 
 ## Static Image
 
@@ -56,7 +63,7 @@ listing.
 
 `make coverage-corpus` runs `quine.pop2` and the recovered `zone*.pop2`
 sources separately, writing their output and coverage maps under `build/`.
-`tools/summarize-coverage.py` produces `build/coverage-corpus.md` with
+`tools/summarize-coverage.py` produces `docs/reports/coverage-corpus.md` with
 per-input word and halfword counts, exclusive contributions, and union
 coverage.
 

@@ -8,6 +8,8 @@ not a usable POPLAN replacement. Keep the machine backend as the default.
 
 The new backend must preserve language semantics, evaluation order, exact numeric
 bits, identity, mutation, diagnostics, recovery and the documented closure failure.
+The requested double-first real-literal conversion is an explicit exception to
+bitwise agreement with the historical decimal scanner (see below).
 It must eventually reproduce legacy allocation, code and activation costs and
 exhaustion thresholds. Native operations must never execute BESM instructions,
 recognize finished instruction words, dispatch via historical PCs, load the
@@ -31,9 +33,10 @@ local to each operation. There is no native architectural register bank.
 | 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Numbers, resident word metadata and logical allocator implemented; compound payload storage remains open |
 | 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Function bindings, aliases, reader conversion and mutable syntax remain open |
 | 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; full numeric/scanner/function coverage remains open |
+| 2: real literal reader | `native_parse_real_literal` validates decimal-point / `$` syntax evidenced at `16672..16735`, parses IEEE binary64, then truncates to BESM encoding | Exact encoding, boundary, malformed-input and locale tests; deliberate conversion policy described below |
 | 2: formatting | Shares existing `format_prreal`, preserving existing formatting limitations | Historical probe comparison; complete numeric printing conformance not established |
 | 2: services | Input/output injected as streams | Resumable input, clocks, packed names/characters and console callbacks not ported |
-| 3: development probe | `native_compile_probe` lowers decimal-integer binary expressions directly to constant/binary/print operations | `2+2=>` runs without image; deliberately rejects precedence, binding, real literals and general POP syntax |
+| 3: development probe | `native_compile_probe` lowers numeric literals and single binary expressions directly to constant/binary/print operations | `2+2=>` runs without image; deliberately rejects precedence, binding and general POP syntax |
 | 3: recovery | Unsupported input returns explicit development failure, with no machine fallback | POP diagnostics and SETPOP recovery not implemented; host failures are not presented as compatible POP diagnostics |
 | 4: frames/control | Not implemented | Functions, branches, loops, recursion, closures, dynamic binding, triangular thresholds and Man-or-Boy required |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
@@ -46,8 +49,9 @@ local to each operation. There is no native architectural register bank.
 printf '2+2=>\n' | build/cpp/poplan --native
 ```
 
-Accepted probe syntax is repeated `INTEGER OP INTEGER =>`, with decimal positive
-integer tokens (zero included), and OP one of `+ - * /`. Whitespace is allowed.
+Accepted probe syntax is repeated `NUMBER [OP NUMBER] =>`, with unsigned decimal
+integer tokens (zero included), real literals described below, and OP one of
+`+ - * /`. Whitespace between tokens is allowed.
 The entire probe is validated before execution; unsupported source produces a
 nonzero exit and no partial execution. This is a deliberately restricted test
 lowering, not a replacement grammar inferred from the POP-2 manual. No compiler
@@ -58,7 +62,7 @@ interactive suspension is not supported.
 machine-only environment controls even if they are present with empty values.
 The dispatch happens before constructing `Machine`. `NativeExecutionResult`
 counts POP operations, independently of historical instruction counts. The
-probe uses four operations per expression. No historical profile is changed.
+probe uses two operations per literal print and four per binary expression. No historical profile is changed.
 
 `poplan_native_guard` compiles the existing CPU source with guards that fail on
 any machine step or decoder entry. Its native probe runs from an empty working
@@ -106,9 +110,9 @@ python3 tools/native-inventory.py > docs/native-resident-inventory.md
   machine-only control combinations and division by zero fail explicitly.
 - `git diff --check`: passed. Existing user changes were retained.
 
-Local logs: `build/native-focused.log`, `build/native-smoke.log`,
-`build/native-reference-corpus.log`, `build/native-probe-historical.normalized`,
-`build/native-zone1224-historical.normalized`, and `build/native-sanitize.log`.
+Local logs: `artifacts/native-verification/native-focused.log`, `artifacts/native-verification/native-smoke.log`,
+`artifacts/native-verification/native-reference-corpus.log`, `artifacts/native-verification/native-probe-historical.normalized`,
+`artifacts/native-verification/native-zone1224-historical.normalized`, and `artifacts/native-verification/native-sanitize.log`.
 
 ASan/UBSan: all 8 CTests passed (216.68 seconds), exit status 0, with
 `ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`. The shared division
@@ -153,8 +157,56 @@ passed; `make test` passed all 10 CTests plus historical regression checks;
 `make cpp-quine` and `make cpp-zone1224` passed. Fresh historical zone1224
 normalized output matched hybrid and instruction-only output. Trivial historical,
 hybrid and native checks all produced `** 4`. Logs are
-`build/native-foundation-smoke.log`, `build/native-foundation-reference.log`,
-`build/native-foundation-zone1224-historical.normalized`, and
-`build/native-foundation-sanitize.log`. ASan/UBSan passed all 10 tests in
+`artifacts/native-verification/native-foundation-smoke.log`, `artifacts/native-verification/native-foundation-reference.log`,
+`artifacts/native-verification/native-foundation-zone1224-historical.normalized`, and
+`artifacts/native-verification/native-foundation-sanitize.log`. ASan/UBSan passed all 10 tests in
 259.07 seconds with exit status 0, using `ASAN_OPTIONS=detect_leaks=0` and
 `UBSAN_OPTIONS=halt_on_error=1`. Whitespace checks also passed.
+
+## Native real literals (2026-09-27)
+
+The native reader now accepts `3.14`, `.5`, signed reals such as `-.5`, and
+optional `$` exponents (`3.14$-3`, `.5$+2`). A decimal point and at least one
+fractional digit are required; `1.`, integer-exponent spelling `1$2`, C-style
+`1.0e2`, hexadecimal, infinity and NaN spellings are rejected. Signed integer
+literals and general unary operators remain outside this probe's grammar.
+
+As explicitly requested, decimal formation first uses locale-independent
+`std::from_chars` into an IEEE binary64 `double`, then converts that double to
+BESM-6 encoding. The converter truncates excess mantissa bits toward zero,
+normalizes negative powers of two, and stores the signed 41-bit mantissa and
+7-bit biased exponent. Both signs of zero become BESM zero. A finite double
+below the normalized BESM range becomes zero; binary64 range errors and BESM
+overflow fail explicitly. The literal reader additionally rejects biased
+exponents of 104 or greater, which overlap POPLAN's integer and object tags.
+The standalone conversion helper supports the full BESM exponent range.
+
+This policy can differ in low bits from historical digit-by-digit BESM decimal
+arithmetic. `Machine::p16645` remains the independent reference implementation.
+The test decimal `1.0000000000018189894035458` demonstrates the specified order:
+binary64 rounds it to `1 + 2^-39` before BESM truncation. Native arithmetic after
+reading still uses the existing BESM arithmetic operations, not host double.
+
+Examples: `3.14=>`, `.5$2=>`, and `1.0+2=>` run with `--native`, including in an
+empty directory through the execution guard. Reading all input until EOF and
+compiling before execution remain probe limitations; this is not the general
+resumable POPLAN reader or its diagnostic/recovery implementation.
+
+Verification for the real-literal change: `poplan-native-reals` checks exact
+encoding, double-first rounding, truncation, normalization, range limits,
+malformed syntax and locale independence without an image. The extended
+`poplan-native-probe` checks ordinary and guarded native runs without an image,
+plus hybrid and instruction-only output comparisons. `make test` passed all
+11 CTests (44.37 seconds) and the historical smoke/regression suite.
+`make cpp-quine` and `make cpp-zone1224` passed; fresh historical zone1224 output
+matched both reference modes. Real-literal examples matched historical printed
+output, and trivial historical/hybrid checks both yielded `** 4`.
+
+Logs: `artifacts/native-verification/native-reals-smoke.log`, `artifacts/native-verification/native-reals-reference.log`,
+`artifacts/native-verification/native-reals-historical.normalized`, and
+`artifacts/native-verification/native-reals-zone1224-historical.normalized`.
+
+ASan/UBSan passed all 11 tests in 236.14 seconds with exit status 0, using
+`ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`; see
+`artifacts/native-verification/native-reals-sanitize.log`. `git diff --check` passed. Existing unrelated
+worktree changes were preserved.

@@ -2,10 +2,13 @@
 #include "poplan/machine.hpp"
 #include "poplan/native.hpp"
 
+#include <cmath>
+#include <limits>
 #include <cstdio>
 #include <ctime>
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <initializer_list>
 #include <iostream>
@@ -448,6 +451,167 @@ void test_native_dictionary(const char *image_path)
     require(overlap_rejected, "dynamic arena cannot reuse resident dictionary identities");
 }
 
+void test_popmess(const char *image_path, const char *source_path, bool devices = false)
+{
+    using poplan::Machine;
+    std::vector<std::uint16_t> entries = {
+        012304, 012314, 012320, 012417, 012420, 012324, 012331, 012335, 012353, 012354, 012357, 012362,
+        012364, 012365, 012367, 012377, 012404, 012411, 012426,
+        012430, 012432, 012445, 012474, 012501, 012505, 012507, 012512};
+    if (devices) {
+        const std::vector<std::uint16_t> device_entries = {
+            03041, 03042, 010020, 010023, 010025, 010026, 010027, 012517,
+            016030, 016037, 016042, 016051, 016072, 016100, 016101,
+            020573, 020575, 020577, 020605, 020613, 020614, 020621, 020622, 020633, 020635,
+            021432, 021441, 021444, 021455,
+            021647, 021650, 021651, 021652, 021661, 021663, 021666, 021670,
+            021671, 021672, 021673, 021674, 021675, 021700, 021703, 021707,
+            021712, 021713, 021716, 021720, 021721, 021725, 021731, 021735,
+            021740, 021741, 021743, 021744, 021746, 021747, 021753, 021755,
+            021762, 021765, 021766, 021772, 021775, 021776,
+            022003, 022006, 022010, 022011, 022012, 022015, 022017, 022020,
+            022021, 022022, 022024};
+        entries.insert(entries.end(), device_entries.begin(), device_entries.end());
+    }
+    std::vector<unsigned> seen(entries.size());
+    auto replay = std::make_unique<Machine>();
+    std::ifstream image(image_path, std::ios::binary), input(source_path);
+    require(bool(image) && bool(input), "POPMESS replay inputs open");
+    replay->load_image(image); replay->boot_static_image();
+    replay->set_translated_routines_enabled(false);
+    const auto temporary = std::filesystem::temp_directory_path()
+        / ("popmess-state-" + std::to_string(reinterpret_cast<std::uintptr_t>(replay.get())));
+    if (devices) {
+        std::filesystem::create_directories(temporary);
+        std::ofstream file(temporary / "replay", std::ios::binary);
+        const std::string blank(6144 * 3, '\0'); file.write(blank.data(), blank.size()); file.close();
+        replay->mount_disk(057, (temporary / "replay").string(), true);
+    }
+    bool finished = false;
+    for (unsigned step = 0; step < 3000000; ++step) {
+        for (std::size_t i = 0; i < entries.size(); ++i) {
+            if (replay->right_half() || replay->program_counter() != entries[i]) continue;
+            auto translated = std::make_unique<Machine>(*replay);
+            auto raw = std::make_unique<Machine>(*replay);
+            if (devices) {
+                for (const auto &[machine, name] : {std::pair{translated.get(), "translated"}, std::pair{raw.get(), "raw"}}) {
+                    std::filesystem::copy_file(temporary / "replay", temporary / name, std::filesystem::copy_options::overwrite_existing);
+                    machine->unmount_disk(057); machine->mount_disk(057, (temporary / name).string(), true);
+                }
+            }
+            translated->set_translated_routines_enabled(true);
+            const auto count = translated->translated_routine_count();
+            translated->step();
+            unsigned ticks = 0;
+            do { raw->step(); ++ticks; }
+            while ((raw->program_counter() != translated->program_counter() || raw->right_half()) && ticks < 10000);
+            const auto label = "POPMESS entry=" + std::to_string(entries[i]);
+            require(ticks < 10000, label + " reaches continuation");
+            require(raw->accumulator() == translated->accumulator(), label + " ACC");
+            require(raw->remainder() == translated->remainder(), label + " RMR");
+            require(raw->alu_mode() == translated->alu_mode(), label + " ALU");
+            for (unsigned r = 0; r < 020; ++r)
+                require(raw->reg(r) == translated->reg(r), label + " register " + std::to_string(r));
+            for (unsigned a = 0; a < Machine::core_words; ++a)
+                if (raw->memory(a) != translated->memory(a))
+                    require(false, label + " memory " + std::to_string(a));
+            require(translated->translated_routine_count() == count + 1, "POPMESS dispatch used");
+            require(translated->console_output() == raw->console_output(), "POPMESS console state");
+            if (devices) {
+                std::ifstream x(temporary / "translated", std::ios::binary), y(temporary / "raw", std::ios::binary);
+                require(std::string(std::istreambuf_iterator<char>(x), {}) == std::string(std::istreambuf_iterator<char>(y), {}), label + " disk contents");
+            }
+            ++seen[i];
+        }
+        auto status = replay->step();
+        if (status == poplan::ExecutionStatus::halted) { finished = true; break; }
+        if (status == poplan::ExecutionStatus::input_required) {
+            std::string line;
+            if (!std::getline(input, line)) { finished = true; break; }
+            replay->queue_console_input(poplan::encode_gost_text(line));
+        }
+    }
+    require(finished, "POPMESS replay completes");
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+        if (!devices) require(seen[i] != 0, "POPMESS entry reached " + std::to_string(entries[i]));
+        if (devices) std::cout << std::oct << entries[i] << std::dec << ": " << seen[i] << '\n';
+    }
+    if (devices) std::filesystem::remove_all(temporary);
+}
+
+void test_native_reals()
+{
+    using poplan::Word48;
+    struct Example { const char *text; std::uint64_t bits; };
+    const Example examples[] = {
+        {"0.0", 00000000000000000ULL}, {"-0.0", 00000000000000000ULL},
+        {".5", 04010000000000000ULL}, {"+.5", 04010000000000000ULL},
+        {"-.5", 03760000000000000ULL}, {"1.0", 04050000000000000ULL},
+        {"-1.0", 04020000000000000ULL}, {"2.0", 04110000000000000ULL},
+        {"3.14", 04114436560507534ULL}, {"0.1", 03654631463146314ULL},
+        {"1.234567890123", 04051700624412142ULL},
+        {".5$2", 04314400000000000ULL}, {".5$+2", 04314400000000000ULL},
+        {"50.0$-2", 04010000000000000ULL},
+        {"1.0$-30", 0}, {"-1.0$-30", 0},
+        // This decimal lies below the BESM increment, but binary64 rounds it
+        // to 1 + 2^-39 FIRST. Exact-decimal-to-BESM truncation would give 1.
+        {"1.0000000000018189894035458", 04050000000000001ULL},
+    };
+    for (const auto &example : examples) {
+        const auto parsed = poplan::native_parse_real_literal(example.text);
+        require(parsed.error.empty() && parsed.value == Word48(example.bits),
+                std::string("native IEEE-first literal bits: ") + example.text);
+    }
+    const auto expect = [](double value, std::uint64_t bits) {
+        const auto encoded = poplan::native_real_from_double(value);
+        require(encoded.error.empty() && encoded.value == Word48(bits),
+                "IEEE double conversion yields the exact expected BESM bits");
+    };
+    expect(std::nextafter(1.0, 2.0), 04050000000000000ULL);
+    expect(std::nextafter(-1.0, -2.0), 04020000000000000ULL);
+    expect(1.0 + std::ldexp(3.0, -40), 04050000000000001ULL);
+    expect(std::ldexp(1.0, -65), 00010000000000000ULL);
+    expect(std::nextafter(std::ldexp(1.0, -65), 0.0), 0);
+    expect(-std::ldexp(1.0, -64), 00020000000000000ULL);
+    expect(-std::ldexp(1.0, -65), 0);
+    expect(std::ldexp(1.0, 62), 07750000000000000ULL);
+    expect(-std::ldexp(1.0, 63), 07760000000000000ULL);
+    for (const auto value : {std::ldexp(1.0, 63), std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity(),
+                             std::numeric_limits<double>::quiet_NaN()}) {
+        require(!poplan::native_real_from_double(value).error.empty(),
+                "nonfinite or BESM-overflowing doubles are rejected");
+    }
+    for (const char *text : {"", ".", "1.", "1", "1e2", "1.0e2", "nan", "inf", "0x1.0p2",
+                             "1.0$", "1.0$+", "1.0$-", "1.0$$2", "1.0$1.5", "1.0x",
+                             "1.0 $2", " 1.0", "1.0 ", "1.0$1000", "1.0$-1000",
+                             "549755813888.0", "1.0$12"}) {
+        require(!poplan::native_parse_real_literal(text).error.empty(),
+                std::string("native real reader rejects malformed/out-of-range token: ") + text);
+    }
+    // Parsing must not depend on the C++ global locale's decimal separator.
+    struct CommaDecimal : std::numpunct<char> {
+        char do_decimal_point() const override { return ','; }
+    };
+    const auto saved_locale = std::locale();
+    std::locale::global(std::locale(saved_locale, new CommaDecimal));
+    const auto localized = poplan::native_parse_real_literal("3.14");
+    std::locale::global(saved_locale);
+    require(localized.error.empty() && localized.value == Word48(04114436560507534ULL),
+            "native real literal parsing is locale independent");
+    const auto real_program = poplan::native_compile_probe("3.14=> 1.0+2=>");
+    require(real_program.error.empty() && real_program.operations.size() == 6
+                && real_program.operations.front().constant == Word48(04114436560507534ULL)
+                && real_program.operations[2].constant == Word48(04050000000000000ULL)
+                && real_program.operations[3].constant == Word48(06400000000000002ULL),
+            "native compiler preserves real versus integer literal encoding");
+    std::ostringstream output;
+    const auto executed = poplan::native_execute(real_program, output);
+    require(executed.error.empty() && executed.operations == 6
+                && output.str() == "** 3.1400000\n** 3.0000000\n",
+            "native real literals reach printing and mixed arithmetic");
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -457,6 +621,10 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 2 && std::string(argv[1]) == "--native-reals") {
+        test_native_reals();
+        return 0;
+    }
     if (argc == 3 && std::string(argv[2]) == "--native-dictionary") {
         test_native_dictionary(argv[1]);
         return 0;
@@ -464,6 +632,12 @@ int main(int argc, char **argv)
     if (argc == 3 && std::string(argv[2]) == "--native-allocator") {
         test_native_allocator(argv[1]);
         return 0;
+    }
+    if (argc == 4 && std::string(argv[2]) == "--popmess-devices") {
+        test_popmess(argv[1], argv[3], true); return 0;
+    }
+    if (argc == 4 && std::string(argv[2]) == "--popmess") {
+        test_popmess(argv[1], argv[3]); return 0;
     }
     require(argc == 2, "the extracted POPLAN image path is supplied");
 
@@ -9456,6 +9630,97 @@ int main(int argc, char **argv)
         } else {
             compare_one_semantic_step(*alternating, *alternating_raw, {},
                                      "value-stack semantic interoperation", 20);
+        }
+    }
+
+    // Shadow operands must preserve spills, aliasing, ALU state and error exits.
+    for (auto entry : {021075, 021107, 011665, 017150, 011647, 011651, 06735}) {
+        for (unsigned variant = 0; variant != 70; ++variant) {
+            auto native = std::make_unique<Machine>(*stack_image);
+            const unsigned mode = variant < 64 ? variant : 053;
+            const unsigned layout = variant < 64 ? 0 : variant - 63;
+            native->alu_mode() = mode;
+            native->accumulator() = Word48(06400000000000105ULL);
+            native->remainder() = Word48(0123456701234567ULL);
+            native->reg(015) = 06000;
+            native->reg(016) = 04000;
+            native->reg(017) = layout == 1 ? 077777 : layout == 2 ? 0 : 05000;
+            native->memory(04001) = Word48((std::uint64_t{04200} << 24) | 04100);
+            native->memory(04101) = Word48(0765432107654321ULL);
+            native->memory(04201) = Word48(0123456701234567ULL);
+            native->memory(021124) = Word48((std::uint64_t{04200} << 24) | 04100);
+            if (entry == 021075 || entry == 021107) {
+                if (layout >= 3) native->reg(017) = layout == 3 ? 04101
+                    : layout == 4 ? 04201 : layout == 5 ? 04001 : 021124;
+            } else if (entry == 011665) {
+                for (const auto &[address, word] : code_11665) native->memory(address) = word;
+                if (layout >= 3) native->reg(017) = layout == 3 ? 04002 : 012021;
+                const auto top = native->reg(017);
+                native->accumulator() = Word48(04000);
+                native->memory(04000) = Word48(0777777777777777ULL);
+                native->memory(012017) = Word48(Word48::mask);
+                native->memory((top - 1) & 077777) = Word48(07000);
+                native->memory((top - 2) & 077777) = Word48(0765432107654321ULL);
+            } else if (entry == 017150) {
+                for (const auto &[address, word] : code_17150) native->memory(address) = word;
+                native->reg(001) = 0141;
+                native->reg(011) = 0123;
+                if (layout >= 3) native->reg(017) = layout == 3 ? 017565 : 017167;
+                native->memory(017567) = Word48(0777777777777777ULL);
+                native->memory(017171) = Word48(04177777777777777ULL);
+            } else if (entry == 011647 || entry == 011651) {
+                for (const auto &[address, word] : code_11647) native->memory(address) = word;
+                for (const auto &[address, word] : code_11651) native->memory(address) = word;
+                native->reg(006) = 06000;
+                native->reg(016) = 011760;
+                native->memory(06000) = native->accumulator();
+                if (entry == 011651)
+                    native->memory((native->reg(017) - 1) & 077777) = Word48(011760);
+                native->memory(011760) = Word48(layout == 6 ? 0 : 01006);
+                if (layout == 6) native->memory(0) = Word48();
+                native->memory(012000) = Word48(06400000000000000ULL);
+                native->memory(012002) = Word48(077);
+                native->memory(012012) = Word48(07777777770000000ULL);
+                native->memory(012016) = Word48(04050000000000000ULL);
+                native->memory(011761) = Word48(04050004061115645ULL);
+            } else {
+                native->reg(010) = 06712;
+                native->reg(013) = 1;
+                native->accumulator() = Word48(04050000000000000ULL);
+                native->memory((native->reg(017) - 1) & 077777) = native->accumulator();
+                if (layout >= 3) native->memory(06755) = Word48(std::uint64_t{1} << 47);
+            }
+            native->start(entry);
+            auto raw = std::make_unique<Machine>(*native);
+            raw->set_translated_routines_enabled(false);
+            if ((entry == 011647 || entry == 011651) && layout == 6) {
+                std::string native_error, raw_error;
+                try { native->step(); } catch (const poplan::MachineError &error) { native_error = error.what(); }
+                try {
+                    for (unsigned steps = 0; steps != 100; ++steps) raw->step();
+                } catch (const poplan::MachineError &error) { raw_error = error.what(); }
+                if (native_error != "BESM-6 arithmetic division by zero" || raw_error != native_error)
+                    std::cerr << "shadow exception entry " << std::oct << entry
+                              << " native/raw: " << native_error << '/' << raw_error << '\n';
+                require(native_error == "BESM-6 arithmetic division by zero"
+                            && raw_error == native_error, "shadow divisor exception");
+                require(raw->program_counter() == 011662 && !raw->right_half(),
+                        "raw divisor exception occurs after 11661 right half");
+                require(native->program_counter() == entry && !native->right_half(),
+                        "semantic exception retains dispatch entry");
+                // Atomic semantic entry and raw instruction PCs differ by design.
+                raw->start(entry);
+                require_same_architectural_state(*native, *raw, "shadow exception state");
+            } else {
+                const auto boundary = compare_one_semantic_step(*native, *raw, {},
+                    "shadow accumulator entry=" + std::to_string(entry)
+                        + " variant=" + std::to_string(variant), 200);
+                if (entry == 06735 && layout >= 3)
+                    require(boundary == 03014 && native->reg(016) == 013017,
+                            "shadow range check preserves error exit");
+                require(native->translated_routine_count() == 1,
+                        "shadow arithmetic retains one dispatch");
+            }
         }
     }
 
