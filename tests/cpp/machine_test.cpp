@@ -470,7 +470,7 @@ void test_popmess(const char *image_path, const char *source_path, bool devices 
             021740, 021741, 021743, 021744, 021746, 021747, 021753, 021755,
             021762, 021765, 021766, 021772, 021775, 021776,
             022003, 022006, 022010, 022011, 022012, 022015, 022017, 022020,
-            022021, 022022, 022024};
+            022021, 022022, 022024, 022216};
         entries.insert(entries.end(), device_entries.begin(), device_entries.end());
     }
     std::vector<unsigned> seen(entries.size());
@@ -478,6 +478,29 @@ void test_popmess(const char *image_path, const char *source_path, bool devices 
     std::ifstream image(image_path, std::ios::binary), input(source_path);
     require(bool(image) && bool(input), "POPMESS replay inputs open");
     replay->load_image(image); replay->boot_static_image();
+    // 12463 uses the live descriptor modifier, not a fixed CLOSE target.
+    // Exercise its computed continuation independently of device selection.
+    for (const unsigned modifier : {0U, 1U, 077777U}) {
+        auto raw = std::make_unique<Machine>(*replay);
+        raw->reg(001) = 012304;
+        raw->reg(003) = 040000;
+        raw->memory(040001) = poplan::Word48(modifier);
+        raw->start(012463);
+        raw->set_translated_routines_enabled(false);
+        auto translated = std::make_unique<Machine>(*raw);
+        translated->set_translated_routines_enabled(true);
+        translated->step();
+        for (unsigned i = 0; i < 4; ++i) raw->step();
+        require(raw->program_counter() == translated->program_counter()
+                    && raw->right_half() == translated->right_half(), "POPMESS computed CLOSE target");
+        require(raw->accumulator() == translated->accumulator()
+                    && raw->remainder() == translated->remainder()
+                    && raw->alu_mode() == translated->alu_mode(), "POPMESS computed CLOSE ALU");
+        for (unsigned r = 0; r < 020; ++r)
+            require(raw->reg(r) == translated->reg(r), "POPMESS computed CLOSE registers");
+        for (unsigned a = 0; a < Machine::core_words; ++a)
+            require(raw->memory(a) == translated->memory(a), "POPMESS computed CLOSE memory");
+    }
     replay->set_translated_routines_enabled(false);
     const auto temporary = std::filesystem::temp_directory_path()
         / ("popmess-state-" + std::to_string(reinterpret_cast<std::uintptr_t>(replay.get())));
@@ -533,10 +556,64 @@ void test_popmess(const char *image_path, const char *source_path, bool devices 
     }
     require(finished, "POPMESS replay completes");
     for (std::size_t i = 0; i < entries.size(); ++i) {
-        if (!devices) require(seen[i] != 0, "POPMESS entry reached " + std::to_string(entries[i]));
+        if (!devices || entries[i] == 021647 || entries[i] == 022010 || entries[i] == 020573)
+            require(seen[i] != 0, "POPMESS entry reached " + std::to_string(entries[i]));
         if (devices) std::cout << std::oct << entries[i] << std::dec << ": " << seen[i] << '\n';
     }
     if (devices) std::filesystem::remove_all(temporary);
+}
+
+void test_disk_mounts()
+{
+    using poplan::Machine;
+    using poplan::Word48;
+    auto machine = std::make_unique<Machine>();
+    const auto path = std::filesystem::temp_directory_path()
+        / ("popmess-host-" + std::to_string(reinterpret_cast<std::uintptr_t>(machine.get())));
+    const std::string initial(6144 * 2, char(0xa5));
+    { std::ofstream out(path, std::ios::binary); out.write(initial.data(), initial.size()); }
+    machine->mount_disk(056, path.string(), true);
+    const auto error = [&](auto action, const char *message) {
+        bool failed = false;
+        try { action(); } catch (const poplan::MachineError &) { failed = true; }
+        require(failed, message);
+    };
+    error([&] { machine->mount_disk(056, path.string()); }, "duplicate mount rejected");
+    error([&] { machine->mount_disk(0100, path.string()); }, "invalid mount unit rejected");
+    error([&] { machine->unmount_disk(0100); }, "invalid unmount unit rejected");
+    constexpr unsigned page = 3;
+    const auto control = [](unsigned zone, bool read) {
+        return Word48((std::uint64_t(page) << 30) | (std::uint64_t(056) << 12)
+                      | zone | (std::uint64_t(read) << 39));
+    };
+    for (unsigned i = 0; i < 02000; ++i) machine->memory(page * 02000 + i) = Word48(0x123456000000ULL + i);
+    machine->accumulator() = control(1, false); machine->remainder() = Word48(012345);
+    machine->alu_mode() = 017; machine->reg(016) = 0777;
+    machine->emulate_e70(0);
+    require(machine->accumulator() == control(1, false) && machine->remainder() == Word48(012345)
+            && machine->alu_mode() == 017 && machine->reg(016) == 0777,
+            "disk adapter preserves CPU state; caller owns extracode side effects");
+    std::ifstream in(path, std::ios::binary);
+    const std::string written{std::istreambuf_iterator<char>(in), {}};
+    require(written.size() == initial.size() && written.substr(0, 6144) == initial.substr(0, 6144),
+            "write affects only its zone and never extends disk");
+    require(written.substr(6144, 6) == std::string("\x12\x34\x56\0\0\0", 6), "disk words are big endian");
+    for (unsigned i = 0; i < 02000; ++i) machine->memory(page * 02000 + i) = Word48();
+    machine->memory(0100) = control(1, true); machine->emulate_e70(0100);
+    for (unsigned i = 0; i < 02000; ++i)
+        require(machine->memory(page * 02000 + i) == Word48(0x123456000000ULL + i), "complete disk readback");
+    machine->accumulator() = control(2, false);
+    error([&] { machine->emulate_e70(0); }, "out-of-range write rejected");
+    machine->accumulator() = Word48(control(0, true).raw() | (std::uint64_t{1} << 40));
+    error([&] { machine->emulate_e70(0); }, "unsupported seek rejected");
+    std::filesystem::resize_file(path, 6144 + 6);
+    machine->accumulator() = control(1, true);
+    error([&] { machine->emulate_e70(0); }, "short disk read rejected");
+    for (unsigned i = 0; i < 02000; ++i)
+        require(machine->memory(page * 02000 + i) == Word48(0x123456000000ULL + i), "failed read publishes no partial page");
+    machine->unmount_disk(056);
+    error([&] { machine->emulate_e70(0); }, "unmounted transfer rejected");
+    std::filesystem::remove(path);
 }
 
 void test_native_reals()
@@ -621,6 +698,7 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 2 && std::string(argv[1]) == "--disk-host") { test_disk_mounts(); return 0; }
     if (argc == 2 && std::string(argv[1]) == "--native-reals") {
         test_native_reals();
         return 0;

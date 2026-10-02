@@ -100,3 +100,17 @@ probes for additional branches. Preserve the original calls, generated-word
 storage, and computed continuations when planning that conversion. Fixing the
 raw diagnostic-text discrepancy is a separate correctness task, not part of
 these coverage changes.
+
+## Measurement: 2026-10-01 after POPMESS semantic transfers
+
+A fresh `make coverage-expansion` completed all seven baselines and 24 probes.
+The known diagnostic-description disagreements remain explicitly classified.
+The prior constructor and diagnostic-restoration fallback regions above are
+now semantic. The only image-matching fallback candidate in this probe batch
+is the guarded `PRSTRI` path `07773..07777`: 10 steps in
+`numberread-recovery`. Its callback guard remains necessary.
+
+This batch still excludes disk-output transfers. Separate success/error
+transfer fixtures now compare hybrid, instruction-only and historical output
+and every written disk byte, with zero hybrid fallback. Their scope, counts,
+unvisited entries and commands are recorded in [reports/popmess.md](reports/popmess.md).

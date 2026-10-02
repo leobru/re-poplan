@@ -89,6 +89,12 @@ public:
     // POPLAN's library supplier reads logical disk 057 through extracode 070.
     // By default this is a flat six-byte-per-word image named "poplib.bin".
     void emulate_e70(std::uint16_t control_address);
+    // Explicit mounts are flat six-byte big-endian words; no creation or growth.
+    void mount_disk(std::uint16_t unit, std::string_view path, bool writable = false);
+    void unmount_disk(std::uint16_t unit) {
+        if (unit > 077) throw MachineError("disk unmount: invalid unit");
+        disk_mounts_[unit] = {};
+    }
     void set_poplib_path(std::string_view path) { poplib_path_ = path; }
 
     // Raw BESM execution used to run the extracted POPLAN image. Image words
@@ -397,6 +403,12 @@ public:
     std::uint16_t p06476(std::uint16_t entry = 06476);
     std::uint16_t p10235(std::uint16_t entry = 010235);
     std::uint16_t p07514(std::uint16_t entry = 07514);
+    std::uint16_t p21441(std::uint16_t entry);
+    std::uint16_t p16030(std::uint16_t entry);
+    std::uint16_t p20573(std::uint16_t entry);
+    std::uint16_t p21647(std::uint16_t entry);
+    std::uint16_t p12517();
+    std::uint16_t p03041(std::uint16_t entry);
     std::uint16_t p12304(std::uint16_t entry = 012304);
     std::uint16_t p03101(std::uint16_t entry);
     std::uint16_t p03145(std::uint16_t entry);
@@ -1631,6 +1643,8 @@ private:
                              std::size_t byte_index) const;
     void set_memory_byte(std::uint16_t address, std::size_t byte_index,
                          std::uint8_t value);
+    bool read_mounted_zone(std::uint16_t unit, std::uint16_t zone,
+                           std::array<Word48, 02000> &data) const;
     bool read_poplib_zone(
         std::uint16_t zone,
         std::array<Word48, 02000> &data) const;
@@ -1646,6 +1660,8 @@ private:
     std::deque<std::vector<std::uint8_t>> console_input_;
     std::vector<std::uint8_t> console_output_;
     std::vector<std::size_t> console_output_record_ends_;
+    struct DiskMount { std::string path; bool writable = false; };
+    std::array<DiskMount, 0100> disk_mounts_{};
     std::string poplib_path_{"poplib.bin"};
     std::uint16_t program_counter_ = 1;
     bool right_half_ = false;

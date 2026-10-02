@@ -50,7 +50,7 @@ quine map:
 make coverage-corpus
 ```
 
-The report is written to `build/coverage-corpus.md`. The zone sources are kept
+The report is written to `docs/reports/coverage-corpus.md`. The zone sources are kept
 as conformance inputs. Lowercase Latin KOI-7 characters and the `` `{|}~``
 positions in `zone1224.pop2` have been converted to UTF-8 Cyrillic with
 `tools/convert-koi7-lower.py`; uppercase POP-2 syntax and other punctuation
@@ -78,6 +78,16 @@ echo '2+2=>' | build/cpp/poplan
 
 prints `** 4`. The focused Э71 loopback demonstration remains available as
 `build/cpp/poplan --io-demo`.
+
+The image-independent `--native` development mode accepts numeric arithmetic
+expressions with precedence and parentheses:
+
+```sh
+printf '%s\n' '2+3*4=>' '(2+3)*4=>' | build/cpp/poplan --native
+```
+
+This prints `14` and `20`. Native functions, variables, closures and Man-or-Boy
+are not implemented yet; see [native runtime status](docs/native-runtime.md).
 
 An explicit image path is also supported:
 
@@ -146,8 +156,27 @@ same 1/50-second units.
 Extracode `070` reads logical disk `057` from the flat `poplib.bin` in the
 current directory. The control word may be in memory or, for effective address
 zero, in ACC; each selected zone is decoded as `02000` big-endian six-byte BESM
-words and transferred to the requested memory page. Other devices retain the
-existing fallback behavior, and writes to `057` are deliberately unsupported.
+words and transferred to the requested memory page. Explicit mounts override
+this default, including POPLIB reads on unit `057`:
+
+```sh
+build/cpp/poplan --disk 57=library.bin --disk-rw 56=scratch.bin < input.pop2
+```
+
+Unit numbers are octal `00..77`; options may repeat for distinct units.
+Images must already exist and contain whole 6144-byte zones. Read-only mounts
+reject writes; writable mounts persist changes without creating or extending
+files. Mounts cannot be combined with `--native` or `--io-demo`.
+
+Hybrid POPMESS semantically handles `MI`, `MO`, their `MIП`/`MOП` character
+conversion variants (Cyrillic П), console `TI`/`CI`/`TO`/`LPO`, and `CLOSE`.
+Constructors retain historical permissive arguments and descriptor reuse.
+Unmounted transfers and seek operations fail explicitly. The existing raw
+error-catalog request on `42/01200` retains its narrow compatibility exception;
+instruction-only diagnostics still omit some descriptive catalog lines.
+DIMON files, other historical devices, and record-oriented `MIR`/`MOR`
+are not covered by this semantic port. See
+[POPMESS verification](docs/reports/popmess.md).
 `tools/run-dispak.sh` imports the same flat file into physical volume `2157`
 with `besmtool write 2157 --start=0 --from-file=poplib.bin` before running
 dispak.

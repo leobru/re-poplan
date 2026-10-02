@@ -36,7 +36,7 @@ local to each operation. There is no native architectural register bank.
 | 2: real literal reader | `native_parse_real_literal` validates decimal-point / `$` syntax evidenced at `16672..16735`, parses IEEE binary64, then truncates to BESM encoding | Exact encoding, boundary, malformed-input and locale tests; deliberate conversion policy described below |
 | 2: formatting | Shares existing `format_prreal`, preserving existing formatting limitations | Historical probe comparison; complete numeric printing conformance not established |
 | 2: services | Input/output injected as streams | Resumable input, clocks, packed names/characters and console callbacks not ported |
-| 3: development probe | `native_compile_probe` lowers numeric literals and single binary expressions directly to constant/binary/print operations | `2+2=>` runs without image; deliberately rejects precedence, binding and general POP syntax |
+| 3: development probe | `native_compile_probe` lowers numeric expressions with resident arithmetic priorities and parentheses to constant/binary/print operations | Expression fixture matches three reference modes; binding, general unary operators and general POP syntax remain unsupported |
 | 3: recovery | Unsupported input returns explicit development failure, with no machine fallback | POP diagnostics and SETPOP recovery not implemented; host failures are not presented as compatible POP diagnostics |
 | 4: frames/control | Not implemented | Functions, branches, loops, recursion, closures, dynamic binding, triangular thresholds and Man-or-Boy required |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
@@ -49,9 +49,13 @@ local to each operation. There is no native architectural register bank.
 printf '2+2=>\n' | build/cpp/poplan --native
 ```
 
-Accepted probe syntax is repeated `NUMBER [OP NUMBER] =>`, with unsigned decimal
-integer tokens (zero included), real literals described below, and OP one of
-`+ - * /`. Whitespace between tokens is allowed.
+Accepted probe syntax is repeated numeric expressions followed by `=>`, with
+unsigned decimal integer tokens (zero included), real literals described below,
+`+ - * /`, and parentheses. Multiplication/division bind more tightly than
+addition/subtraction; operators at equal priority associate to the left.
+Whitespace between tokens is allowed. General unary operators remain absent;
+signed real literals are accepted at the beginning of an expression or inside
+parentheses, so use `1+(-.5)=>` rather than `1+ -.5=>`.
 The entire probe is validated before execution; unsupported source produces a
 nonzero exit and no partial execution. This is a deliberately restricted test
 lowering, not a replacement grammar inferred from the POP-2 manual. No compiler
@@ -62,7 +66,8 @@ interactive suspension is not supported.
 machine-only environment controls even if they are present with empty values.
 The dispatch happens before constructing `Machine`. `NativeExecutionResult`
 counts POP operations, independently of historical instruction counts. The
-probe uses two operations per literal print and four per binary expression. No historical profile is changed.
+probe uses one operation per literal, binary operator and print; parentheses
+emit none. `2+3*4=>` uses six native operations. No historical profile is changed.
 
 `poplan_native_guard` compiles the existing CPU source with guards that fail on
 any machine step or decoder entry. Its native probe runs from an empty working
@@ -210,3 +215,59 @@ ASan/UBSan passed all 11 tests in 236.14 seconds with exit status 0, using
 `ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`; see
 `artifacts/native-verification/native-reals-sanitize.log`. `git diff --check` passed. Existing unrelated
 worktree changes were preserved.
+
+
+## Native arithmetic expressions (2026-10-01)
+
+The restricted development compiler now supports operator chains and nested
+parentheses: `2+3*4=>` prints `14`, `(2+3)*4=>` prints `20`, and `20-6-3=>`
+prints `11`. It reads arithmetic priorities from the explicit resident
+`keyword_descriptors`, masking the same property field as `03726` (`04377`,
+octal `3600000000000000`). The source comparison complements the pending
+field, adds the incoming field and one, then either restores the pending item
+or emits it through `04447`. For the four resident arithmetic operators this
+reduces the earlier operator when its field is less than or equal to the new
+field. That includes left association at equal priority; it is not a grammar
+inferred from a generic POP-2 description.
+
+A native pending-operation stack retains each grouping boundary and emits only
+constant/binary/print operations. Compilation and execution are iterative.
+The arithmetic kernel and double-first real conversion policy are unchanged.
+No instruction words, execution PCs, executable image, or machine fallback are
+used. The full input is still validated before execution, with no partial
+output on unsupported syntax.
+
+Historical experiments also expose restrictions worth retaining explicitly:
+`2*-3` interns `*-` as a word, while `2* -3` prints an empty stack rather than
+ordinary arithmetic negation. This slice rejects both forms instead of
+inventing unary semantics. Signed integer tokens, general unary expressions,
+variables, function calls, closures, and Man-or-Boy remain unsupported.
+Mutable operator definitions, compiler allocation costs, POP diagnostics and
+recovery are still open gates. The grouping stress test establishes freedom
+from C++ recursion, not historical allocation or nesting thresholds.
+
+Evidence and tests:
+
+- `tests/inputs/native-expressions.pop2` contains 66 expressions: all 16 ordered
+  binary-operator pairs, with ungrouped, left-grouped and right-grouped forms,
+  plus mixed real/integer arithmetic, signed real atoms, nested grouping and
+  large-integer cancellation. Expected output was obtained through the
+  historical wrapper.
+- `tests/native-probe.py` compares native and guarded native execution in an
+  empty directory, hybrid C++, instruction-only C++, and (with `--historical`)
+  historical execution. The smoke suite enables that historical comparison.
+- Malformed expressions, unsupported operator words and unported unary forms
+  must fail explicitly without partial output. A 5000-parenthesis native-only
+  probe checks the iterative compilation path.
+
+Validation logs for this increment are kept in `artifacts/native-expressions/`.
+Earlier dated measurements above describe their original implementation state.
+
+Verification for this increment: all 16 regular CTests passed (86.76 seconds),
+as did `make test` (including historical native-expression comparisons),
+`make cpp-quine`, and `make cpp-zone1224`. Fresh historical zone1224 output
+matched the reference backend; both trivial checks produced `** 4`.
+All 16 ASan/UBSan CTests passed (357.55 seconds), exit status 0, with
+`ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`.
+`git diff --check` passed. Logs: `artifacts/native-expressions/ctest.log`,
+`smoke.log`, `quine-zone.log`, and `sanitize-ctest.log` in the same directory.

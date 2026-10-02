@@ -34,6 +34,13 @@ if(BUILD_TESTING)
         COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin
     )
 
+    add_test(NAME poplan-disk-host COMMAND poplan_core_tests --disk-host)
+    add_test(NAME poplan-popmess-error-state COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --popmess-devices ${CMAKE_SOURCE_DIR}/tests/inputs/popmess-errors.pop2)
+    add_test(NAME poplan-popmess-device-state COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --popmess-devices ${CMAKE_SOURCE_DIR}/tests/inputs/popmess-devices.pop2)
+    add_test(NAME poplan-popmess-state COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --popmess ${CMAKE_SOURCE_DIR}/tests/inputs/popmess-constructors.pop2)
+
+    add_test(NAME poplan-native-reals COMMAND poplan_core_tests --native-reals)
+
     add_test(NAME poplan-native-allocator
         COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-allocator)
 
@@ -72,6 +79,9 @@ if(BUILD_TESTING)
                 ${CMAKE_SOURCE_DIR}
     )
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME poplan-popmess-devices
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/popmess-devices.py
+            --executable $<TARGET_FILE:poplan>)
     add_test(NAME poplan-coverage-expansion
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/coverage-expansion.py
             --regression --executable $<TARGET_FILE:poplan>

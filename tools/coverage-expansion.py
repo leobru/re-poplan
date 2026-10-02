@@ -119,6 +119,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--executable', type=Path, default=ROOT / 'build/cpp/poplan')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/coverage-expansion')
+    parser.add_argument('--report', type=Path,
+                        help='report destination; defaults to docs/reports/coverage-expansion.md for full profiles, stdout for regressions')
     parser.add_argument('--regression', action='store_true', help='supported cases only, no baseline profiling')
     parser.add_argument('--historical', action='store_true')
     parser.add_argument('--report-only', action='store_true',
@@ -231,8 +233,14 @@ def main():
               'EOF-only probes establish clean input suspension, not a missing-END diagnostic.',
               'No output consumer or CLOSE on a disk-output constructor is invoked.',
               'JUMPOUT/device operation 100 and disk-output transfers remain excluded.', '']
-    args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / 'report.md').write_text('\n'.join(lines))
+    report = args.report
+    if report is None and not args.regression:
+        report = ROOT / 'docs/reports/coverage-expansion.md'
+    if report is None:
+        print('\n'.join(lines))
+    else:
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text('\n'.join(lines))
     return int(failed)
 
 

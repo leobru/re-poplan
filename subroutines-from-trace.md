@@ -434,3 +434,27 @@ and for targets found only in other workloads.
 invocation was active. It is not proof that the routine is leaf for every
 input. The analyzer recognizes normal register returns and the
 `utc (link)` computed-return idiom used by `20110`.
+
+## POPMESS mounted-device continuation inventory (2026-10-01)
+
+The constructor probes and `tests/inputs/popmess-{devices,errors}.pop2`
+establish the following semantic families. Original addresses remain dispatch
+entries; shared implementations do not erase independent call boundaries.
+
+| Family | Established responsibility |
+| --- | --- |
+| `12304..12512` | Live command lookup, argument descriptors, reuse and CLOSE validation |
+| `12517` | Computed CLOSE wrapper through live object/table fields |
+| `16030..16101` | Device buffer allocation and release continuations |
+| `20573..20635` | Buffer transfer and E70 service continuations |
+| `21432`, `21441`, `21444`, `21455` | Indexed packed-character descriptors |
+| `21647..22024` | MI/MO character suppliers/consumers, conversion, closure and buffer turnover |
+| `22216` | Closed-device descriptor load before diagnostic `03014` |
+| `03041..03042`, `10020..10027` | Diagnostic restoration and callback continuations |
+
+Ranges identify families, not blanket translation of every enclosed address.
+The disassembly seeds in `poplan.sym` and individual dispatch cases are the
+precise boundaries. Full-state replay checks reached entries against raw
+execution, including independently cloned disk files. The success and error
+fixtures have zero raw steps; this is a fixture-specific measurement, not a
+claim about all POPMESS commands. See `docs/reports/popmess.md`.

@@ -7,13 +7,30 @@ not an independently designed POP-2 parser or interpreter.
 
 The opt-in `--native` development path and its open implementation gates are
 tracked in [native-runtime.md](native-runtime.md). It currently supports only
-numeric literal printing and single binary arithmetic probes. Real literals
+numeric literal printing and arithmetic expressions with resident operator
+precedence and parentheses. Real literals
 are parsed into IEEE double before BESM encoding, as explicitly requested;
 this differs from the reference scanner's digit-by-digit arithmetic.
 Native logical allocation/release and packed-name
 interning now have instruction-only differential tests, but are not yet connected
 to a full native reader/compiler. The fully native language runtime remains
 incomplete. The contract below continues to govern the independent machine reference backend.
+
+## POPMESS console and mounted disks (2026-10-01)
+
+The hybrid backend now translates argument-bearing constructors, descriptor
+reuse, CLOSE, MI/MO transfers and their character-conversion variants, buffer
+allocation/turnover, and the exercised diagnostic recovery paths. It retains
+live command tables, generated code storage, original calls and continuations.
+Explicit `--disk`/`--disk-rw` mounts provide bounded flat-image E70 transfers;
+these are not historical DIMON filesystem emulation. This does not extend the
+image-independent native backend.
+
+[The status matrix](reports/popmess.md) records implementation boundaries and
+verification. Full-state differential replay compares all memory and machine
+state, with independent disk copies for each backend. Historical comparisons
+check both output and complete written disk images. Unexercised branches and
+record-oriented devices remain outside the completeness claim.
 
 ## Compatibility Contract
 

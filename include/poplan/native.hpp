@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace poplan {
@@ -101,6 +102,11 @@ struct NativeNumberResult {
     Word48 value;
     std::string error;
 };
+// IEEE binary64 to normalized BESM encoding; discard excess mantissa bits
+// toward zero, flush BESM underflow to zero, and diagnose nonfinite/overflow.
+NativeNumberResult native_real_from_double(double);
+// Signed decimal real with a required fractional digit and optional $ exponent.
+NativeNumberResult native_parse_real_literal(std::string_view);
 NativeNumberResult native_number_binary(NativeBinary, Word48, Word48);
 std::string native_format_number(Word48);
 
@@ -118,7 +124,8 @@ struct NativeProgram {
     std::string error;
 };
 
-// Development slice: decimal integer, binary operator, decimal integer, =>.
+// Development slice: numeric arithmetic with resident operator precedence,
+// parentheses, and =>. Mutable syntax and general unary operators are absent.
 // This is deliberately not presented as the completed POP reader/compiler.
 NativeProgram native_compile_probe(const std::string &source);
 struct NativeExecutionResult {

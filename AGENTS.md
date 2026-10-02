@@ -50,10 +50,15 @@ The BESM-6 instruction set and opcode notation are documented at:
 
 ## Canonical evidence and documentation
 
+Reserve `build/` for artifacts reproducible through Make targets. Keep saved
+coverage reports in `docs/reports/` and one-off experimental output or validation
+logs in `artifacts/` (or a temporary directory), so `make clean` cannot erase
+status evidence.
+
 - `build/poplan.lst` is the generated annotated listing.
 - `build/trace.quine` and `build/quine.cov` are the historical quine trace and
   coverage map.
-- `build/coverage-corpus.md` summarizes the quine and recovered `zone*.pop2`
+- `docs/reports/coverage-corpus.md` summarizes the quine and recovered `zone*.pop2`
   coverage.
 - `subroutines-from-trace.md` is the canonical trace-backed routine inventory,
   including known continuations and observed call counts.

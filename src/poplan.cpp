@@ -1,7 +1,10 @@
 #include "poplan/machine.hpp"
 #include "poplan/native.hpp"
 
+#include <charconv>
+#include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <istream>
 #include <iterator>
 #include <ostream>
@@ -1077,6 +1080,83 @@ NativeInternResult NativeDictionary::intern(Word48 name)
     return {NativeInternResult::Status::created, handle};
 }
 
+NativeNumberResult native_real_from_double(double value)
+{
+    static_assert(std::numeric_limits<double>::is_iec559
+                  && std::numeric_limits<double>::radix == 2
+                  && std::numeric_limits<double>::digits == 53
+                  && std::numeric_limits<double>::max_exponent == 1024,
+                  "native real literals require IEEE binary64 double");
+    if (!std::isfinite(value)) {
+        return {{}, "native real conversion requires a finite double"};
+    }
+    if (value == 0) return {{}, {}}; // BESM has one zero, including input -0.0.
+    int exponent = 0;
+    const double fraction = std::frexp(value, &exponent);
+    // BESM's signed 41-bit mantissa has 40 fractional bits. ldexp is exact
+    // here; this cast deliberately truncates rather than rounds to nearest.
+    auto mantissa = static_cast<std::int64_t>(std::ldexp(fraction, 40));
+    if (mantissa == -(std::int64_t{1} << 39)) {
+        // Negative powers of two normalize as -1, not -0.5. Check AFTER
+        // truncation too, since a nearby double can truncate to this boundary.
+        mantissa *= 2;
+        --exponent;
+    }
+    exponent += 64;
+    if (exponent < 0) return {{}, {}};
+    if (exponent > 0177) return {{}, "native real conversion: BESM exponent overflow"};
+    return {Word48((static_cast<std::uint64_t>(exponent) << 41)
+                   | (static_cast<std::uint64_t>(mantissa) & ((std::uint64_t{1} << 41) - 1))), {}};
+}
+
+NativeNumberResult native_parse_real_literal(std::string_view spelling)
+{
+    // Retain the lexical shape established at 16672..16735. Decimal formation
+    // now intentionally goes through IEEE double as requested; it does not
+    // replay the reference scanner's per-digit BESM arithmetic/rounding.
+    const auto digit = [](char c) { return c >= '0' && c <= '9'; };
+    std::size_t position = 0;
+    bool negative = false;
+    if (position < spelling.size() && (spelling[position] == '+' || spelling[position] == '-')) {
+        negative = spelling[position++] == '-';
+    }
+    const auto start = position;
+    while (position < spelling.size() && digit(spelling[position])) ++position;
+    if (position == spelling.size() || spelling[position++] != '.') {
+        return {{}, "native real literal requires a decimal point"};
+    }
+    const auto fraction = position;
+    while (position < spelling.size() && digit(spelling[position])) ++position;
+    if (position == fraction) return {{}, "native real literal requires fractional digits"};
+    const auto exponent_mark = position;
+    if (position < spelling.size() && spelling[position] == '$') {
+        ++position;
+        if (position < spelling.size() && (spelling[position] == '+' || spelling[position] == '-')) ++position;
+        const auto exponent_digits = position;
+        while (position < spelling.size() && digit(spelling[position])) ++position;
+        if (position == exponent_digits) return {{}, "native real literal requires exponent digits"};
+    }
+    if (position != spelling.size()) return {{}, "invalid native real literal suffix"};
+    std::string decimal(spelling.substr(start));
+    if (exponent_mark < spelling.size()) decimal[exponent_mark - start] = 'e';
+    double value = 0;
+    const auto parsed = std::from_chars(decimal.data(), decimal.data() + decimal.size(), value,
+                                        std::chars_format::general);
+    if (parsed.ec == std::errc::result_out_of_range) {
+        return {{}, "native real literal is outside IEEE double range"};
+    }
+    if (parsed.ec != std::errc{} || parsed.ptr != decimal.data() + decimal.size()) {
+        return {{}, "invalid native real literal"};
+    }
+    auto result = native_real_from_double(negative ? -value : value);
+    // The full BESM format has a larger exponent range than POP real objects:
+    // exponent 104 is the integer tag, and higher exponents are other objects.
+    if (result.error.empty() && (result.value.raw() >> 41) >= 104) {
+        return {{}, "native real literal exceeds POPLAN real range"};
+    }
+    return result;
+}
+
 NativeProgram native_compile_probe(const std::string &source)
 {
     NativeProgram program;
@@ -1088,24 +1168,37 @@ NativeProgram native_compile_probe(const std::string &source)
             ++position;
         }
     };
-    const auto integer = [&](Word48 &value) {
+    std::string literal_error;
+    const auto number = [&](Word48 &value) {
         space();
         const auto start = position;
-        std::uint64_t payload = 0;
-        // Decimal integer payload in PRREAL: signed 40 bits. Until the full
-        // scanner is ported, reject overflow rather than inventing promotion.
-        constexpr std::uint64_t maximum = (std::uint64_t{1} << 39) - 1;
-        while (position < source.size()
-               && source[position] >= '0' && source[position] <= '9') {
-            const unsigned digit = source[position] - '0';
-            if (payload > (maximum - digit) / 10) {
-                return false;
-            }
-            payload = payload * 10 + digit;
+        const auto digit = [](char c) { return c >= '0' && c <= '9'; };
+        if (position < source.size() && (source[position] == '+' || source[position] == '-')) ++position;
+        while (position < source.size() && digit(source[position])) ++position;
+        if (position < source.size() && source[position] == '.') {
             ++position;
+            while (position < source.size() && digit(source[position])) ++position;
+            if (position < source.size() && source[position] == '$') {
+                ++position;
+                if (position < source.size() && (source[position] == '+' || source[position] == '-')) ++position;
+                while (position < source.size() && digit(source[position])) ++position;
+            }
+            const auto real = native_parse_real_literal(std::string_view(source).substr(start, position - start));
+            literal_error = real.error;
+            value = real.value;
+            return real.error.empty();
+        }
+        // Keep the existing unsigned integer token/range contract.
+        if (start == position || !digit(source[start])) return false;
+        std::uint64_t payload = 0;
+        constexpr std::uint64_t maximum = (std::uint64_t{1} << 39) - 1;
+        for (auto index = start; index < position; ++index) {
+            const unsigned digit_value = source[index] - '0';
+            if (payload > (maximum - digit_value) / 10) return false;
+            payload = payload * 10 + digit_value;
         }
         value = Word48(06400000000000000ULL | payload);
-        return position != start;
+        return true;
     };
     const auto unsupported = [&] {
         // Compile the entire probe before execution; unsupported text cannot
@@ -1113,34 +1206,98 @@ NativeProgram native_compile_probe(const std::string &source)
         program.operations.clear();
         program.error = "native compiler incomplete at byte "
             + std::to_string(position)
-            + ": supported development probe is INTEGER OP INTEGER =>";
+            + ": " + (literal_error.empty()
+                ? "supported development probe is a numeric arithmetic expression followed by =>"
+                : literal_error);
         return program;
     };
+    // 03724..03734 drains pending operators according to the masked resident
+    // property field (04377). Lower fields bind more tightly; equal fields
+    // drain first. Keep this restricted numeric lowering separate from mutable
+    // syntax and the general compiler, whose accounting/recovery is not ported.
+    struct Pending {
+        bool parenthesis;
+        NativeBinary binary;
+        std::uint64_t priority;
+        std::uint16_t provenance;
+    };
+    std::vector<Pending> pending;
+    const auto emit = [&] {
+        const auto op = pending.back();
+        pending.pop_back();
+        program.operations.push_back({NativeOperation::Kind::binary, {}, op.binary, op.provenance});
+    };
+    const auto operator_character = [](char c) {
+        return c == '+' || c == '-' || c == '*' || c == '/';
+    };
+    const auto operator_info = [](char c) {
+        Pending result{false, NativeBinary::add, 0, 06672};
+        Word48 name("+");
+        switch (c) {
+        case '-': result.binary = NativeBinary::subtract; result.provenance = 06702; name = Word48("-"); break;
+        case '*': result.binary = NativeBinary::multiply; result.provenance = 06676; name = Word48("*"); break;
+        case '/': result.binary = NativeBinary::divide; result.provenance = 06706; name = Word48("/"); break;
+        }
+        for (const auto &descriptor : keyword_descriptors) {
+            if (descriptor.name == name) {
+                result.priority = descriptor.property_word.raw() & 03600000000000000ULL;
+                break;
+            }
+        }
+        return result;
+    };
+    bool operand = true;
+    bool expression = false;
+    bool after_binary = false;
     space();
     while (position < source.size()) {
-        Word48 left, right;
-        if (!integer(left)) return unsupported();
-        space();
-        if (position == source.size()) return unsupported();
-        NativeBinary binary;
-        std::uint16_t provenance;
-        switch (source[position++]) {
-        case '+': binary = NativeBinary::add; provenance = 06672; break;
-        case '-': binary = NativeBinary::subtract; provenance = 06702; break;
-        case '*': binary = NativeBinary::multiply; provenance = 06676; break;
-        case '/': binary = NativeBinary::divide; provenance = 06706; break;
-        default: return unsupported();
+        if (operand) {
+            if (source[position] == '(') {
+                // Parenthesized subexpressions retain their own reduction boundary.
+                pending.push_back({true, {}, 0, 03570});
+                ++position;
+                after_binary = false;
+            } else {
+                // Unary operators after infix operators have historical stack
+                // effects not covered by this slice. Do not guess their grammar.
+                if (after_binary && (source[position] == '+' || source[position] == '-'))
+                    return unsupported();
+                Word48 value;
+                if (!number(value)) return unsupported();
+                program.operations.push_back({NativeOperation::Kind::constant, value, {}, 016645});
+                operand = false;
+                expression = true;
+            }
+        } else if (source[position] == ')') {
+            while (!pending.empty() && !pending.back().parenthesis) emit();
+            if (pending.empty()) return unsupported();
+            pending.pop_back();
+            ++position;
+        } else if (source.compare(position, 2, "=>") == 0) {
+            while (!pending.empty() && !pending.back().parenthesis) emit();
+            if (!pending.empty()) return unsupported();
+            position += 2;
+            program.operations.push_back({NativeOperation::Kind::print, {}, {}, 012674});
+            operand = true;
+            expression = false;
+            after_binary = false;
+        } else if (operator_character(source[position])) {
+            const auto next = operator_info(source[position++]);
+            // The resident reader interns adjacent operator characters as one
+            // word: **, +-, etc. are not two arithmetic tokens.
+            if (position < source.size() && operator_character(source[position]))
+                return unsupported();
+            while (!pending.empty() && !pending.back().parenthesis
+                   && pending.back().priority <= next.priority) emit();
+            pending.push_back(next);
+            operand = true;
+            after_binary = true;
+        } else {
+            return unsupported();
         }
-        if (!integer(right)) return unsupported();
-        space();
-        if (source.compare(position, 2, "=>") != 0) return unsupported();
-        position += 2;
-        program.operations.push_back({NativeOperation::Kind::constant, left});
-        program.operations.push_back({NativeOperation::Kind::constant, right});
-        program.operations.push_back({NativeOperation::Kind::binary, {}, binary, provenance});
-        program.operations.push_back({NativeOperation::Kind::print, {}, {}, 012674});
         space();
     }
+    if (expression || !pending.empty()) return unsupported();
     return program;
 }
 

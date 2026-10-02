@@ -117,9 +117,42 @@ std::uint64_t jiffies_since_midnight()
 
 } // namespace
 
+void Machine::mount_disk(std::uint16_t unit, std::string_view path, bool writable)
+{
+    if (unit > 077 || path.empty()) throw MachineError("disk mount: invalid unit or empty path");
+    if (!disk_mounts_[unit].path.empty()) throw MachineError("disk mount: duplicate unit");
+    std::fstream file(std::string(path), std::ios::binary | std::ios::in
+                      | (writable ? std::ios::out : std::ios::openmode{}));
+    if (!file) throw MachineError("disk mount: cannot open " + std::string(path));
+    file.seekg(0, std::ios::end);
+    const auto size = file.tellg();
+    if (size <= 0 || size % (02000 * 6) != 0)
+        throw MachineError("disk mount: expected complete flat 6144-byte zones");
+    disk_mounts_[unit] = {std::string(path), writable};
+}
+
+bool Machine::read_mounted_zone(std::uint16_t unit, std::uint16_t zone,
+                               std::array<Word48, 02000> &data) const
+{
+    std::ifstream input(disk_mounts_[unit].path, std::ios::binary);
+    if (!input) return false;
+    input.seekg(static_cast<std::streamoff>(zone) * 02000 * 6);
+    for (auto &word : data) {
+        std::uint64_t bits = 0;
+        for (unsigned byte = 0; byte < 6; ++byte) {
+            const int c = input.get();
+            if (c == std::char_traits<char>::eof()) return false;
+            bits = (bits << 8) | static_cast<unsigned char>(c);
+        }
+        word = Word48(bits);
+    }
+    return true;
+}
+
 bool Machine::read_poplib_zone(
     std::uint16_t zone, std::array<Word48, 02000> &data) const
 {
+    if (!disk_mounts_[057].path.empty()) return read_mounted_zone(057, zone, data);
     constexpr std::streamoff flat_word_bytes = 6;
     constexpr std::streamoff flat_zone_bytes = 02000 * flat_word_bytes;
     constexpr std::streamoff physical_control_bytes = 8 * 8;
@@ -202,26 +235,47 @@ void Machine::emulate_e70(std::uint16_t control_address)
             read_operation ? 1U : 0U, seek_operation ? 1U : 0U);
     }
 
-    // Other logical devices retain the old no-op behavior until their actual
-    // POPLAN use is established.  A speculative disk operation transfers no
-    // data.
-    if (unit != poplib_unit || seek_operation) {
+    const auto &mount = disk_mounts_[unit];
+    // The instruction-only diagnostic formatter historically requests the
+    // unavailable system catalog on 42/01200 with return link 03112. Retain
+    // that existing non-transfer compatibility path (and its documented missing
+    // description), not a successful user-device read. Explicit mounts override it.
+    if (mount.path.empty() && unit == 042 && zone == 01200 && read_operation
+        && !seek_operation && control_address == 020657 && registers_[015] == 03112)
         return;
-    }
-    if (!read_operation) {
-        throw MachineError("E70: writing logical unit 57 is unsupported");
-    }
-
-    std::array<Word48, words_per_zone> data{};
-    if (!read_poplib_zone(zone, data)) {
+    if (mount.path.empty() && unit != poplib_unit) {
         std::ostringstream message;
-        message << "E70: logical unit 57 file '" << poplib_path_
-                << "' has no complete zone " << std::oct << zone;
+        message << "E70: logical unit " << std::oct << unit << " is not mounted";
         throw MachineError(message.str());
     }
-
+    if (seek_operation) throw MachineError("E70: seek operation is unsupported");
     const std::uint16_t destination = static_cast<std::uint16_t>(page << 10);
-    std::copy(data.begin(), data.end(), memory_.begin() + destination);
+    if (read_operation) {
+        std::array<Word48, words_per_zone> data{};
+        const bool read = mount.path.empty() ? read_poplib_zone(zone, data)
+                                            : read_mounted_zone(unit, zone, data);
+        if (!read) throw MachineError("E70: cannot read complete disk zone");
+        std::copy(data.begin(), data.end(), memory_.begin() + destination);
+    } else {
+        if (mount.path.empty() || !mount.writable)
+            throw MachineError("E70: disk is read-only");
+        std::fstream file(mount.path, std::ios::binary | std::ios::in | std::ios::out);
+        if (!file) throw MachineError("E70: cannot open writable disk");
+        file.seekg(0, std::ios::end);
+        const std::streamoff size = file.tellg();
+        const std::streamoff offset = static_cast<std::streamoff>(zone) * words_per_zone * 6;
+        constexpr std::streamoff zone_bytes = words_per_zone * 6;
+        if (size <= 0 || size % zone_bytes != 0 || offset + zone_bytes > size)
+            throw MachineError("E70: write outside complete disk zones");
+        file.seekp(offset);
+        for (std::size_t index = 0; index < words_per_zone; ++index) {
+            const auto bits = memory_[destination + index].raw();
+            for (int shift = 40; shift >= 0; shift -= 8)
+                file.put(static_cast<char>((bits >> shift) & 0377));
+        }
+        file.flush();
+        if (!file) throw MachineError("E70: disk write failed");
+    }
 }
 
 void Machine::load_image(std::istream &input)
@@ -805,6 +859,86 @@ bool Machine::dispatch_translated_routine()
     }
 
     switch (program_counter_) {
+    case 012517: continuation = p12517(); break;
+    case 021441:
+    case 021432:
+    case 021455:
+    case 021444:
+        continuation = p21441(program_counter_); break;
+    case 016030:
+    case 016037:
+    case 016042:
+    case 016051:
+    case 016072:
+    case 016100:
+    case 016101:
+        continuation = p16030(program_counter_); break;
+    case 020573:
+    case 020575:
+    case 020577:
+    case 020605:
+    case 020613:
+    case 020614:
+    case 020621:
+    case 020622:
+    case 020633:
+    case 020635:
+        continuation = p20573(program_counter_); break;
+    case 03041:
+    case 03042:
+        continuation = p03041(program_counter_); break;
+    case 021647:
+    case 021671:
+    case 022010:
+    case 022020:
+    case 021650:
+    case 021672:
+    case 021651:
+    case 021652:
+    case 021661:
+    case 021663:
+    case 021666:
+    case 021670:
+    case 021673:
+    case 021674:
+    case 021675:
+    case 021700:
+    case 021703:
+    case 021707:
+    case 021762:
+    case 021712:
+    case 021713:
+    case 021716:
+    case 021720:
+    case 021721:
+    case 021725:
+    case 021731:
+    case 021735:
+    case 021740:
+    case 021741:
+    case 021744:
+    case 021743:
+    case 021746:
+    case 021747:
+    case 021753:
+    case 021755:
+    case 021765:
+    case 021766:
+    case 021772:
+    case 021775:
+    case 021776:
+    case 022003:
+    case 022006:
+    case 022011:
+    case 022021:
+    case 022012:
+    case 022017:
+    case 022015:
+    case 022022:
+    case 022024:
+    case 022216:
+        continuation = p21647(program_counter_); break;
+
     case 06476: case 06500: case 06502:
         continuation = p06476(program_counter_); break;
     case 010235: case 010236: case 010237: case 010240:
@@ -813,6 +947,10 @@ bool Machine::dispatch_translated_routine()
     case 07514: case 07515: case 07523: case 07527:
     case 07530: case 07534: case 07542:
         continuation = p07514(program_counter_); break;
+    case 012324: case 012331: case 012335: case 012353: case 012354:
+    case 012357: case 012362: case 012364: case 012365: case 012367:
+    case 012404: case 012411: case 012426: case 012430: case 012432:
+    case 012445: case 012463: case 012474: case 012501: case 012505: case 012507:
     case 012304: case 012314: case 012320: case 012377:
     case 012417: case 012420: case 012424:
     case 012433: case 012435: case 012437: case 012441:
@@ -828,6 +966,7 @@ bool Machine::dispatch_translated_routine()
     case 07622: case 07625: case 07626: case 07633: case 07636:
     case 07641: case 07644:
         continuation = p07622(program_counter_); break;
+    case 010020: case 010023: case 010025: case 010026: case 010027:
     case 010002: case 010005: case 010006: case 010007:
     case 010011: case 010013: case 010015:
         continuation = p10002(program_counter_); break;

@@ -16,7 +16,7 @@ CPP_ZONE1224_INTERPRETED_NORMALIZED := $(BUILD_DIR)/cpp-zone1224-interpreted.nor
 DISPAK_RUNNER ?= ./tools/run-dispak.sh
 ZONE_INPUTS := $(wildcard zone*.pop2)
 ZONE_COVERAGES := $(patsubst %.pop2,$(BUILD_DIR)/%.cov,$(ZONE_INPUTS))
-COVERAGE_CORPUS := $(BUILD_DIR)/coverage-corpus.md
+COVERAGE_CORPUS := docs/reports/coverage-corpus.md
 
 .PHONY: all image trace listing calls dictionary coverage-corpus cpp cpp-test cpp-run cpp-trivial cpp-quine cpp-zone1224 test clean
 
@@ -83,8 +83,8 @@ test: image
 $(IMAGE): tools/extract-image.sh
 	./tools/extract-image.sh $@
 
-$(TRACE): tools/run-trace.sh poplan.b6 quine.pop2 | $(BUILD_DIR)
-	./tools/run-trace.sh quine.pop2 $(OUTPUT) $@ $(COVERAGE)
+$(TRACE) $(COVERAGE) $(OUTPUT) &: tools/run-trace.sh poplan.b6 quine.pop2 | $(BUILD_DIR)
+	./tools/run-trace.sh quine.pop2 $(OUTPUT) $(TRACE) $(COVERAGE)
 
 $(LISTING): $(IMAGE) $(TRACE) poplan.sym tools/disassemble.sh
 	./tools/disassemble.sh $(IMAGE) $(TRACE) > $@
@@ -100,6 +100,7 @@ $(BUILD_DIR)/zone%.cov: zone%.pop2 poplan.b6 | $(BUILD_DIR)
 		< $< > $(BUILD_DIR)/zone$*.out
 
 $(COVERAGE_CORPUS): $(COVERAGE) $(ZONE_COVERAGES) tools/summarize-coverage.py
+	mkdir -p $(dir $@)
 	./tools/summarize-coverage.py $(COVERAGE) $(ZONE_COVERAGES) > $@
 
 $(BUILD_DIR):

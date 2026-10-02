@@ -6,7 +6,10 @@ import subprocess
 import sys
 import tempfile
 
-binary, guarded, root = map(Path, sys.argv[1:])
+binary, guarded, root = map(Path, sys.argv[1:4])
+historical = '--historical' in sys.argv[4:]
+expressions = (root / 'tests/inputs/native-expressions.pop2').read_text()
+expression_expected = (root / 'tests/expected/native-expressions.out').read_text()
 sys.path.insert(0, str(root / 'tools'))
 import importlib.util
 spec = importlib.util.spec_from_file_location('normalize_output', root / 'tools/normalize-output.py')
@@ -32,10 +35,19 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
         assert result.returncode == 0, result.stderr
         assert result.stdout == expected, repr(result.stdout)
         for text in ('2+2=> FUNCTION F; END;', '1+', '549755813888+1=>',
-                     '2+3*4=>', '1+2=> junk', '1.+2=>'):
+                     '2+3**4=>', '1+2=> junk', '1.+2=>',
+                     '2+3*=>', '(2+3=>', '2+3)=>', '()=>', '2(3)=>',
+                     '2 3=>', '1=> (2+3)', '2*-3=>', '2* -3=>', '2+ -3=>',
+                     '2//3=>', '-(2+3)=>', '-2=>'):
             result = run(executable, ['--native'], text, directory)
             assert result.returncode != 0 and not result.stdout, result
             assert 'compiler incomplete' in result.stderr, result.stderr
+        result = run(executable, ['--native'], expressions, directory)
+        assert result.returncode == 0 and result.stdout == expression_expected, result
+        # Explicit pending operations, not C++ recursion, handle grouping.
+        deep = '(' * 5000 + '2+3' + ')' * 5000 + '=>'
+        result = run(executable, ['--native'], deep, directory)
+        assert result.returncode == 0 and result.stdout == '** 5\n', result
         reals = '3.14=> .5=> 3.14$-3=> 3.14$+2=> .5$2=> 0.0=> 123456789.25=> 1.234567890123=> 1.0+2=> -.5=>'.replace(' ', '\n') + '\n'
         real_expected = ('** 3.1400000\n** .50000000\n** .00314000\n** 314.00000\n'
                          '** 50.000000\n** .00000000\n** 123456789.2\n** 1.2345679\n'
@@ -65,4 +77,9 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
         result = run(binary, ['--image', str(root / 'build/poplan.bin')], reals, root, environment)
         assert result.returncode == 0, result.stderr
         assert normalize(result.stdout) == real_expected, repr(result.stdout)
+        result = run(binary, ['--image', str(root / 'build/poplan.bin')], expressions, root, environment)
+        assert result.returncode == 0 and normalize(result.stdout) == expression_expected, result
+    if historical:
+        result = run(root / 'tools/run-dispak.sh', ['--bootstrap', str(root / 'poplan.b6')], expressions, root)
+        assert result.returncode == 0 and normalize(result.stdout) == expression_expected, result
 print('native probe, raw/hybrid comparison, CLI rejection and execution guard passed')

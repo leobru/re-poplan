@@ -193,4 +193,8 @@ ctest --test-dir "$root/build/cpp" --output-on-failure
 python3 "$root/tools/coverage-expansion.py" --regression --historical \
     --output "$temporary/coverage-expansion"
 
+python3 "$root/tests/popmess-devices.py" --historical
+python3 "$root/tests/native-probe.py" "$root/build/cpp/poplan" \
+    "$root/build/cpp/poplan_native_guard" "$root" --historical
+
 echo "POPLAN smoke tests passed"

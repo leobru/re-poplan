@@ -25818,6 +25818,23 @@ std::uint16_t Machine::p10002(std::uint16_t entry)
         p03275_push_acc();
     };
     switch (entry) {
+    case 010020:
+        load(address_add(registers_[005], 0243));
+        accumulator_ = accumulator_ & memory_[address_add(registers_[005], 0317)]; remainder_ = Word48();
+        remainder_ = accumulator_; accumulator_ = Word48(accumulator_.raw() ^ memory_[address_add(registers_[005], 0335)].raw());
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return address_add(registers_[005], 0311);
+        load(address_add(registers_[005], 0316)); push(010023);
+        [[fallthrough]];
+    case 010023:
+        load(01567); registers_[015] = 07742; return 02750;
+    case 010025:
+        load(address_add(registers_[005], 0243)); push(010026);
+        [[fallthrough]];
+    case 010026:
+        registers_[016] = 010463; registers_[015] = 010027; return 02764;
+    case 010027:
+        registers_[016] = 07667; registers_[015] = 07742; return 02764;
     case 010002:
         load(registers_[001]);
         shift_accumulator(24);
@@ -26086,7 +26103,172 @@ std::uint16_t Machine::p12304(std::uint16_t entry)
         if (accumulator_condition())
             return memory_[address_add(registers_[004], 1)].address();
         if (registers_[002] != 0) return 012324;
-        [[fallthrough]];
+        return 012417;
+    case 012324:
+        registers_[007] = registers_[002];
+        load(address_add(registers_[004], 1)); mask(0222);
+        registers_[003] = 012624;
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) return cell(056);
+        registers_[007] = address_add(registers_[007], memory_[registers_[002]].address() + 1);
+        registers_[016] = 5; registers_[015] = 012331;
+        return 05430;
+    case 012331:
+        accumulator_ = Word48(registers_[016]); select_alu_group(rau_logical);
+        shift_accumulator(-24); exclusive_or(0237);
+        memory_[cell(0323)] = accumulator_;
+        registers_[003] = registers_[016]; load(cell(0223));
+        memory_[registers_[003]] = accumulator_;
+        registers_[015] = 012335; return 012426;
+    case 012335:
+        memory_[cell(0321)] = accumulator_; mask(0217); exclusive_or(0237);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(047);
+        load(cell(0321)); shift_accumulator(24);
+        registers_[016] = accumulator_.address();
+        if (!registers_[016]) return 012424;
+        load(address_add(registers_[016], 4)); mask(0224); exclusive_or(0225);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(address_add(memory_[address_add(registers_[016], 4)].address(), 1));
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[address_add(registers_[002], 1)].raw());
+        select_alu_group(rau_logical); mask(0226);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(address_add(registers_[004], 1)); shift_accumulator(-9); exclusive_or(0227);
+        accumulator_ = accumulator_ & memory_[address_add(memory_[address_add(registers_[016], 4)].address(), 1)];
+        remainder_ = Word48(); select_alu_group(rau_logical); mask(0227);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(address_add(registers_[016], 4));
+        memory_[address_add(registers_[003], 4)] = accumulator_;
+        registers_[003] = accumulator_.address(); return cell(0100);
+    case 012353:
+        load(registers_[002]); registers_[015] = 012354; return 011464;
+    case 012354:
+        exclusive_or(0225); memory_[address_add(registers_[003], 4)] = accumulator_;
+        registers_[003] = accumulator_.address(); load(registers_[002]);
+        registers_[010] = accumulator_.address(); registers_[011] = registers_[003];
+        return 012357;
+    case 012357:
+        do { // 12357..12361: copy the live template, including aliased stores.
+            registers_[002] = address_add(registers_[002], 1);
+            registers_[011] = address_add(registers_[011], 1);
+            registers_[010] = address_add(registers_[010], -1);
+            load(registers_[002]); memory_[registers_[011]] = accumulator_;
+        } while (registers_[010]);
+        return 012362;
+    case 012362:
+        accumulator_ = Word48(registers_[007]); select_alu_group(rau_logical);
+        accumulator_ = cyclic_add(accumulator_, memory_[cell(0240)]);
+        remainder_ = Word48(); select_alu_group(rau_multiplicative);
+        memory_[cell(0317)] = accumulator_;
+        return 012364;
+    case 012364:
+        registers_[005] = 077776; registers_[015] = 012365; return 012433;
+    case 012365:
+        hardware_push_acc(); registers_[016] = 012623;
+        registers_[015] = 012367; return 021431;
+    case 012367:
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) return cell(0120);
+        if (registers_[005]) {
+            registers_[005] = address_add(registers_[005], 1); return 012365;
+        }
+        sti(016); sti(014); sti(013);
+        registers_[013] = address_add(registers_[013], registers_[003]);
+        shift_accumulator((registers_[014] & 0177) - 64);
+        shift_accumulator((registers_[016] & 0177) - 64);
+        xts(cell(0230));
+        shift_accumulator((registers_[014] & 0177) - 64);
+        shift_accumulator((registers_[016] & 0177) - 64);
+        exclusive_or(0230);
+        accumulator_ = accumulator_ & memory_[registers_[013]];
+        remainder_ = Word48(); select_alu_group(rau_logical);
+        registers_[017] = address_add(registers_[017], -1);
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[registers_[017]].raw());
+        memory_[registers_[013]] = accumulator_; return cell(060);
+    case 012404:
+        load(address_add(registers_[004], 1)); shift_accumulator(-9); mask(0227);
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[address_add(registers_[003], 1)].raw());
+        select_alu_group(rau_logical); mask(0231);
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[address_add(registers_[003], 1)].raw());
+        select_alu_group(rau_logical);
+        memory_[address_add(registers_[003], 1)] = accumulator_;
+        registers_[016] = 1; registers_[015] = 012411; return 05430;
+    case 012411:
+        accumulator_ = Word48(registers_[016]); select_alu_group(rau_logical);
+        exclusive_or(0323); memory_[cell(0323)] = accumulator_;
+        load(address_add(registers_[004], 1)); shift_accumulator(24); exclusive_or(0241);
+        its(003); shift_accumulator(-24);
+        registers_[017] = address_add(registers_[017], -1);
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[registers_[017]].raw());
+        select_alu_group(rau_logical);
+        if (registers_[016]) memory_[registers_[016]] = accumulator_; // E75
+        return memory_[registers_[007]].address();
+    case 012426:
+        its(015); hardware_push_acc(); load(cell(0320));
+        registers_[015] = 012430; return 017045;
+    case 012430:
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0140);
+        load(cell(0320)); registers_[015] = 012432; return 017013;
+    case 012432:
+        stx(address_add(registers_[017], -2)); return cell(0137);
+    case 012445:
+        load(cell(0321)); mask(0217); exclusive_or(0237);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(cell(0321)); shift_accumulator(24); registers_[016] = accumulator_.address();
+        if (!registers_[016]) return 012424;
+        load(address_add(registers_[016], 4)); mask(0224); exclusive_or(0225);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0120);
+        load(address_add(registers_[016], 4)); registers_[003] = accumulator_.address();
+        load(address_add(registers_[003], 1)); mask(0225);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0157);
+        load(address_add(registers_[003], 1)); mask(0232);
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) return cell(0206);
+        load(address_add(registers_[003], 2)); value_stack_push(accumulator_);
+        registers_[015] = 012512;
+        accumulator_ = Word48(registers_[003]); select_alu_group(rau_logical);
+        memory_[cell(0322)] = accumulator_; load(cell(0242)); return 02750;
+    case 012463:
+        load(cell(0321)); registers_[015] = 012512;
+        return address_add(cell(0160), memory_[address_add(registers_[003], 1)].address());
+    case 012474:
+        load(address_add(registers_[003], 3)); mask(0217);
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return cell(0201);
+        load(cell(0233)); memory_[cell(0321)] = accumulator_;
+        load(address_add(registers_[004], 1)); mask(0234);
+        remainder_ = accumulator_;
+        if (!accumulator_condition()) return cell(0175);
+        load(cell(0235)); memory_[cell(0321)] = accumulator_;
+        return 012501;
+    case 012501:
+        load(address_add(registers_[003], 3)); exclusive_or(0321);
+        memory_[address_add(registers_[003], 3)] = accumulator_;
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[address_add(registers_[003], 5)].raw());
+        select_alu_group(rau_logical); mask(0217);
+        remainder_ = accumulator_;
+        accumulator_ = Word48(accumulator_.raw() ^ memory_[address_add(registers_[003], 5)].raw());
+        select_alu_group(rau_logical); memory_[address_add(registers_[003], 5)] = accumulator_;
+        return 012505;
+    case 012505:
+        load(address_add(registers_[003], 3)); shift_accumulator(15); mask(0236);
+        registers_[015] = 012507; return 016005;
+    case 012507:
+        memory_[address_add(registers_[003], 6)] = accumulator_;
+        load(cell(0323)); value_stack_push(accumulator_); return 012512;
     case 012417:
         load(cell(0320));
         registers_[015] = 012420;
@@ -26158,6 +26340,331 @@ std::uint16_t Machine::p12304(std::uint16_t entry)
         return 03235;
     }
     throw MachineError("invalid 12304 entry");
+}
+
+
+std::uint16_t Machine::p21441(std::uint16_t entry)
+{
+    // Indexed descriptor access differs from 21431/21443 by adding the buffer
+    // base already in r14. Preserve the separate computed suffix entries.
+    if (entry == 021441 || entry == 021455)
+        registers_[014] = address_add(registers_[014], memory_[registers_[016]].address());
+    registers_[010] = 021431;
+    if (entry == 021441 || entry == 021432) {
+        accumulator_ = memory_[registers_[014]]; select_alu_group(rau_logical);
+        shift_accumulator(static_cast<int>((memory_[registers_[016]].raw() >> 41) & 0177) - 64);
+        accumulator_ = accumulator_ & memory_[021457]; remainder_ = Word48(); select_alu_group(rau_logical);
+        xts(registers_[016]);
+        accumulator_ = cyclic_add(accumulator_, memory_[021460]); remainder_ = Word48(); select_alu_group(rau_multiplicative);
+        memory_[registers_[016]] = accumulator_; remainder_ = accumulator_;
+        if (accumulator_condition()) {
+            accumulator_ = cyclic_add(accumulator_, memory_[021461]); remainder_ = Word48(); select_alu_group(rau_multiplicative);
+            memory_[registers_[016]] = accumulator_; registers_[014] = 0;
+        }
+        hardware_pop_acc(); select_alu_group(rau_logical); return registers_[015];
+    }
+    // 21444..21454: masked byte replacement and descriptor advancement.
+    shift_accumulator(static_cast<int>((memory_[registers_[016]].raw() >> 41) & 0177) - 64);
+    remainder_ = accumulator_; accumulator_ = Word48(accumulator_.raw() ^ memory_[registers_[014]].raw()); select_alu_group(rau_logical);
+    xts(021457);
+    shift_accumulator(static_cast<int>((memory_[registers_[016]].raw() >> 41) & 0177) - 64);
+    registers_[017] = address_add(registers_[017], -1);
+    accumulator_ = accumulator_ & memory_[registers_[017]]; remainder_ = Word48(); select_alu_group(rau_logical);
+    remainder_ = accumulator_; accumulator_ = Word48(accumulator_.raw() ^ memory_[registers_[014]].raw());
+    memory_[registers_[014]] = accumulator_;
+    accumulator_ = memory_[registers_[016]];
+    accumulator_ = cyclic_add(accumulator_, memory_[021462]); remainder_ = Word48(); select_alu_group(rau_multiplicative);
+    memory_[registers_[016]] = accumulator_;
+    accumulator_ = cyclic_add(accumulator_, memory_[021460]); remainder_ = accumulator_;
+    if (accumulator_condition()) return registers_[015];
+    accumulator_ = cyclic_add(accumulator_, memory_[021463]); remainder_ = Word48(); select_alu_group(rau_multiplicative);
+    memory_[registers_[016]] = accumulator_; registers_[014] = 0;
+    return registers_[015];
+}
+
+std::uint16_t Machine::p16030(std::uint16_t entry)
+{
+    const auto addr = [&](int off) { return address_add(registers_[010], off); };
+    const auto load = [&](std::uint16_t a) { accumulator_ = memory_[a]; select_alu_group(rau_logical); };
+    const auto mask = [&](int off) { accumulator_ = accumulator_ & memory_[addr(off)]; remainder_ = Word48(); select_alu_group(rau_logical); };
+    const auto xor_at = [&](std::uint16_t a) { remainder_ = accumulator_; accumulator_ = Word48(accumulator_.raw() ^ memory_[a].raw()); select_alu_group(rau_logical); };
+    switch (entry) {
+    case 016030:
+        registers_[010] = 016005; registers_[014] = registers_[016];
+        memory_[addr(0244)] = accumulator_; registers_[016] = accumulator_.address();
+        if (!registers_[014]) return 016042;
+        load(registers_[016]); mask(0222); remainder_ = accumulator_;
+        if (!accumulator_condition()) return addr(035);
+        xor_at(registers_[016]); memory_[registers_[016]] = accumulator_;
+        accumulator_ = Word48(registers_[015]); select_alu_group(rau_logical); hardware_push_acc();
+        registers_[015] = 016037; return 020575;
+    case 016037:
+        registers_[010] = 016005; hardware_pop_acc(); select_alu_group(rau_logical);
+        registers_[015] = accumulator_.address(); load(addr(0244)); registers_[016] = accumulator_.address();
+        [[fallthrough]];
+    case 016042:
+        load(registers_[016]); mask(0220); memory_[addr(0244)] = accumulator_;
+        xor_at(addr(0220)); remainder_ = accumulator_;
+        if (!accumulator_condition()) return registers_[015];
+        load(addr(0244)); accumulator_ = cyclic_add(accumulator_, memory_[addr(0223)]);
+        remainder_ = accumulator_; select_alu_group(rau_multiplicative);
+        if (!accumulator_condition()) return addr(044);
+        xor_at(registers_[016]); mask(0224); xor_at(registers_[016]); memory_[registers_[016]] = accumulator_;
+        return registers_[015];
+    case 016051:
+        load(registers_[016]); mask(0225); memory_[registers_[016]] = accumulator_; mask(0226);
+        remainder_ = accumulator_;
+        return accumulator_condition() ? registers_[015] : 021075;
+    case 016072:
+        registers_[010] = 016005; registers_[014] = accumulator_.address();
+        load(registers_[014]); accumulator_ = Word48(accumulator_.raw() | memory_[addr(0222)].raw());
+        remainder_ = Word48(); select_alu_group(rau_logical);
+        memory_[registers_[014]] = accumulator_; mask(0226); remainder_ = accumulator_;
+        return accumulator_condition() ? registers_[015] : addr(073);
+    case 016100:
+        remainder_ = accumulator_;
+        if (accumulator_condition()) return registers_[015];
+        memory_[addr(0246)] = accumulator_;
+        [[fallthrough]];
+    case 016101:
+        accumulator_ = Word48(registers_[015]); select_alu_group(rau_logical); its(014); hardware_push_acc();
+        registers_[016] = accumulator_.address(); registers_[015] = 016104; return 021075;
+    }
+    throw MachineError("invalid disk buffer entry");
+}
+
+std::uint16_t Machine::p20573(std::uint16_t entry)
+{
+    const auto addr = [&](int off) { return address_add(registers_[010], off); };
+    const auto load = [&](std::uint16_t a) { accumulator_ = memory_[a]; select_alu_group(rau_logical); };
+    const auto mask = [&](int off) { accumulator_ = accumulator_ & memory_[addr(off)]; remainder_ = Word48(); select_alu_group(rau_logical); };
+    const auto xor_at = [&](std::uint16_t a) { remainder_ = accumulator_; accumulator_ = Word48(accumulator_.raw() ^ memory_[a].raw()); select_alu_group(rau_logical); };
+    switch (entry) {
+    case 020573:
+        registers_[010] = 020573; registers_[012] = 0; load(addr(044)); return addr(4);
+    case 020575:
+        registers_[010] = 020573; registers_[012] = 077777; load(0);
+        [[fallthrough]];
+    case 020577:
+        memory_[addr(064)] = accumulator_;
+        accumulator_ = Word48(registers_[015]); select_alu_group(rau_logical); its(012); its(016);
+        xts(registers_[016]); mask(045); memory_[addr(053)] = accumulator_;
+        xor_at(registers_[016]); memory_[registers_[016]] = accumulator_;
+        load(addr(053)); registers_[015] = 020605; return 016145;
+    case 020605:
+        registers_[010] = 020573; hardware_pop_acc(); select_alu_group(rau_logical); sti(016); sti(012);
+        registers_[015] = accumulator_.address(); registers_[013] = 020647;
+        load(registers_[016]); mask(046); shift_accumulator(15); memory_[addr(051)] = accumulator_;
+        alu_mode_ = 3; registers_[011] = 020633; return 020613;
+    case 020613:
+        registers_[014] = 077775; return 020614;
+    case 020614:
+        load(registers_[013]); remainder_ = accumulator_;
+        if (!accumulator_condition()) return addr(027);
+        mask(047); memory_[addr(052)] = accumulator_; load(registers_[013]); shift_accumulator(12);
+        reverse_subtract(memory_[addr(051)]); remainder_ = accumulator_;
+        if (accumulator_condition()) return addr(026);
+        arithmetic_add(memory_[addr(052)], false, true); remainder_ = accumulator_;
+        if (accumulator_condition()) return registers_[011];
+        [[fallthrough]];
+    case 020621:
+        registers_[013] = address_add(registers_[013], 1);
+        if (registers_[014]) { registers_[014] = address_add(registers_[014], 1); return 020614; }
+        [[fallthrough]];
+    case 020622:
+        registers_[011] = 020635; registers_[013] = 020653;
+        if (registers_[012]) { registers_[012] = address_add(registers_[012], 1); return 020613; }
+        load(addr(053)); mask(050); shift_accumulator(-20); xor_at(addr(064)); xor_at(addr(051));
+        memory_[addr(064)] = accumulator_; registers_[014] = registers_[016];
+        registers_[016] = addr(064); emulate_e70(registers_[016]); select_alu_group(rau_logical);
+        load(addr(053)); xor_at(registers_[014]); memory_[registers_[014]] = accumulator_;
+        load(addr(053)); return 016151;
+    case 020633: case 020635:
+        load(addr(051)); registers_[016] = entry == 020633 ? 012043 : 012044; return 03014;
+    }
+    throw MachineError("invalid disk transfer entry");
+}
+
+std::uint16_t Machine::p21647(std::uint16_t entry)
+{
+    const auto addr = [&](int off) { return address_add(registers_[001], off); };
+    const auto obj = [&](int off) { return address_add(registers_[002], off); };
+    const auto load = [&](std::uint16_t a) { accumulator_ = memory_[a]; select_alu_group(rau_logical); };
+    const auto mask = [&](int off) { accumulator_ = accumulator_ & memory_[addr(off)]; remainder_ = Word48(); select_alu_group(rau_logical); };
+    const auto xor_at = [&](std::uint16_t a) { remainder_ = accumulator_; accumulator_ = Word48(accumulator_.raw() ^ memory_[a].raw()); select_alu_group(rau_logical); };
+    const auto add = [&](int off) { accumulator_ = cyclic_add(accumulator_, memory_[addr(off)]); remainder_ = Word48(); select_alu_group(rau_multiplicative); };
+    const auto test = [&] { remainder_ = accumulator_; return accumulator_condition(); };
+    switch (entry) {
+    case 021647: case 021671: case 022010: case 022020:
+        registers_[015] = address_add(entry, 1); return 021663;
+    case 021650: case 021672:
+        registers_[015] = address_add(entry, 1); return 03277;
+    case 021651:
+        memory_[addr(0374)] = accumulator_; memory_[addr(0375)] = accumulator_;
+        [[fallthrough]];
+    case 021652:
+        load(obj(1)); mask(0350);
+        if (!test()) return addr(021);
+        load(addr(0374)); xor_at(obj(2)); registers_[015] = 021661;
+        if (!test()) return addr(051);
+        load(addr(0374)); mask(0351); xor_at(addr(0352));
+        if (test()) return addr(017);
+        load(addr(0375)); registers_[015] = 021661; return 021675;
+    case 021661:
+        hardware_pop_acc(); select_alu_group(rau_logical); sti(002);
+        registers_[001] = accumulator_.address(); return 03235;
+    case 021663:
+        accumulator_ = Word48(registers_[001]); select_alu_group(rau_logical);
+        its(002); hardware_push_acc(); registers_[001] = 021647;
+        registers_[002] = registers_[016]; return registers_[015];
+    case 021666:
+        load(addr(0374)); registers_[016] = 012045; return 03014;
+    case 021670:
+        registers_[016] = 012041; return addr(0347);
+    case 021673:
+        memory_[addr(0374)] = accumulator_; registers_[015] = 021674; return 021275;
+    case 021674:
+        memory_[addr(0375)] = accumulator_; return addr(3);
+    case 021675:
+        memory_[addr(0374)] = accumulator_;
+        accumulator_ = Word48(registers_[015]); select_alu_group(rau_logical); hardware_push_acc();
+        load(obj(6)); registers_[015] = 021700; return 016072;
+    case 021700:
+        registers_[014] = accumulator_.address(); registers_[016] = obj(3);
+        load(addr(0374)); registers_[015] = 021703; return 021455;
+    case 021703:
+        if (registers_[014]) return 021716;
+        load(obj(3)); mask(0353);
+        if (test()) return addr(044);
+        load(obj(6)); registers_[016] = 1; registers_[015] = 021707; return 016030;
+    case 021707: case 021762:
+        load(obj(3)); add(0354); memory_[obj(3)] = accumulator_;
+        shift_accumulator(15); mask(0355); registers_[015] = address_add(entry, 3); return 016005;
+    case 021712:
+        memory_[obj(6)] = accumulator_;
+        [[fallthrough]];
+    case 021713:
+        load(obj(3)); xor_at(obj(5));
+        if (test()) return addr(047);
+        hardware_pop_acc(); select_alu_group(rau_logical); registers_[015] = accumulator_.address();
+        return addr(051);
+    case 021716:
+        registers_[015] = 0; registers_[017] = address_add(registers_[017], -1);
+        return memory_[registers_[017]].address();
+    case 021720:
+        accumulator_ = Word48(registers_[015]); select_alu_group(rau_logical); hardware_push_acc();
+        [[fallthrough]];
+    case 021721:
+        load(obj(3)); mask(0351); xor_at(addr(0356));
+        if (!test()) return addr(056);
+        load(addr(0370)); registers_[015] = 021721; return addr(026);
+    case 021725:
+        load(obj(3)); mask(0357); memory_[obj(3)] = accumulator_;
+        load(obj(1)); mask(0360); memory_[obj(1)] = accumulator_;
+        load(obj(6)); registers_[015] = 021731; return 016072;
+    case 021731:
+        accumulator_ = cyclic_add(accumulator_, memory_[obj(3)]); remainder_ = Word48(); select_alu_group(rau_multiplicative);
+        registers_[014] = accumulator_.address(); load(addr(0371)); memory_[registers_[014]] = accumulator_;
+        load(obj(6)); registers_[016] = 1; registers_[015] = 021716; return 016030;
+    case 021735:
+        accumulator_ = Word48(registers_[015]); select_alu_group(rau_logical); hardware_push_acc();
+        load(obj(1)); mask(0361);
+        if (!test()) return addr(0134);
+        [[fallthrough]];
+    case 021740:
+        load(obj(6)); registers_[015] = 021741; return 016076;
+    case 021741:
+        registers_[014] = accumulator_.address(); registers_[016] = obj(3);
+        registers_[015] = 021743; return 021441;
+    case 021743:
+        if (!registers_[014]) return 021755;
+        [[fallthrough]];
+    case 021744:
+        xor_at(addr(0370)); if (!test()) return addr(077);
+        xor_at(addr(0370)); return addr(047);
+    case 021746:
+        load(obj(6)); registers_[015] = 021747; return 016076;
+    case 021747:
+        accumulator_ = cyclic_add(accumulator_, memory_[obj(3)]); remainder_ = Word48(); select_alu_group(rau_multiplicative);
+        registers_[014] = accumulator_.address(); load(registers_[014]); xor_at(addr(0371));
+        if (test()) return addr(071);
+        registers_[015] = 021753; return 021776;
+    case 021753:
+        registers_[015] = 1; registers_[017] = address_add(registers_[017], -1);
+        return memory_[registers_[017]].address();
+    case 021755:
+        memory_[addr(0374)] = accumulator_; load(obj(3)); add(0362); memory_[addr(0373)] = accumulator_;
+        load(obj(3)); mask(0353); if (test()) return addr(0117);
+        load(obj(6)); registers_[016] = 0; registers_[015] = 021762; return 016030;
+    case 021765:
+        memory_[obj(6)] = accumulator_;
+        [[fallthrough]];
+    case 021766:
+        load(addr(0373)); xor_at(obj(5)); if (test()) return addr(0126);
+        load(addr(0374)); xor_at(addr(0370)); if (!test()) return addr(0103);
+        registers_[015] = 021772; return 021776;
+    case 021772:
+        load(obj(1)); xor_at(addr(0363)); memory_[obj(1)] = accumulator_;
+        load(addr(0374)); return addr(047);
+    case 021775:
+        load(addr(0374)); return addr(075);
+    case 021776:
+        load(obj(3)); mask(0357); memory_[obj(3)] = accumulator_;
+        load(obj(1)); mask(0360); memory_[obj(1)] = accumulator_;
+        load(obj(6)); registers_[016] = 0; return 016030;
+    case 022003:
+        load(obj(1)); mask(0363); if (test()) return addr(0137);
+        registers_[016] = 012040; return addr(0347);
+    case 022006:
+        xor_at(obj(1)); memory_[obj(1)] = accumulator_; return addr(0104);
+    case 022011: case 022021:
+        registers_[015] = address_add(entry, 1); return 021735;
+    case 022012:
+        xor_at(addr(0352)); memory_[addr(0374)] = accumulator_;
+        if (registers_[015]) { load(obj(2)); memory_[addr(0374)] = accumulator_; }
+        [[fallthrough]];
+    case 022015:
+        hardware_pop_acc(); select_alu_group(rau_logical); sti(002);
+        registers_[001] = accumulator_.address(); registers_[015] = 03235; return 022017;
+    case 022017:
+        registers_[016] = 022243; return 03301;
+    case 022022:
+        its(015); xts(address_add(registers_[017], -1)); registers_[015] = 022024; return 021274;
+    case 022024:
+        stx(address_add(registers_[017], -2)); sti(015); return addr(0143);
+    case 022216:
+        // 22216: report the live descriptor of the closed device.
+        load(obj(3)); return 03014;
+    }
+    throw MachineError("invalid POPMESS character device entry");
+}
+
+std::uint16_t Machine::p12517()
+{
+    registers_[010] = 012517;
+    registers_[016] = memory_[address_add(registers_[010], 0107)].address();
+    registers_[015] = address_add(memory_[address_add(registers_[010], 0106)].address(), 1);
+    const auto modifier = memory_[address_add(registers_[016], 1)].address();
+    return memory_[address_add(registers_[010], modifier - 033)].address();
+}
+
+std::uint16_t Machine::p03041(std::uint16_t entry)
+{
+    if (entry == 03041) {
+        accumulator_ = memory_[0]; select_alu_group(rau_logical);
+        memory_[address_add(registers_[001], 0164)] = accumulator_;
+    }
+    accumulator_ = memory_[address_add(registers_[001], 0163)]; select_alu_group(rau_logical);
+    remainder_ = accumulator_;
+    if (!accumulator_condition()) return 013362;
+    registers_[016] = accumulator_.address();
+    accumulator_ = memory_[registers_[016]];
+    memory_[address_add(registers_[001], 0162)] = accumulator_;
+    accumulator_ = memory_[address_add(registers_[016], 1)] & memory_[address_add(registers_[001], 0142)];
+    remainder_ = Word48(); memory_[address_add(registers_[001], 0163)] = accumulator_;
+    accumulator_ = memory_[address_add(registers_[016], 1)] & memory_[address_add(registers_[001], 0143)];
+    shift_accumulator(24); memory_[address_add(registers_[001], 0170)] = accumulator_;
+    return address_add(registers_[001], 016);
 }
 
 } // namespace poplan
