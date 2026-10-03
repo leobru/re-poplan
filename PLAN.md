@@ -1,0 +1,130 @@
+# Next Five Steps for Native POPLAN
+
+## Goal and boundary
+
+Build toward faithful functions, recursion, and Man-or-Boy behavior from commit
+`3a07cb3`. Native mode currently supports numeric expressions; allocation and
+dictionary foundations now belong to the native runtime (see status below).
+
+Keep `--native` opt-in, preserve the double-first real-literal policy, and never
+execute BESM instructions or fall back to `Machine`. Add declarations in
+`include/poplan/native.hpp` and implementation in existing C++ files only.
+
+## Implementation sequence
+
+### 1. Connect native storage and recover allocation accounting
+
+- Introduce `NativeRuntime` to own the allocator, dictionary, value stack,
+  compiled programs, and stable-handle object storage.
+- Recover startup reservations, collection/retry behavior, and the allocation
+  costs of compiler operations, function descriptors, environments, and
+  activations from listing and trace evidence.
+- Implement the required collection paths with explicit roots in bindings,
+  programs, values, and frames. Preserve historical free-list ordering and
+  `COREUSED` accounting.
+- Record compiler emission sites as semantic operations with provenance and
+  logical costs; never infer operations from finished instruction words.
+
+**Acceptance:** primitive differentials match allocation addresses, free lists,
+collection/retry results, and accounting. Unknown costs remain blockers to
+claiming exhaustion compatibility.
+
+### 2. Add the reader, bindings, and top-level recovery
+
+- Introduce a resumable `NativeReader`, retaining token boundaries, packed-name
+  conversion, six-character significance, and historical operator-word behavior.
+- Connect interning to executable bindings. Support `VARS`, variable reads,
+  `->`, statement separators, and the stack behavior needed by function bodies.
+- Port signed-number/unary handling from the original compiler rather than
+  treating signs as conventional arithmetic syntax.
+- Replace whole-input probe execution with statement compilation and explicit
+  suspension/recovery states. Implement diagnostics for supported syntax and
+  unbound bindings, followed by historical SETPOP recovery.
+
+**Acceptance:** declarations, reassignment, name collisions, stack results, EOF,
+split input, and recovery match the references. Unsupported facilities still
+fail explicitly without machine fallback.
+
+### 3. Implement named functions and conditional execution
+
+- Add typed operations for binding access, assignment, calls, returns,
+  comparisons, and conditional branches.
+- Support `FUNCTI`, formal parameters, local declarations, `END`, and
+  `IF … THEN … ELSE … CLOSE`.
+- Introduce explicit `NativeFrame` records containing operation position,
+  return continuation, environment references, and binding-restoration state.
+- Preserve argument evaluation order, dynamic binding restoration, and
+  zero/multiple results. POP recursion and unwinding must not use C++ recursion.
+- Route arithmetic primitives and user functions through the same native call
+  machinery.
+
+**Acceptance:** constant functions, argument passing, local shadowing,
+conditional branches, ordinary recursion, and recovery through nested calls
+match semantic checkpoints and printed output.
+
+### 4. Add closures and reproduce historical rebinding
+
+- Implement nested function creation, retained environments, captured-variable
+  mutation, function-valued arguments, and indirect calls.
+- Preserve sharing and function identity through stable handles.
+- Port the binding/rebinding decisions represented by `11726..11731` and
+  `11755..11757` at their semantic source.
+- Reproduce the documented closure-rebinding failure through environment logic,
+  not fixture recognition, recursion cutoffs, or a corrected host closure model.
+
+**Acceptance:** closure checkpoints preserve aliasing, mutations, restoration,
+and the documented three-argument Man-or-Boy sequence leading to exhaustion.
+
+### 5. Establish recursion and Man-or-Boy conformance
+
+- Match the existing triangular fixtures' successful values and exact exhaustion
+  boundaries, including no-local `124/125`, one-local `82/83`, five-formal
+  `34/35`, and nested-function `26/27`.
+- Match canonical Man-or-Boy success at `K=3` and historical failure at `K=4`,
+  plus the four- and three-argument variants.
+- Check the two-argument variant using bounded execution and semantic
+  checkpoints rather than a wall-clock termination expectation.
+- Update the native status matrix with implemented syntax, allocation evidence,
+  remaining branches, and separately reported native operation counts.
+
+**Acceptance:** historical failures remain failures; returning the
+mathematically correct `-67` is not the compatibility target.
+
+## Verification and delivery
+
+At each completed step:
+
+- Run focused primitive and semantic-checkpoint differentials, preserving
+  sharing and cycles when canonicalizing handles.
+- Compare native, hybrid, instruction-only, and historical output through
+  `tools/run-dispak.sh`.
+- Run native execution without an image through the machine/decoder isolation
+  guard.
+- Run complete CTest, smoke, quine, zone1224, ASan/UBSan with leak detection
+  disabled, and whitespace checks.
+- Keep reports outside `build/`, preserve unrelated edits, and record a
+  reviewable milestone commit.
+
+General list/string facilities, macros, mutable syntax, generated accessors,
+and native POPMESS remain later work unless a listed milestone requires a
+specific supporting primitive.
+
+## Step 1 status — 2026-10-02
+
+Implemented runtime ownership, stable reference/pair storage, startup reservation,
+root traversal, nonmoving collection, historical free-list reconstruction and
+single collection/retry with explicit exhaustion. Numeric execution now uses the
+runtime. Focused differentials include both raw retry outcomes and cyclic/shared
+graphs; source cost inventory is in `docs/native-allocation.md`.
+
+Step 1 is **partial**, not an exhaustion-compatibility gate pass. Aggregate
+compiler/emission, environment and activation costs remain unresolved. Operations
+carry emitter-family provenance and explicitly unknown costs; execution reports
+incomplete legacy accounting. Next work must recover the original sizing pass
+and its caller-to-operation mapping before charging compiled programs or claiming
+recursive thresholds. Frame-root storage does not implement POP call frames.
+
+
+Milestone verification passed: 17 normal and 17 ASan/UBSan CTests, historical
+smoke/expression comparisons, quine, zone1224 (including historical comparison),
+native isolation guard and whitespace checks. Logs: `artifacts/native-storage/`.

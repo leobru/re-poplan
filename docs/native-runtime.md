@@ -29,8 +29,8 @@ local to each operation. There is no native architectural register bank.
 | 1: resident inventory | [184 descriptor audit](native-resident-inventory.md), generated from `keyword_descriptors` in `src/poplan.cpp` | Bootstrap names checked against image; callable bindings all unbound |
 | 1: syntax and compiler | `03544`, `03736`, `04001`, `04214`, `04536`, `04665`; canonical descriptions in `subroutines-from-trace.md` | Full branch, syntax-handler and lowering inventory still required |
 | 1: emission sites | `05007`, `05052..05157`, especially `05124`; generated rebinding `11726..11731`, binding `11755..11757` | Need enumerate callers and establish each emitted operation's POP meaning; do not decode completed words |
-| 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Collection and activation/code accounting remain open |
-| 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Numbers, resident word metadata and logical allocator implemented; compound payload storage remains open |
+| 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Reference/pair collection and retry implemented; activation/code accounting remain open |
+| 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Runtime owns numbers, dictionary and reference/pair payloads with stable handles and explicit roots; other compound payloads remain open |
 | 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Function bindings, aliases, reader conversion and mutable syntax remain open |
 | 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; full numeric/scanner/function coverage remains open |
 | 2: real literal reader | `native_parse_real_literal` validates decimal-point / `$` syntax evidenced at `16672..16735`, parses IEEE binary64, then truncates to BESM encoding | Exact encoding, boundary, malformed-input and locale tests; deliberate conversion policy described below |
@@ -85,9 +85,9 @@ threshold evidence in [original-structure.md](original-structure.md) is binding;
 passing small arithmetic expressions does not establish those behaviors.
 
 Primitive comparisons canonicalize logical inputs and compare exact result bits
-and failure/success with instruction-only execution. They currently do not
-compare allocation events, compound sharing/cycles, language diagnostics or
-recovery, because those facilities have not been implemented. Shared arithmetic
+and failure/success with instruction-only execution. Storage differentials also
+compare allocation events and compound sharing/cycles. Language diagnostics and
+recovery remain unimplemented. Shared arithmetic
 also means historical end-to-end comparison remains necessary as a separate
 oracle. A full implementation still needs semantic checkpoints and the entire
 acceptance corpus under all backends.
@@ -271,3 +271,32 @@ All 16 ASan/UBSan CTests passed (357.55 seconds), exit status 0, with
 `ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`.
 `git diff --check` passed. Logs: `artifacts/native-expressions/ctest.log`,
 `smoke.log`, `quine-zone.log`, and `sanitize-ctest.log` in the same directory.
+
+## Storage milestone (2026-10-02)
+
+Step 1 of [PLAN.md](../PLAN.md) now connects numeric execution to `NativeRuntime`.
+The runtime owns dictionary bindings, values, retained programs, stable reference
+and pair handles, and explicit frame roots. Collection preserves sharing/cycles,
+rebuilds historical free lists, and retries once before reporting exhaustion.
+Startup reservations and both raw retry outcomes are differential-tested.
+See [native-allocation.md](native-allocation.md) for source boundaries, costs,
+collector quirks and verification scope.
+
+This supersedes the earlier collection/startup TODOs above. It does not complete
+the original implementation gates: per-emission sizing, environments, activations,
+collection depth diagnostics and language recovery remain open. The operation
+cost field is unknown and execution reports incomplete legacy accounting.
+No new POP syntax or recursive conformance is claimed.
+
+
+Validation: all 17 normal CTests passed (76.64 seconds), including the new
+storage differential. `make test`, `make cpp-quine`, and `make cpp-zone1224`
+completed with exit status 0. Historical `zone1224.pop2` output matches normalized
+hybrid output; the required trivial historical/hybrid/native checks agree.
+The smoke suite also passed historical expression comparisons and the native
+image/decoder isolation guard. All 17 ASan/UBSan CTests passed (351.33 seconds)
+with `ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`, exit status 0.
+`git diff --check` passed. Logs and historical outputs are retained under
+`artifacts/native-storage/` (`ctest.log`, `smoke.log`, `corpus.log`,
+`sanitize-test.log`, and `zone1224-*.normalized`). These runs include the
+pre-existing, separately uncommitted machine shadow-arithmetic edits.

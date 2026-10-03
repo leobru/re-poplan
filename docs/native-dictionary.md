@@ -53,3 +53,10 @@ establish where the reader ends a token, converts characters or discards suffixe
 Validation: the focused dictionary test, combined 10-test smoke suite and
 ASan/UBSan suite all passed; see [native-runtime.md](native-runtime.md) for logs
 and the exact continuation verification scope.
+
+`NativeRuntime::intern` now wraps this single-attempt interface with collection
+and one retry. It returns `exhausted` after a failed retry. Runtime collection
+keeps interned word records and their bindings rooted; dropping a binding can
+release an otherwise unreachable reference/pair payload. See
+[native-allocation.md](native-allocation.md) for the storage milestone and its
+remaining language-recovery limitations.

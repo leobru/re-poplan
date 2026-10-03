@@ -964,6 +964,41 @@ NativeCoreUsage NativeAllocator::core_usage() const
             static_cast<std::uint16_t>(common_free)};
 }
 
+void NativeAllocator::collect(const std::vector<std::uint16_t> &marked)
+{
+    NativeAllocatorSnapshot next;
+    for (const auto address : marked) {
+        const auto found = std::find_if(state_.live.begin(), state_.live.end(),
+            [address](NativeBlock block) { return block.address == address; });
+        if (found == state_.live.end())
+            throw std::logic_error("native collector: root block is not allocated");
+        if (std::none_of(next.live.begin(), next.live.end(),
+                [address](NativeBlock block) { return block.address == address; }))
+            next.live.push_back(*found);
+    }
+    std::sort(next.live.begin(), next.live.end(), [](NativeBlock a, NativeBlock b) {
+        return a.address < b.address;
+    });
+    // 05640..05701 scans the mark bitmap in ascending address order. A free
+    // run is linked only when a marked word ends it (05667..05672). The scan
+    // stops before the bitmap word containing the upper bound (05654..05655).
+    const unsigned scan_end = limit_ / 48 * 48;
+    unsigned cursor = first_;
+    for (const auto block : next.live) {
+        if (cursor < block.address) {
+            NativeBlock gap{static_cast<std::uint16_t>(cursor),
+                            static_cast<std::uint16_t>(block.address - cursor)};
+            (block.address < scan_end ? next.common : next.unavailable).push_back(gap);
+        }
+        cursor = block.address + block.words;
+    }
+    if (cursor < limit_)
+        next.unavailable.push_back({static_cast<std::uint16_t>(cursor),
+                                    static_cast<std::uint16_t>(limit_ - cursor)});
+    // Collection rebuilds all free storage in the common list, not size bins.
+    state_ = std::move(next);
+}
+
 std::uint8_t NativeDictionary::hash(Word48 name)
 {
     // 01107..01121: successive masked left shifts followed by right shifts
@@ -1078,6 +1113,157 @@ NativeInternResult NativeDictionary::intern(Word48 name)
         property = Word48((property.raw() & ~std::uint64_t{077777}) | handle);
     }
     return {NativeInternResult::Status::created, handle};
+}
+
+void NativeDictionary::bind(std::uint32_t handle, NativeValue value)
+{
+    mutable_word(handle).binding = value;
+}
+
+NativeRuntime::NativeRuntime() : NativeRuntime(033064, 066000)
+{
+    // Startup's sole 05447 request is two words at 065776. Its contents belong
+    // to the reference compiler's startup state; reserve the logical extent
+    // without inventing a native callable object or instruction payload.
+    const auto block = allocator_.try_allocate(2);
+    if (block.status != NativeAllocation::Status::allocated)
+        throw std::logic_error("native startup reservation failed");
+    reservations_.push_back(block.block.address);
+}
+
+NativeRuntime::NativeRuntime(std::uint16_t first, std::uint16_t limit)
+    : allocator_(first, limit), dictionary_(allocator_)
+{}
+
+void NativeRuntime::validate(NativeValue value) const
+{
+    switch (value.kind) {
+    case NativeValue::Kind::unbound: case NativeValue::Kind::number: return;
+    case NativeValue::Kind::word: dictionary_.word(value.handle); return;
+    default: object(value); return;
+    }
+}
+
+const NativeObject &NativeRuntime::object(NativeValue value) const
+{
+    const auto found = objects_.find(value.handle);
+    if (found == objects_.end() || found->second.kind != value.kind)
+        throw std::logic_error("native storage: invalid or reclaimed object handle");
+    return found->second;
+}
+
+void NativeRuntime::store(NativeValue target, std::size_t field, NativeValue value)
+{
+    object(target);
+    validate(value);
+    objects_.at(target.handle).fields.at(field) = value;
+}
+
+NativeObjectAllocation NativeRuntime::allocate_object(NativeValue::Kind kind,
+                                                      std::vector<NativeValue> fields)
+{
+    for (const auto value : fields) validate(value);
+    if (next_handle_ == std::numeric_limits<std::uint32_t>::max())
+        throw std::overflow_error("native object handle overflow");
+    // Allocate host metadata before changing logical storage. Pending fields
+    // are roots during a collection triggered by this very allocation.
+    const auto handle = next_handle_;
+    auto node = objects_.emplace(handle, NativeObject{kind, {}, std::move(fields)}).first;
+    try {
+        auto allocation = allocator_.try_allocate(node->second.fields.size());
+        if (allocation.status == NativeAllocation::Status::collection_required) {
+            collect(node->second.fields);
+            allocation = allocator_.try_allocate(node->second.fields.size());
+        }
+        if (allocation.status != NativeAllocation::Status::allocated) {
+            objects_.erase(handle);
+            return {NativeAllocation::Status::exhausted, {}};
+        }
+        node->second.block = allocation.block;
+        ++next_handle_;
+        return {NativeAllocation::Status::allocated, {kind, {}, handle}};
+    } catch (...) {
+        objects_.erase(handle);
+        throw;
+    }
+}
+
+NativeObjectAllocation NativeRuntime::make_reference(NativeValue value)
+{
+    return allocate_object(NativeValue::Kind::reference, {value}); // 10277: one word
+}
+
+NativeObjectAllocation NativeRuntime::make_pair(NativeValue first, NativeValue second)
+{
+    return allocate_object(NativeValue::Kind::pair, {first, second}); // 05215: two words
+}
+
+NativeInternResult NativeRuntime::intern(Word48 name)
+{
+    auto result = dictionary_.intern(name);
+    if (result.status == NativeInternResult::Status::collection_required) {
+        collect();
+        result = dictionary_.intern(name);
+        if (result.status == NativeInternResult::Status::collection_required)
+            result.status = NativeInternResult::Status::exhausted;
+    }
+    return result;
+}
+
+void NativeRuntime::bind(std::uint32_t word, NativeValue value)
+{
+    validate(value);
+    dictionary_.bind(word, value);
+}
+
+std::size_t NativeRuntime::retain_program(NativeProgram program)
+{
+    for (const auto root : program.roots) validate(root);
+    programs_.push_back(std::move(program));
+    return programs_.size() - 1;
+}
+
+void NativeRuntime::release_program(std::size_t program)
+{
+    if (!programs_.at(program)) throw std::logic_error("native program already released");
+    programs_[program].reset();
+}
+
+void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
+{
+    std::vector<NativeValue> pending = temporary_roots;
+    pending.insert(pending.end(), values_.begin(), values_.end());
+    std::vector<std::uint16_t> marked = reservations_;
+    for (const auto &word : dictionary_.words()) {
+        if (std::any_of(allocator_.snapshot().live.begin(), allocator_.snapshot().live.end(),
+                [&](NativeBlock block) { return block.address == word.handle; }))
+            marked.push_back(static_cast<std::uint16_t>(word.handle));
+        pending.push_back(word.binding);
+    }
+    for (const auto &program : programs_)
+        if (program) pending.insert(pending.end(), program->roots.begin(), program->roots.end());
+    for (const auto &frame : frame_roots_)
+        pending.insert(pending.end(), frame.begin(), frame.end());
+    std::vector<std::uint32_t> visited;
+    while (!pending.empty()) {
+        const auto value = pending.back(); pending.pop_back();
+        validate(value);
+        if (value.kind == NativeValue::Kind::unbound || value.kind == NativeValue::Kind::number
+            || value.kind == NativeValue::Kind::word) continue;
+        if (std::find(visited.begin(), visited.end(), value.handle) != visited.end()) continue;
+        visited.push_back(value.handle);
+        const auto &payload = object(value);
+        marked.push_back(payload.block.address);
+        pending.insert(pending.end(), payload.fields.begin(), payload.fields.end());
+    }
+    allocator_.collect(marked);
+    for (auto it = objects_.begin(); it != objects_.end();) {
+        // A zero extent is the pending host-only record of allocate_object.
+        if (it->second.block.words && std::find(visited.begin(), visited.end(), it->first) == visited.end())
+            it = objects_.erase(it);
+        else ++it;
+    }
+    ++collections_;
 }
 
 NativeNumberResult native_real_from_double(double value)
@@ -1298,18 +1484,20 @@ NativeProgram native_compile_probe(const std::string &source)
         space();
     }
     if (expression || !pending.empty()) return unsupported();
+    for (auto &operation : program.operations) operation.emission_site = 05052;
     return program;
 }
 
-NativeExecutionResult native_execute(const NativeProgram &program,
-                                     std::ostream &output)
+NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ostream &output)
 {
+    if (!programs_.at(program_index)) throw std::logic_error("native program was released");
+    const auto &program = *programs_[program_index];
     NativeExecutionResult result;
     if (!program.error.empty()) {
         result.error = program.error;
         return result;
     }
-    std::vector<Word48> values;
+    auto &values = values_;
     // The linear probe has one explicit operation cursor. General activation
     // frames and legacy code/activation accounting remain separate open gates.
     for (std::size_t operation = 0; operation < program.operations.size(); ++operation) {
@@ -1317,21 +1505,26 @@ NativeExecutionResult native_execute(const NativeProgram &program,
         ++result.operations;
         switch (instruction.kind) {
         case NativeOperation::Kind::constant:
-            values.push_back(instruction.constant);
+            values.push_back({NativeValue::Kind::number, instruction.constant, 0});
             break;
         case NativeOperation::Kind::binary: {
             if (values.size() < 2) {
                 result.error = "invalid native graph: binary stack underflow";
                 return result;
             }
-            const Word48 right = values.back();
+            if (values.back().kind != NativeValue::Kind::number
+                || values[values.size() - 2].kind != NativeValue::Kind::number) {
+                result.error = "native numeric operation requires numbers";
+                return result;
+            }
+            const Word48 right = values.back().number;
             values.pop_back();
-            const auto number = native_number_binary(instruction.binary, values.back(), right);
+            const auto number = native_number_binary(instruction.binary, values.back().number, right);
             if (!number.error.empty()) {
                 result.error = number.error;
                 return result;
             }
-            values.back() = number.value;
+            values.back().number = number.value;
             break;
         }
         case NativeOperation::Kind::print:
@@ -1339,9 +1532,14 @@ NativeExecutionResult native_execute(const NativeProgram &program,
                 result.error = "invalid native graph: print stack underflow";
                 return result;
             }
+            if (std::any_of(values.begin(), values.end(), [](NativeValue value) {
+                    return value.kind != NativeValue::Kind::number; })) {
+                result.error = "native printing of nonnumeric values is not implemented";
+                return result;
+            }
             output << "**";
             for (const auto value : values) {
-                const auto text = native_format_number(value);
+                const auto text = native_format_number(value.number);
                 output << text;
             }
             output << '\n';
@@ -1350,6 +1548,12 @@ NativeExecutionResult native_execute(const NativeProgram &program,
         }
     }
     return result;
+}
+
+NativeExecutionResult native_execute(const NativeProgram &program, std::ostream &output)
+{
+    NativeRuntime runtime;
+    return runtime.execute(runtime.retain_program(program), output);
 }
 
 int run_native_shell(std::istream &input, std::ostream &output, std::ostream &errors)

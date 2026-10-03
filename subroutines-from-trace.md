@@ -458,3 +458,15 @@ precise boundaries. Full-state replay checks reached entries against raw
 execution, including independently cloned disk files. The success and error
 fixtures have zero raw steps; this is a fixture-specific measurement, not a
 claim about all POPMESS commands. See `docs/reports/popmess.md`.
+
+
+### Collector evidence added for native storage (2026-10-02)
+
+`05543` is the collector supervisor continuation named by control word `05542`;
+`05702` begins restoration. `05722` traverses tagged objects; `06020` tests marks,
+`06027` starts extent marking, and `06036` continues marking from a supplied
+length. Explicit seeds in `poplan.sym` expose these computed entries in the
+listing. Instruction-only synthetic reference/pair graphs and full `05430`
+retry probes establish free-list order, cycles/sharing and success/exhaustion.
+These are new native storage evidence, not new hybrid semantic-dispatch entries
+or revisions to saved workload counts. See `docs/native-allocation.md`.

@@ -156,6 +156,201 @@ void write_word(std::ostream &output, std::uint64_t word)
     }
 }
 
+void test_native_storage(const char *image_path)
+{
+    using namespace poplan;
+    auto raw = std::make_unique<Machine>();
+    std::ifstream image(image_path, std::ios::binary);
+    require(bool(image), "native storage oracle image opens");
+    raw->load_image(image); raw->boot_static_image();
+    raw->set_translated_routines_enabled(false);
+    unsigned startup_allocations = 0;
+    bool ready = false;
+    for (unsigned ticks = 0; ticks < 1000000; ++ticks) {
+        if (!raw->right_half() && raw->program_counter() == 05447) {
+            ++startup_allocations;
+            require(raw->accumulator().address() == 2, "startup allocation is two words");
+        }
+        if (raw->step() == ExecutionStatus::input_required) { ready = true; break; }
+    }
+    require(ready && startup_allocations == 1, "raw startup reaches input with one allocation");
+    NativeRuntime startup;
+    const auto &initial = startup.allocator().snapshot();
+    require(initial.common.size() == 1 && initial.common[0].address == raw->memory(017).address()
+                && initial.common[0].words == (raw->memory(initial.common[0].address).raw() >> 24)
+                && initial.live.size() == 1 && initial.live[0].address == 065776
+                && initial.live[0].words == 2, "native startup reservations match raw input boundary");
+
+    // Adapt native reference/pair roots into raw hardware-stack roots. The
+    // collector scans ABOVE 17010, with the saved POP stack pointer at r17-3.
+    for (unsigned pattern = 0; pattern < 16; ++pattern) {
+        NativeRuntime runtime(040000, 041000);
+        auto oracle = std::make_unique<Machine>(*raw);
+        oracle->memory(017) = Word48(040000);
+        oracle->memory(017010) = Word48(041000);
+        for (unsigned a = 040000; a < 041100; ++a) oracle->memory(a) = Word48();
+        const auto anchor = runtime.make_pair().value;
+        std::vector<NativeValue> references;
+        for (unsigned i = 0; i < 0776; ++i) references.push_back(runtime.make_reference().value);
+        const auto selected = references[(pattern * 47) % references.size()];
+        const auto peer = references[(pattern * 47 + 11) % references.size()];
+        runtime.store(selected, 0, peer); runtime.store(peer, 0, selected);
+        runtime.store(anchor, 0, selected); runtime.store(anchor, 1, selected);
+        const auto encode = [&](NativeValue v) {
+            if (v.kind == NativeValue::Kind::unbound) return Word48(06500000000000000ULL);
+            return Word48((v.kind == NativeValue::Kind::pair ? 07200000000000000ULL
+                                                           : 07240000000000000ULL)
+                          | runtime.object(v).block.address);
+        };
+        for (const auto v : references) {
+            const auto &obj = runtime.object(v);
+            oracle->memory(obj.block.address) = encode(obj.fields[0]);
+        }
+        oracle->memory(runtime.object(anchor).block.address) = encode(selected);
+        oracle->memory(runtime.object(anchor).block.address + 1) = encode(selected);
+        // Every fourth case has no upper anchor, exposing the discarded tail.
+        const auto root = pattern % 4 == 3 ? selected : anchor;
+        switch (pattern % 4) {
+        case 0: runtime.values().push_back(root); break;
+        case 1: {
+            NativeProgram program; program.roots.push_back(root);
+            runtime.retain_program(std::move(program)); break;
+        }
+        case 2: runtime.frame_roots().push_back({root}); break;
+        case 3: runtime.bind(runtime.dictionary().lookup(Word48("REF")), root); break;
+        }
+        oracle->memory(041001) = encode(root);
+        oracle->reg(004) = 05523; oracle->reg(017) = 041100;
+        oracle->memory(041075) = Word48(070000);
+        oracle->alu_mode() = 003;
+        oracle->start(05543);
+        unsigned ticks = 0;
+        while (oracle->program_counter() != 05702 || oracle->right_half()) {
+            require(++ticks < 2000000, "collector reaches restoration");
+            require(oracle->step() == ExecutionStatus::running, "collector runs");
+        }
+        runtime.collect();
+        auto address = oracle->memory(05502).address();
+        unsigned free = 0;
+        for (const auto block : runtime.allocator().snapshot().common) {
+            require(address == block.address, "collector common-list address order");
+            require((oracle->memory(address).raw() >> 24) == block.words, "collector extent size");
+            free += block.words;
+            address = oracle->memory(address).address();
+        }
+        require(address == 0, "collector has no extra raw extents");
+        for (unsigned size = 1; size < 021; ++size)
+            require(oracle->memory(05502 + size).raw() == 0
+                        && runtime.allocator().snapshot().small[size].empty(), "collector empties size bins");
+        require(runtime.allocator().core_usage().free == free, "collector COREUSED projection");
+        require(runtime.object(selected).fields[0].handle == peer.handle
+                    && runtime.object(peer).fields[0].handle == selected.handle, "collector preserves cycles and handles");
+        unsigned accounted = free;
+        for (auto b : runtime.allocator().snapshot().live) accounted += b.words;
+        for (auto b : runtime.allocator().snapshot().unavailable) accounted += b.words;
+        require(accounted == 01000, "collector conserves even unavailable trailing storage");
+        const auto allocated = runtime.make_reference();
+        oracle->accumulator() = Word48(1); oracle->reg(015) = 077700;
+        oracle->reg(016) = 1; oracle->reg(017) = 070001;
+        oracle->memory(070000) = Word48(1);
+        oracle->start(05447);
+        ticks = 0;
+        while (oracle->program_counter() != 077700 || oracle->right_half()) {
+            require(++ticks < 10000, "post-collection allocation returns"); oracle->step();
+        }
+        require(allocated.status == NativeAllocation::Status::allocated
+                    && runtime.object(allocated.value).block.address == oracle->reg(016),
+                "post-collection allocation matches raw high-end split");
+    }
+
+    // Exercise the actual 05430 -> 05523 -> 05447 retry wrapper as well as
+    // the isolated collector. Adapt native value roots to the raw POP stack.
+    for (bool keep_all : {false, true}) {
+        NativeRuntime runtime(040000, 041000);
+        auto oracle = std::make_unique<Machine>(*raw);
+        oracle->memory(017) = Word48(040000);
+        oracle->memory(017010) = Word48(041000);
+        for (unsigned a = 040000; a < 041100; ++a) oracle->memory(a) = Word48();
+        for (unsigned a = 05502; a < 05523; ++a) oracle->memory(a) = Word48();
+        oracle->reg(006) = 070000;
+        for (unsigned i = 0; i < 01000; ++i) {
+            const auto value = runtime.make_reference().value;
+            const auto address = runtime.object(value).block.address;
+            oracle->memory(address) = Word48(06500000000000000ULL);
+            if (keep_all || i == 0) {
+                runtime.values().push_back(value);
+                oracle->memory(--oracle->reg(006)) = Word48(07240000000000000ULL | address);
+            }
+        }
+        oracle->reg(017) = 041001; oracle->reg(016) = 2; oracle->reg(015) = 077700;
+        oracle->start(05430);
+        unsigned collections = 0, ticks = 0;
+        while ((oracle->program_counter() != 077700 && oracle->program_counter() != 05440)
+               || oracle->right_half()) {
+            require(++ticks < 2000000, "raw collection/retry reaches return or exhaustion");
+            if (oracle->program_counter() == 05523 && !oracle->right_half()) ++collections;
+            require(oracle->step() == ExecutionStatus::running, "raw collection/retry runs");
+        }
+        const auto allocation = runtime.make_pair();
+        require(collections == 1 && runtime.collection_count() == 1,
+                "native and raw wrappers collect exactly once");
+        require(keep_all ? allocation.status == NativeAllocation::Status::exhausted
+                          && oracle->program_counter() == 05440
+                        : allocation.status == NativeAllocation::Status::allocated
+                          && runtime.object(allocation.value).block.address == oracle->reg(016),
+                "collection/retry matches raw success address and exhaustion boundary");
+    }
+
+    NativeRuntime retry(040000, 040040);
+    const auto anchor = retry.make_reference().value;
+    retry.values().push_back(anchor);
+    NativeValue child;
+    for (unsigned i = 0; i < 037; ++i) child = retry.make_reference().value;
+    const auto pair = retry.make_pair(child, child);
+    require(pair.status == NativeAllocation::Status::allocated && retry.collection_count() == 1,
+            "allocation collects and retries exactly once");
+    require(retry.object(pair.value).fields[0].handle == child.handle
+                && retry.object(pair.value).fields[1].handle == child.handle,
+            "allocation arguments are temporary roots and preserve aliases");
+    retry.values().push_back(pair.value);
+    retry.collect();
+    require(retry.object(child).block.words == 1, "transitive child survives");
+    retry.values().pop_back(); retry.collect();
+    bool reclaimed = false;
+    try { retry.object(child); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed, "unreachable cycle-free object becomes invalid");
+
+    NativeRuntime full(040000, 040040);
+    for (unsigned i = 0; i < 040; ++i) full.values().push_back(full.make_reference().value);
+    const auto failed = full.make_reference();
+    require(failed.status == NativeAllocation::Status::exhausted && full.collection_count() == 1,
+            "live full heap returns exhaustion after one collection");
+    require(full.allocator().snapshot().live.size() == 040, "failed allocation publishes no object");
+
+    NativeRuntime roots;
+    const auto reference = roots.make_reference().value;
+    const auto name = roots.intern(Word48("NROOT"));
+    roots.bind(name.handle, reference);
+    roots.collect();
+    require(roots.object(reference).block.words == 1 && roots.dictionary().lookup(Word48("NROOT")) == name.handle,
+            "dynamic word records and bindings are roots");
+    roots.bind(name.handle, {});
+    NativeProgram program; program.roots.push_back(reference);
+    const auto id = roots.retain_program(std::move(program));
+    roots.collect(); require(roots.object(reference).block.words == 1, "program owns its roots");
+    roots.release_program(id); roots.collect();
+    reclaimed = false;
+    try { roots.object(reference); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed, "releasing a program removes its roots");
+    auto arithmetic = native_compile_probe("(2+3)*4=>");
+    for (const auto &op : arithmetic.operations)
+        require(op.emission_site == 05052 && !op.legacy_words, "unknown emission cost is not zero");
+    std::ostringstream out;
+    const auto result = roots.execute(roots.retain_program(std::move(arithmetic)), out);
+    require(result.error.empty() && out.str() == "** 20\n" && !result.legacy_accounting_complete,
+            "runtime owns and executes programs without claiming unknown costs");
+}
+
 void test_native_allocator(const char *image_path)
 {
     using poplan::Machine;
@@ -698,6 +893,7 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 3 && std::string(argv[2]) == "--native-storage") { test_native_storage(argv[1]); return 0; }
     if (argc == 2 && std::string(argv[1]) == "--disk-host") { test_disk_mounts(); return 0; }
     if (argc == 2 && std::string(argv[1]) == "--native-reals") {
         test_native_reals();

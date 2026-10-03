@@ -559,3 +559,15 @@ Validation proceeds in this order:
 
 The fix is acceptable only if the existing quine, primitive, recursion, and
 larger-program conformance tests remain unchanged.
+
+
+### Native storage milestone (2026-10-02)
+
+The opt-in POP-level runtime now owns its allocator, dictionary, values, programs
+and stable reference/pair payloads. Its collector/retry follows recovered
+`05523..06046` semantics without machine execution. The reference backend retains
+its address-preserving interfaces and independent instruction oracle. Native
+fidelity here concerns logical identities, roots, free lists and allocation
+outcomes, not emulated registers or bitmap memory. Compiler/activation costs and
+recursive exhaustion remain open; see [native-allocation.md](native-allocation.md)
+and [the next steps](../PLAN.md).
