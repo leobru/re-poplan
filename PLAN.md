@@ -1,5 +1,7 @@
 # Next Five Steps for Native POPLAN
 
+**Current status:** step 1 storage/accounting foundation complete; next is step 2.
+
 ## Goal and boundary
 
 Build toward faithful functions, recursion, and Man-or-Boy behavior from commit
@@ -67,8 +69,8 @@ match semantic checkpoints and printed output.
 - Implement nested function creation, retained environments, captured-variable
   mutation, function-valued arguments, and indirect calls.
 - Preserve sharing and function identity through stable handles.
-- Port the binding/rebinding decisions represented by `11726..11731` and
-  `11755..11757` at their semantic source.
+- Port the binding/rebinding decisions represented by ordinary call binding at
+  `03206..03234` and restoration at `03235..03260` at their semantic source.
 - Reproduce the documented closure-rebinding failure through environment logic,
   not fixture recognition, recursion cutoffs, or a corrected host closure model.
 
@@ -117,8 +119,9 @@ single collection/retry with explicit exhaustion. Numeric execution now uses the
 runtime. Focused differentials include both raw retry outcomes and cyclic/shared
 graphs; source cost inventory is in `docs/native-allocation.md`.
 
-Step 1 is **partial**, not an exhaustion-compatibility gate pass. Aggregate
-compiler/emission, environment and activation costs remain unresolved. Operations
+At this earlier milestone step 1 was **partial**, not an exhaustion-compatibility
+gate pass. Aggregate compiler/emission, environment and activation costs were
+still unresolved. The completion below supersedes these TODOs. Operations
 carry emitter-family provenance and explicitly unknown costs; execution reports
 incomplete legacy accounting. Next work must recover the original sizing pass
 and its caller-to-operation mapping before charging compiled programs or claiming
@@ -128,3 +131,32 @@ recursive thresholds. Frame-root storage does not implement POP call frames.
 Milestone verification passed: 17 normal and 17 ASan/UBSan CTests, historical
 smoke/expression comparisons, quine, zone1224 (including historical comparison),
 native isolation guard and whitespace checks. Logs: `artifacts/native-storage/`.
+
+
+## Step 1 completion — 2026-10-03
+
+Step 1 is complete at its storage/primitive boundary. Compiler operations now
+have concrete source emission sites and word costs, including zero-width labels
+and the final return word. Runtime-owned compilation charges literal interning,
+intermediate nodes, five-word descriptors, both environment arrays and code
+extents in the tested finalizer order. It retains pending roots across collection
+and releases intermediate chains with the historical bucket ordering.
+
+Explicit activation accounting now distinguishes retained size, entry peak and
+restoration peak, with bounded entry/exit, roots and error unwind. Instruction-only
+differentials establish the costs for ordinary binding, argument transfer and
+argument rebuilding. The earlier n+1 argument-storage estimate is corrected to
+n; the earlier closure source attribution is corrected to `03206..03260`.
+
+See `docs/native-accounting.md` for the complete source/cost inventory and test
+scope. This completes the accounting foundation, not the native language: reader
+allocation scheduling is step 2; actual calls, binding restoration and closure
+semantics are steps 3–4; whole-session exhaustion compatibility is step 5.
+`storage_accounting_complete` distinguishes charged code storage from the still
+false whole-session `legacy_accounting_complete` flag. No unknown cost is being
+silently counted as zero. Next implementation work is step 2.
+
+
+Completion verification passed: all 18 normal and 18 ASan/UBSan CTests, the full
+smoke suite, quine, zone1224 with historical comparison, native isolation guard
+and whitespace checks. Logs: `artifacts/native-accounting/`.

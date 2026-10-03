@@ -156,6 +156,269 @@ void write_word(std::ostream &output, std::uint64_t word)
     }
 }
 
+void test_native_accounting(const char *image_path)
+{
+    using namespace poplan;
+    const auto oracle = [&] {
+        auto m = std::make_unique<Machine>();
+        std::ifstream image(image_path, std::ios::binary);
+        require(bool(image), "accounting image opens");
+        m->load_image(image);
+        m->set_translated_routines_enabled(false);
+        m->memory(0) = Word48();
+        m->memory(017) = Word48(040000);
+        m->memory(017010) = Word48(066000);
+        for (unsigned a = 05502; a < 05523; ++a) m->memory(a) = Word48();
+        m->memory(05502) = Word48(040000);
+        m->memory(040000) = Word48(std::uint64_t(026000) << 24);
+        return m;
+    };
+    const auto run = [](Machine &m, unsigned entry, unsigned stop) {
+        m.start(entry);
+        for (unsigned ticks = 0; m.program_counter() != stop || m.right_half(); ++ticks) {
+            require(ticks < 1000000, "accounting oracle reaches boundary");
+            require(m.step() == ExecutionStatus::running, "accounting oracle runnable");
+        }
+        require(m.translated_routine_count() == 0, "accounting oracle is instruction-only");
+    };
+    const auto free_lists = [&](Machine &m, const NativeRuntime &runtime) {
+        const auto &snapshot = runtime.allocator().snapshot();
+        const auto chain = [&](unsigned head, const std::vector<NativeBlock> &blocks, bool common) {
+            auto cursor = m.memory(head).address();
+            for (const auto block : blocks) {
+                require(cursor == block.address, "compiler free-list address/order");
+                if (common) require(m.memory(cursor).raw() >> 24 == block.words,
+                                    "compiler common extent size");
+                cursor = m.memory(cursor).address();
+            }
+            require(cursor == 0, "compiler free-list complete");
+        };
+        chain(05502, snapshot.common, true);
+        for (unsigned i = 1; i < 021; ++i) chain(05502 + i, snapshot.small[i], false);
+        m.reg(006) = 067000; m.reg(017) = 071001;
+        run(m, 010402, 010415);
+        const auto usage = runtime.allocator().core_usage();
+        require(m.memory(m.reg(006)).address() == usage.used
+                    && m.memory(m.reg(017) - 1).address() == usage.free,
+                "compiler COREUSED matches raw");
+    };
+    const std::vector<NativeEmission> kinds{
+        NativeEmission::evaluate, NativeEmission::literal, NativeEmission::branch_zero,
+        NativeEmission::branch_nonzero, NativeEmission::jump, NativeEmission::store_binding,
+        NativeEmission::return_value, NativeEmission::evaluate_stack, NativeEmission::load_capture,
+        NativeEmission::embedded_value, NativeEmission::call_binding, NativeEmission::update_binding,
+        NativeEmission::transfer_arguments, NativeEmission::rebuild_arguments, NativeEmission::label,
+        NativeEmission::continuation, NativeEmission::load_binding, NativeEmission::capture_function,
+        NativeEmission::jump_capture};
+    for (unsigned pattern = 0; pattern < 12; ++pattern) {
+        auto m = oracle();
+        NativeRuntime runtime(040000, 066000);
+        NativeCompilation compilation;
+        if (pattern) compilation.emissions = kinds;
+        if (pattern > 5) compilation.emissions.insert(compilation.emissions.end(), kinds.begin(), kinds.end());
+        compilation.bindings.resize(pattern % 4);
+        compilation.captures.resize(pattern % 3);
+        m->memory(04463) = Word48(); m->memory(04464) = Word48(04462);
+        m->memory(03645) = Word48(1);
+        m->memory(05203) = Word48(); m->memory(03504) = Word48();
+        unsigned code_words = 1;
+        for (auto emission : compilation.emissions) {
+            const auto cost = native_emission_cost(emission);
+            // Adapt a semantic operation into ORIGINAL compiler IR, not a BESM
+            // instruction. 04447 consumes class tag and payload and sizes it.
+            m->reg(017) = 070001; m->memory(070000) = Word48(03000);
+            m->reg(015) = 077700; m->reg(007) = 01200;
+            m->accumulator() = Word48(std::uint64_t(cost.site - 05052) << 39);
+            run(*m, 04447, 077700);
+            if (emission == NativeEmission::label) {
+                const auto node = m->memory(04464).address();
+                m->memory(node) = Word48(m->memory(node).raw() | 03100);
+            }
+            code_words += cost.code_words;
+        }
+        // Execute the original post-optimization sizing walk; do not supply
+        // the native answer to the raw finalizer's size word.
+        m->memory(020061) = Word48(1);
+        m->reg(001) = 017624;
+        m->reg(003) = m->memory(04463).address();
+        while (m->reg(003)) {
+            m->reg(015) = 077700;
+            run(*m, 017774, 077700);
+        }
+        require(m->memory(020061).address() == code_words, "post-optimization sizing matches every emission kind");
+        m->memory(03645) = m->memory(020061);
+        const auto build_chain = [&](unsigned table, unsigned count) {
+            m->memory(table) = Word48(); m->memory(table + 1) = Word48(table - 1);
+            m->memory(table + 2) = Word48();
+            for (unsigned i = 0; i < count; ++i) {
+                m->reg(016) = table; m->reg(017) = 070000; m->reg(015) = 077700;
+                m->accumulator() = Word48(06400000000000000ULL | i);
+                run(*m, 017602, 077700);
+            }
+        };
+        build_chain(017560, compilation.bindings.size());
+        build_chain(017577, compilation.captures.size());
+        m->reg(017) = 070000; m->reg(015) = 077700;
+        run(*m, 05007, 077700);
+        const auto descriptor = (m->accumulator().raw() >> 24) & 077777;
+        const auto code = m->accumulator().address();
+        const auto result = runtime.compile_storage(compilation);
+        require(result.status == NativeAllocation::Status::allocated, "native compiler storage succeeds");
+        const auto &storage = runtime.compiled_storage(result.id);
+        require(storage.descriptor.address == descriptor && storage.descriptor.words == 5
+                    && storage.code.address == code && storage.code.words == m->memory(descriptor).address(),
+                "compiler descriptor/code allocation matches raw finalizer");
+        require(storage.bindings.address == m->memory(descriptor + 3).address()
+                    && storage.captures.address == m->memory(descriptor + 4).address(),
+                "compiler environment arrays match raw finalizer");
+        free_lists(*m, runtime);
+        runtime.collect();
+        require(runtime.compiled_storage(result.id).code.address == code,
+                "compiled program blocks survive collection without moving");
+        runtime.release_compiled_storage(result.id); runtime.collect();
+        require(runtime.allocator().snapshot().live.empty(), "released compilation has no roots");
+    }
+
+    for (unsigned count = 0; count < 9; ++count) {
+        for (unsigned mask = 0; mask < 4; ++mask) {
+            auto m = oracle();
+            std::vector<NativeBindingSlot> slots(count);
+            for (unsigned i = 0; i < count; ++i) slots[i] = {bool((i + mask) & 1), bool((i + mask) & 2)};
+            const auto cost = native_binding_frame_cost(slots);
+            m->memory(03272) = Word48(06600000000077700ULL);
+            m->memory(03273) = Word48(040100);
+            m->memory(03274) = Word48();
+            m->memory(040103) = Word48(040200);
+            m->memory(040200) = Word48(count + 1);
+            for (unsigned i = 0; i < count; ++i) {
+                m->memory(040201 + i) = Word48(041001 + 2*i
+                    | (slots[i].argument ? m->memory(03266).raw() : 0)
+                    | (slots[i].result ? m->memory(03267).raw() : 0));
+                m->memory(041000 + 2*i) = Word48();
+                m->memory(041001 + 2*i) = Word48(06400000000000001ULL);
+            }
+            m->reg(015) = 077701; m->reg(017) = 066001; m->reg(006) = 071000;
+            for (unsigned a = 071000; a < 071020; ++a) m->memory(a) = Word48(06400000000000002ULL);
+            unsigned peak = m->reg(017);
+            m->start(03206);
+            for (unsigned ticks = 0; m->program_counter() != 077700; ++ticks) {
+                require(ticks < 10000, "binding frame entry returns");
+                m->step(); peak = std::max(peak, unsigned(m->reg(017)));
+            }
+            require(m->reg(017) - 066001 == cost.retained && peak - 066001 == cost.entry_peak,
+                    "binding retained/entry peak agrees with raw");
+            // Restore uses the current function's environment descriptor.
+            m->memory(03274) = Word48(06600000000000000ULL | (std::uint64_t(040100) << 24));
+            peak = m->reg(017); m->start(03235);
+            for (unsigned ticks = 0; m->program_counter() != 077701; ++ticks) {
+                require(ticks < 10000, "binding frame exit returns");
+                m->step(); peak = std::max(peak, unsigned(m->reg(017)));
+            }
+            require(m->reg(017) == 066001 && peak - 066001 == cost.exit_peak,
+                    "binding restoration/exit peak agrees with raw");
+        }
+        auto m = oracle();
+        m->reg(016) = count; m->reg(015) = 077700; m->reg(017) = 066001;
+        m->reg(006) = 071000;
+        unsigned peak = m->reg(017);
+        m->start(020110);
+        for (unsigned ticks = 0; m->program_counter() != 077700; ++ticks) {
+            require(ticks < 10000, "argument frame returns");
+            m->step(); peak = std::max(peak, unsigned(m->reg(017)));
+        }
+        const auto cost = native_argument_frame_cost(count);
+        require(m->reg(017) - 066001 == cost.retained && peak - 066001 == cost.entry_peak,
+                "argument frame retained/peak matches raw: n=" + std::to_string(count) + " retained=" + std::to_string(m->reg(017) - 066001) + " peak=" + std::to_string(peak - 066001));
+    }
+    // 20124 ordinary rebuilding releases n retained slots and borrows four.
+    for (unsigned count = 1; count < 9; ++count) {
+        auto m = oracle();
+        m->reg(017) = 066001 + count; m->reg(016) = count;
+        m->reg(015) = 077700; m->reg(006) = 071000;
+        m->accumulator() = Word48(count - 1);
+        unsigned peak = m->reg(017);
+        m->start(020124);
+        for (unsigned ticks = 0; m->program_counter() != 077700; ++ticks) {
+            require(ticks < 10000, "argument rebuilding returns");
+            m->step(); peak = std::max(peak, unsigned(m->reg(017)));
+        }
+        require(m->reg(017) == 066001
+                    && peak - 066001 == native_argument_frame_cost(count).exit_peak,
+                "argument rebuilding releases retained storage with exact peak");
+    }
+    {
+        NativeRuntime literals(040000, 066000);
+        auto m = oracle();
+        for (const auto bits : {0ULL, 06400000000000000ULL, 06400000000000002ULL,
+                               06400000000000002ULL, 04050000000000000ULL, 0ULL}) {
+            m->reg(017) = 070000; m->reg(015) = 077700;
+            m->accumulator() = Word48(bits);
+            run(*m, 06134, 077700);
+            const auto block = literals.intern_literal(Word48(bits));
+            require(block.status == NativeAllocation::Status::allocated
+                        && block.block.address == m->accumulator().address(),
+                    "literal pool returns raw interned address, including reuse and bit distinctions");
+            free_lists(*m, literals);
+        }
+        literals.collect();
+        require(literals.allocator().snapshot().live.size() == 4,
+                "literal pool records remain collection roots");
+    }
+    NativeRuntime frames;
+    const auto reference = frames.make_reference().value;
+    const auto cost = native_binding_frame_cost({{true, false}, {false, true}});
+    unsigned depth = 0;
+    while (frames.enter_frame(cost, {reference})) ++depth;
+    require(depth && frames.activation_words() == depth * cost.retained
+                && frames.activation_peak() <= 067000 - 066001, "activation accounting has a bounded area");
+    frames.collect(); require(frames.object(reference).block.words == 1, "activation owns roots");
+    while (depth--) require(frames.leave_frame(), "ordinary frame exit fits");
+    frames.collect();
+    require(frames.activation_words() == 0, "unwinding releases every activation charge");
+
+    require(frames.enter_frame({503, 503, 503}), "near-full accounting prefix");
+    const auto late = native_binding_frame_cost({{false, true}, {false, false}});
+    require(frames.enter_frame(late), "entry does not preempt a later restoration failure");
+    require(!frames.leave_frame() && frames.activation_words() == 509,
+            "exit peak is checked at restoration and preserves the pending frame");
+    frames.unwind_frames(0);
+    require(frames.activation_words() == 0, "error unwinding releases charges without borrowing exit scratch");
+
+    NativeRuntime owner;
+    const auto child = owner.make_reference().value;
+    NativeCompilation linked;
+    linked.emissions = {NativeEmission::literal, NativeEmission::call_binding};
+    linked.bindings = {child}; linked.captures = {child};
+    const auto compiled = owner.compile_storage(linked);
+    owner.finish_compilation_context(compiled.id);
+    owner.collect();
+    require(owner.object(child).block.words == 1, "compiled environments trace shared object roots");
+    owner.release_compiled_storage(compiled.id); owner.collect();
+    bool reclaimed = false;
+    try { owner.object(child); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed, "released compiled environments remove their roots");
+    for (unsigned size = 0; size < 24; ++size) {
+        NativeRuntime small(040000, 040000 + size);
+        NativeCompilation request;
+        request.emissions.assign(8, NativeEmission::literal);
+        const auto result = small.compile_storage(request);
+        require(result.status == NativeAllocation::Status::exhausted,
+                "compiler storage cannot exceed the logical arena");
+        small.collect();
+        require(small.allocator().snapshot().live.empty(), "failed compiler construction publishes no roots");
+    }
+    NativeRuntime program_runtime;
+    const auto before = program_runtime.allocator().core_usage();
+    auto program = native_compile_probe("2+2=>");
+    const auto id = program_runtime.retain_program(program);
+    require(program_runtime.allocator().core_usage().used == before.used + 20,
+            "numeric program charges one interned literal, four nodes, descriptor and five code words");
+    std::ostringstream output;
+    require(program_runtime.execute(id, output).error.empty() && output.str() == "** 4\n",
+            "charged numeric program executes without machine code");
+    program_runtime.release_program(id); program_runtime.collect();
+}
+
 void test_native_storage(const char *image_path)
 {
     using namespace poplan;
@@ -183,15 +446,17 @@ void test_native_storage(const char *image_path)
 
     // Adapt native reference/pair roots into raw hardware-stack roots. The
     // collector scans ABOVE 17010, with the saved POP stack pointer at r17-3.
-    for (unsigned pattern = 0; pattern < 16; ++pattern) {
-        NativeRuntime runtime(040000, 041000);
+    for (unsigned pattern = 0; pattern < 32; ++pattern) {
+        const unsigned limit = 041000 + (pattern < 16 ? 0 : pattern - 15);
+        const unsigned saved_stack = limit + 0100;
+        NativeRuntime runtime(040000, limit);
         auto oracle = std::make_unique<Machine>(*raw);
         oracle->memory(017) = Word48(040000);
-        oracle->memory(017010) = Word48(041000);
-        for (unsigned a = 040000; a < 041100; ++a) oracle->memory(a) = Word48();
+        oracle->memory(017010) = Word48(limit);
+        for (unsigned a = 040000; a < saved_stack; ++a) oracle->memory(a) = Word48();
         const auto anchor = runtime.make_pair().value;
         std::vector<NativeValue> references;
-        for (unsigned i = 0; i < 0776; ++i) references.push_back(runtime.make_reference().value);
+        for (unsigned i = 0; i < limit - 040000 - 2; ++i) references.push_back(runtime.make_reference().value);
         const auto selected = references[(pattern * 47) % references.size()];
         const auto peer = references[(pattern * 47 + 11) % references.size()];
         runtime.store(selected, 0, peer); runtime.store(peer, 0, selected);
@@ -219,9 +484,9 @@ void test_native_storage(const char *image_path)
         case 2: runtime.frame_roots().push_back({root}); break;
         case 3: runtime.bind(runtime.dictionary().lookup(Word48("REF")), root); break;
         }
-        oracle->memory(041001) = encode(root);
-        oracle->reg(004) = 05523; oracle->reg(017) = 041100;
-        oracle->memory(041075) = Word48(070000);
+        oracle->memory(limit + 1) = encode(root);
+        oracle->reg(004) = 05523; oracle->reg(017) = saved_stack;
+        oracle->memory(saved_stack - 3) = Word48(070000);
         oracle->alu_mode() = 003;
         oracle->start(05543);
         unsigned ticks = 0;
@@ -248,7 +513,7 @@ void test_native_storage(const char *image_path)
         unsigned accounted = free;
         for (auto b : runtime.allocator().snapshot().live) accounted += b.words;
         for (auto b : runtime.allocator().snapshot().unavailable) accounted += b.words;
-        require(accounted == 01000, "collector conserves even unavailable trailing storage");
+        require(accounted == limit - 040000, "collector conserves even unavailable trailing storage");
         const auto allocated = runtime.make_reference();
         oracle->accumulator() = Word48(1); oracle->reg(015) = 077700;
         oracle->reg(016) = 1; oracle->reg(017) = 070001;
@@ -344,7 +609,7 @@ void test_native_storage(const char *image_path)
     require(reclaimed, "releasing a program removes its roots");
     auto arithmetic = native_compile_probe("(2+3)*4=>");
     for (const auto &op : arithmetic.operations)
-        require(op.emission_site == 05052 && !op.legacy_words, "unknown emission cost is not zero");
+        require((op.emission_site == 05053 || op.emission_site == 05064) && op.legacy_words == 1, "known numeric emission costs");
     std::ostringstream out;
     const auto result = roots.execute(roots.retain_program(std::move(arithmetic)), out);
     require(result.error.empty() && out.str() == "** 20\n" && !result.legacy_accounting_complete,
@@ -893,6 +1158,7 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 3 && std::string(argv[2]) == "--native-accounting") { test_native_accounting(argv[1]); return 0; }
     if (argc == 3 && std::string(argv[2]) == "--native-storage") { test_native_storage(argv[1]); return 0; }
     if (argc == 2 && std::string(argv[1]) == "--disk-host") { test_disk_mounts(); return 0; }
     if (argc == 2 && std::string(argv[1]) == "--native-reals") {

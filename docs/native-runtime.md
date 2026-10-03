@@ -29,7 +29,7 @@ local to each operation. There is no native architectural register bank.
 | 1: resident inventory | [184 descriptor audit](native-resident-inventory.md), generated from `keyword_descriptors` in `src/poplan.cpp` | Bootstrap names checked against image; callable bindings all unbound |
 | 1: syntax and compiler | `03544`, `03736`, `04001`, `04214`, `04536`, `04665`; canonical descriptions in `subroutines-from-trace.md` | Full branch, syntax-handler and lowering inventory still required |
 | 1: emission sites | `05007`, `05052..05157`, especially `05124`; generated rebinding `11726..11731`, binding `11755..11757` | Need enumerate callers and establish each emitted operation's POP meaning; do not decode completed words |
-| 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Reference/pair collection and retry implemented; activation/code accounting remain open |
+| 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Reference/pair collection, retry, compiler storage and activation cost primitives implemented; full session scheduling remains open |
 | 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Runtime owns numbers, dictionary and reference/pair payloads with stable handles and explicit roots; other compound payloads remain open |
 | 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Function bindings, aliases, reader conversion and mutable syntax remain open |
 | 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; full numeric/scanner/function coverage remains open |
@@ -58,8 +58,9 @@ signed real literals are accepted at the beginning of an expression or inside
 parentheses, so use `1+(-.5)=>` rather than `1+ -.5=>`.
 The entire probe is validated before execution; unsupported source produces a
 nonzero exit and no partial execution. This is a deliberately restricted test
-lowering, not a replacement grammar inferred from the POP-2 manual. No compiler
-allocation-cost claims follow from it. Input is currently collected until EOF;
+lowering, not a replacement grammar inferred from the POP-2 manual. Compiler graph storage is charged using the recovered costs in
+[native-accounting.md](native-accounting.md); full session accounting still needs
+the historical reader and call paths. Input is currently collected until EOF;
 interactive suspension is not supported.
 
 `--native` is mutually exclusive with `--image` and `--io-demo`, and rejects the
@@ -300,3 +301,35 @@ with `ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`, exit status 0.
 `artifacts/native-storage/` (`ctest.log`, `smoke.log`, `corpus.log`,
 `sanitize-test.log`, and `zone1224-*.normalized`). These runs include the
 pre-existing, separately uncommitted machine shadow-arithmetic edits.
+
+
+## Step 1 accounting completion (2026-10-03)
+
+The storage foundation now includes compiler finalization and explicit activation
+costs. See [native-accounting.md](native-accounting.md) for every source boundary
+and the differential matrix. Runtime-retained numeric programs charge literals,
+intermediate nodes, descriptor and code storage; all ordinary emission cases
+have known costs. Environment storage, entry/restoration peaks, argument transfer
+and rebuilding match focused instruction-only probes. The tests correct the
+previous n+1 argument-frame estimate to n retained words.
+
+Step 1 of `PLAN.md` is complete at the storage boundary. The original full-runtime
+gates remain open. `storage_accounting_complete` reports charged program storage;
+`legacy_accounting_complete` stays false because reader scratch scheduling,
+actual POP calls and recovery have not been ported. No recursive threshold or
+Man-or-Boy conformance is claimed. The next implementation step is the reader,
+bindings and top-level recovery.
+
+
+Validation: all 18 normal CTests passed (63.95 seconds) and all 18 ASan/UBSan
+CTests passed (320.59 seconds), with final exit status 0 and
+`ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1`. The focused storage,
+accounting and guarded probe tests passed before the complete suite. `make test`,
+`make cpp-quine` and `make cpp-zone1224` passed. Separate trivial
+historical/hybrid/native checks and normalized historical zone1224 comparison
+passed. The smoke suite includes historical numeric expression comparison and
+the image-independent native decoder guard. `git diff --check` passed.
+Logs: `artifacts/native-accounting/{focused,ctest,smoke,corpus,sanitize-test}.log`;
+historical outputs and normalized comparisons are in the same directory.
+The validation worktree includes the pre-existing, separately uncommitted
+machine shadow-arithmetic edits; this milestone does not modify them.

@@ -1120,6 +1120,225 @@ void NativeDictionary::bind(std::uint32_t handle, NativeValue value)
     mutable_word(handle).binding = value;
 }
 
+NativeEmissionCost native_emission_cost(NativeEmission emission)
+{
+    // 05052..05076 selects one output word per operation, except the label
+    // at 05070. 17774/20002 counts labels without advancing the sizing cursor.
+    // 04447 and 17762 allocate two-word intermediate nodes independently.
+    switch (emission) {
+    case NativeEmission::evaluate: return {05052, 2, 1};
+    case NativeEmission::literal: return {05053, 2, 1};
+    case NativeEmission::branch_zero: return {05054, 2, 1};
+    case NativeEmission::branch_nonzero: return {05055, 2, 1};
+    case NativeEmission::jump: return {05056, 2, 1};
+    case NativeEmission::store_binding: return {05057, 2, 1};
+    case NativeEmission::return_value: return {05060, 2, 1};
+    case NativeEmission::evaluate_stack: return {05061, 2, 1};
+    case NativeEmission::load_capture: return {05062, 2, 1};
+    case NativeEmission::embedded_value: return {05063, 2, 1};
+    case NativeEmission::call_binding: return {05064, 2, 1};
+    case NativeEmission::update_binding: return {05065, 2, 1};
+    case NativeEmission::transfer_arguments: return {05066, 2, 1};
+    case NativeEmission::rebuild_arguments: return {05067, 2, 1};
+    case NativeEmission::label: return {05070, 2, 0};
+    case NativeEmission::continuation: return {05071, 2, 1};
+    case NativeEmission::load_binding: return {05072, 2, 1};
+    case NativeEmission::capture_function: return {05073, 2, 1};
+    case NativeEmission::jump_capture: return {05076, 2, 1};
+    }
+    throw std::logic_error("native compiler: unknown emission kind");
+}
+
+NativeFrameCost native_binding_frame_cost(const std::vector<NativeBindingSlot> &slots)
+{
+    if (slots.size() > 077777 / 2)
+        throw std::overflow_error("native binding frame size");
+    // 03206 saves previous function and return link; 03217..03222 saves two
+    // words per binding in reverse order. Arguments/results borrow three words.
+    NativeFrameCost cost{2, 2, 2};
+    for (auto slot = slots.rbegin(); slot != slots.rend(); ++slot) {
+        cost.retained += 2;
+        cost.entry_peak = std::max(cost.entry_peak, cost.retained + (slot->argument ? 3u : 0u));
+    }
+    auto remaining = cost.retained;
+    cost.exit_peak = remaining;
+    for (const auto slot : slots) {
+        cost.exit_peak = std::max(cost.exit_peak, remaining + (slot.result ? 3u : 0u));
+        remaining -= 2;
+    }
+    return cost;
+}
+
+NativeFrameCost native_argument_frame_cost(std::uint16_t arguments)
+{
+    if (arguments > 077777) throw std::overflow_error("native argument count");
+    if (!arguments) return {};
+    // 20111 reserves one and 20113 adds n. Restoration pops four words,
+    // including one reserved slot: net n, not n+1. Rebuilding at 20124
+    // temporarily saves four words above the retained argument area.
+    return {arguments, arguments == 1 ? 1u : unsigned(arguments) + 4,
+            unsigned(arguments) + 4};
+}
+
+NativeAllocation NativeRuntime::allocate_storage(std::uint32_t words)
+{
+    auto allocation = allocator_.try_allocate(words);
+    if (allocation.status == NativeAllocation::Status::collection_required) {
+        collect();
+        allocation = allocator_.try_allocate(words);
+        if (allocation.status == NativeAllocation::Status::collection_required)
+            allocation.status = NativeAllocation::Status::exhausted;
+    }
+    return allocation;
+}
+
+NativeAllocation NativeRuntime::intern_literal(Word48 value)
+{
+    // 06134/01167 uses full-word equality and two-word records. The collector
+    // roots every entry of this table at 05554..05564, like interned names.
+    auto [entry, inserted] = literals_.emplace(value.raw(), NativeBlock{});
+    if (!inserted) return {NativeAllocation::Status::allocated, entry->second};
+    try {
+        const auto allocation = allocate_storage(2);
+        if (allocation.status != NativeAllocation::Status::allocated) {
+            literals_.erase(entry);
+            return allocation;
+        }
+        entry->second = allocation.block;
+        return allocation;
+    } catch (...) {
+        literals_.erase(entry);
+        throw;
+    }
+}
+
+NativeCompilationResult NativeRuntime::compile_storage(NativeCompilation compilation)
+{
+    if (!compilation.literals.empty() && compilation.literals.size() != compilation.emissions.size())
+        throw std::logic_error("native compiler literal/operation count mismatch");
+    std::uint32_t words = 1; // 05143 terminator, sizing seed 05175
+    for (const auto emission : compilation.emissions) {
+        words += native_emission_cost(emission).code_words;
+        if (words > 077777) return {NativeAllocation::Status::exhausted, 0};
+    }
+    if (words > 077777 || compilation.bindings.size() >= 077777 || compilation.captures.size() >= 077777)
+        return {NativeAllocation::Status::exhausted, 0};
+    for (const auto value : compilation.bindings) validate(value);
+    for (const auto value : compilation.captures) validate(value);
+    const auto id = compilations_.size();
+    compilations_.push_back(CompilationRecord{std::move(compilation), {}, {}});
+    auto &record = *compilations_.back();
+    // Publish pending roots before any allocation that can collect. Reserving
+    // metadata first keeps host allocation failure from leaking a logical block.
+    const auto allocate = [&](std::uint32_t count, NativeBlock &block) {
+        const auto allocation = allocate_storage(count);
+        block = allocation.block;
+        return allocation.status == NativeAllocation::Status::allocated
+            || allocation.status == NativeAllocation::Status::zero_size;
+    };
+    const auto discard = [&] {
+        // Failed construction keeps no root. Its partial extents become garbage
+        // for collection, rather than being silently returned to another bucket.
+        compilations_[id].reset();
+        return NativeCompilationResult{NativeAllocation::Status::exhausted, id};
+    };
+    try {
+        record.temporary.reserve(record.source.emissions.size() + record.source.bindings.size()
+                                 + record.source.captures.size());
+        const auto count = record.source.emissions.size() + record.source.bindings.size()
+            + record.source.captures.size();
+        for (std::size_t i = 0; i < count; ++i) {
+            if (i < record.source.literals.size() && record.source.literals[i]
+                && intern_literal(*record.source.literals[i]).status != NativeAllocation::Status::allocated)
+                return discard();
+            NativeBlock block;
+            if (!allocate(2, block)) return discard();
+            record.temporary.push_back(block);
+        }
+        // 05021 descriptor, then 05160/11464 copies the two environment chains.
+        if (!allocate(5, record.storage.descriptor)
+            || !allocate(record.source.bindings.empty() ? 0 : record.source.bindings.size() + 1,
+                         record.storage.bindings)
+            || !allocate(record.source.captures.empty() ? 0 : record.source.captures.size() + 1,
+                         record.storage.captures)) return discard();
+        // 05033/03531 frees the capture chain before allocating executable space.
+        const auto capture_begin = record.source.emissions.size() + record.source.bindings.size();
+        for (std::size_t i = capture_begin; i < record.temporary.size(); ++i) {
+            allocator_.release(record.temporary[i]);
+            record.temporary[i] = {};
+        }
+        if (!allocate(words, record.storage.code)) return discard();
+        // 05147/03531 releases the operation chain in forward list order.
+        for (std::size_t i = 0; i < record.source.emissions.size(); ++i) {
+            allocator_.release(record.temporary[i]);
+            record.temporary[i] = {};
+        }
+        // The binding chain is retained by the compiler's 17560 table; unlike
+        // the capture chain it is not freed by this finalizer.
+        return {NativeAllocation::Status::allocated, id};
+    } catch (...) {
+        compilations_[id].reset();
+        throw;
+    }
+}
+
+const NativeCompiledStorage &NativeRuntime::compiled_storage(std::size_t id) const
+{
+    if (!compilations_.at(id)) throw std::logic_error("native compiled storage was released");
+    return compilations_[id]->storage;
+}
+
+void NativeRuntime::finish_compilation_context(std::size_t id)
+{
+    compiled_storage(id);
+    // Restoring the enclosing compiler table removes roots, not free-list
+    // entries. The finalized environment arrays remain owned by the program.
+    compilations_[id]->temporary.clear();
+}
+
+void NativeRuntime::release_compiled_storage(std::size_t id)
+{
+    compiled_storage(id);
+    compilations_[id].reset();
+}
+
+bool NativeRuntime::enter_frame(NativeFrameCost cost, std::vector<NativeValue> roots)
+{
+    if (cost.entry_peak < cost.retained || cost.exit_peak < cost.retained)
+        throw std::logic_error("native frame peak below retained size");
+    for (const auto root : roots) validate(root);
+    // Startup hardware area 066001..066777; 067000 is the collision watchpoint.
+    constexpr std::uint32_t capacity = 067000 - 066001;
+    const auto peak = cost.entry_peak;
+    if (peak > capacity || activation_words_ > capacity - peak) return false;
+    accounting_frames_.push_back({cost, std::move(roots)});
+    activation_peak_ = std::max(activation_peak_, activation_words_ + peak);
+    activation_words_ += cost.retained;
+    return true;
+}
+
+bool NativeRuntime::leave_frame()
+{
+    if (accounting_frames_.empty()) throw std::logic_error("native frame stack underflow");
+    const auto cost = accounting_frames_.back().cost;
+    const auto base = activation_words_ - cost.retained;
+    constexpr std::uint32_t capacity = 067000 - 066001;
+    if (cost.exit_peak > capacity || base > capacity - cost.exit_peak) return false;
+    activation_peak_ = std::max(activation_peak_, base + cost.exit_peak);
+    activation_words_ = base;
+    accounting_frames_.pop_back();
+    return true;
+}
+
+void NativeRuntime::unwind_frames(std::size_t depth)
+{
+    if (depth > accounting_frames_.size()) throw std::logic_error("native unwind depth");
+    while (accounting_frames_.size() > depth) {
+        activation_words_ -= accounting_frames_.back().cost.retained;
+        accounting_frames_.pop_back();
+    }
+}
+
 NativeRuntime::NativeRuntime() : NativeRuntime(033064, 066000)
 {
     // Startup's sole 05447 request is two words at 065776. Its contents belong
@@ -1219,13 +1438,40 @@ void NativeRuntime::bind(std::uint32_t word, NativeValue value)
 std::size_t NativeRuntime::retain_program(NativeProgram program)
 {
     for (const auto root : program.roots) validate(root);
-    programs_.push_back(std::move(program));
-    return programs_.size() - 1;
+    const auto id = programs_.size();
+    programs_.push_back(ProgramRecord{std::move(program), std::nullopt});
+    auto &record = *programs_.back();
+    if (!record.program.error.empty() || record.program.operations.empty()) return id;
+    try {
+        NativeCompilation compilation;
+        for (const auto &operation : record.program.operations) {
+            compilation.literals.push_back(operation.kind == NativeOperation::Kind::constant
+                ? std::optional<Word48>(operation.constant) : std::nullopt);
+            switch (operation.kind) {
+            case NativeOperation::Kind::constant:
+                compilation.emissions.push_back(NativeEmission::literal); break;
+            case NativeOperation::Kind::binary: case NativeOperation::Kind::print:
+                compilation.emissions.push_back(NativeEmission::call_binding); break;
+            default: throw std::logic_error("native program: unknown operation kind");
+            }
+        }
+        const auto allocation = compile_storage(std::move(compilation));
+        if (allocation.status == NativeAllocation::Status::allocated) {
+            record.storage = allocation.id;
+            finish_compilation_context(allocation.id);
+        }
+        else record.program.error = "native compiler storage exhausted";
+    } catch (...) {
+        programs_[id].reset();
+        throw;
+    }
+    return id;
 }
 
 void NativeRuntime::release_program(std::size_t program)
 {
     if (!programs_.at(program)) throw std::logic_error("native program already released");
+    if (programs_[program]->storage) release_compiled_storage(*programs_[program]->storage);
     programs_[program].reset();
 }
 
@@ -1234,6 +1480,8 @@ void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
     std::vector<NativeValue> pending = temporary_roots;
     pending.insert(pending.end(), values_.begin(), values_.end());
     std::vector<std::uint16_t> marked = reservations_;
+    for (const auto &[bits, block] : literals_)
+        if (block.words) marked.push_back(block.address);
     for (const auto &word : dictionary_.words()) {
         if (std::any_of(allocator_.snapshot().live.begin(), allocator_.snapshot().live.end(),
                 [&](NativeBlock block) { return block.address == word.handle; }))
@@ -1241,7 +1489,19 @@ void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
         pending.push_back(word.binding);
     }
     for (const auto &program : programs_)
-        if (program) pending.insert(pending.end(), program->roots.begin(), program->roots.end());
+        if (program) pending.insert(pending.end(), program->program.roots.begin(), program->program.roots.end());
+    for (const auto &compilation : compilations_) {
+        if (!compilation) continue;
+        const auto &s = compilation->storage;
+        for (const auto block : {s.descriptor, s.bindings, s.captures, s.code})
+            if (block.words) marked.push_back(block.address);
+        for (const auto block : compilation->temporary)
+            if (block.words) marked.push_back(block.address);
+        pending.insert(pending.end(), compilation->source.bindings.begin(), compilation->source.bindings.end());
+        pending.insert(pending.end(), compilation->source.captures.begin(), compilation->source.captures.end());
+    }
+    for (const auto &frame : accounting_frames_)
+        pending.insert(pending.end(), frame.roots.begin(), frame.roots.end());
     for (const auto &frame : frame_roots_)
         pending.insert(pending.end(), frame.begin(), frame.end());
     std::vector<std::uint32_t> visited;
@@ -1484,19 +1744,26 @@ NativeProgram native_compile_probe(const std::string &source)
         space();
     }
     if (expression || !pending.empty()) return unsupported();
-    for (auto &operation : program.operations) operation.emission_site = 05052;
+    for (auto &operation : program.operations) {
+        const auto cost = native_emission_cost(operation.kind == NativeOperation::Kind::constant
+            ? NativeEmission::literal : NativeEmission::call_binding);
+        operation.emission_site = cost.site;
+        operation.legacy_words = cost.code_words;
+    }
     return program;
 }
 
 NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ostream &output)
 {
     if (!programs_.at(program_index)) throw std::logic_error("native program was released");
-    const auto &program = *programs_[program_index];
+    const auto &program = programs_[program_index]->program;
     NativeExecutionResult result;
     if (!program.error.empty()) {
         result.error = program.error;
         return result;
     }
+    result.storage_accounting_complete = programs_[program_index]->storage.has_value()
+        || program.operations.empty();
     auto &values = values_;
     // The linear probe has one explicit operation cursor. General activation
     // frames and legacy code/activation accounting remain separate open gates.

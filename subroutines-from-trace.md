@@ -470,3 +470,16 @@ listing. Instruction-only synthetic reference/pair graphs and full `05430`
 retry probes establish free-list order, cycles/sharing and success/exhaustion.
 These are new native storage evidence, not new hybrid semantic-dispatch entries
 or revisions to saved workload counts. See `docs/native-allocation.md`.
+
+
+### Native accounting checkpoints (2026-10-03)
+
+Instruction-only synthetic compiler IR now exercises `17774/20002` sizing and
+`05007` finalization across all 19 emitter cases (`05074..05075` remain data).
+The native differential compares descriptor/environment/code addresses, all free
+chains and `10402` accounting. Frame checkpoints at `03206`, `03235`, `20110`,
+and `20124` compare retained words and temporary high-water marks. The `20110`
+retained argument area is n words: four restore pops follow three saved words,
+removing the extra reservation. Source/cost formulas and test scope are in
+`docs/native-accounting.md`. These are new primitive measurements, not revisions
+to saved corpus counts or new hybrid semantic entries.

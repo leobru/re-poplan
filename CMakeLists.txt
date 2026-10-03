@@ -45,6 +45,8 @@ if(BUILD_TESTING)
         COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-allocator)
     add_test(NAME poplan-native-storage
         COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-storage)
+    add_test(NAME poplan-native-accounting
+        COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-accounting)
 
     add_test(NAME poplan-native-dictionary
         COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --native-dictionary)

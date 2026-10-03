@@ -571,3 +571,14 @@ fidelity here concerns logical identities, roots, free lists and allocation
 outcomes, not emulated registers or bitmap memory. Compiler/activation costs and
 recursive exhaustion remain open; see [native-allocation.md](native-allocation.md)
 and [the next steps](../PLAN.md).
+
+
+### Native compiler/activation accounting (2026-10-03)
+
+The step 1 storage foundation is complete: native compiler storage and explicit
+activation cost primitives now pass instruction-only differentials, including
+all 19 emitter cases and separate entry/exit peaks. See
+[native-accounting.md](native-accounting.md). Ordinary closure binding evidence
+is at `03206..03260`; `11726..11757` is packed record access/update. The native
+reader and actual function semantics remain subsequent steps. Neither hybrid
+PC dispatch nor historical profile measurements changed in this milestone.

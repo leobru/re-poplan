@@ -106,6 +106,33 @@ private:
 };
 
 enum class NativeBinary { add, subtract, multiply, divide };
+// POP compiler operations at the source of emission, never BESM instructions.
+enum class NativeEmission {
+    evaluate, literal, branch_zero, branch_nonzero, jump, store_binding,
+    return_value, evaluate_stack, load_capture, embedded_value, call_binding,
+    update_binding, transfer_arguments, rebuild_arguments, label,
+    continuation, load_binding, capture_function, jump_capture
+};
+struct NativeEmissionCost {
+    std::uint16_t site;
+    std::uint16_t node_words;
+    std::uint16_t code_words;
+};
+NativeEmissionCost native_emission_cost(NativeEmission);
+
+struct NativeBindingSlot {
+    bool argument = false;
+    bool result = false;
+};
+struct NativeFrameCost {
+    std::uint32_t retained = 0;
+    std::uint32_t entry_peak = 0;
+    std::uint32_t exit_peak = 0;
+};
+// Peaks include retained words and are relative to the caller's frame base.
+NativeFrameCost native_binding_frame_cost(const std::vector<NativeBindingSlot> &);
+NativeFrameCost native_argument_frame_cost(std::uint16_t arguments);
+
 struct NativeNumberResult {
     Word48 value;
     std::string error;
@@ -125,8 +152,8 @@ struct NativeOperation {
     NativeBinary binary = NativeBinary::add;
     // Evidence annotation, never an execution address.
     std::uint16_t provenance = 0;
-    // Allocation-site evidence is separate from primitive provenance. Unknown
-    // cost must never be interpreted as a zero-word historical allocation.
+    // Emission-site evidence is separate from primitive provenance. This is the
+    // contribution to the final code extent, not a separate allocation request.
     std::uint16_t emission_site = 0;
     std::optional<std::uint16_t> legacy_words = std::nullopt;
 };
@@ -137,6 +164,24 @@ struct NativeProgram {
     std::vector<NativeValue> roots;
 };
 
+// One compilation unit after reader decisions and optional optimization.
+// Captures/bindings are the two chains copied at 05025 and 05027. They are
+// separate from the number of POP arguments at a later call.
+struct NativeCompilation {
+    std::vector<NativeEmission> emissions;
+    std::vector<NativeValue> bindings;
+    std::vector<NativeValue> captures;
+    // Empty for pre-resolved operands; otherwise one optional literal per op.
+    std::vector<std::optional<Word48>> literals;
+};
+struct NativeCompiledStorage {
+    NativeBlock descriptor, bindings, captures, code;
+};
+struct NativeCompilationResult {
+    NativeAllocation::Status status;
+    std::size_t id = 0;
+};
+
 // Development slice: numeric arithmetic with resident operator precedence,
 // parentheses, and =>. Mutable syntax and general unary operators are absent.
 // This is deliberately not presented as the completed POP reader/compiler.
@@ -144,6 +189,9 @@ NativeProgram native_compile_probe(const std::string &source);
 struct NativeExecutionResult {
     std::size_t operations = 0;
     std::string error;
+    bool storage_accounting_complete = false;
+    // Full session accounting additionally needs the historical reader and
+    // language call/recovery paths; code storage alone does not establish it.
     bool legacy_accounting_complete = false;
 };
 
@@ -169,6 +217,7 @@ public:
     const NativeAllocator &allocator() const { return allocator_; }
     const NativeDictionary &dictionary() const { return dictionary_; }
     NativeInternResult intern(Word48 name);
+    NativeAllocation intern_literal(Word48 value);
     void bind(std::uint32_t word, NativeValue value);
     NativeObjectAllocation make_reference(NativeValue value = {});
     NativeObjectAllocation make_pair(NativeValue first = {}, NativeValue second = {});
@@ -177,6 +226,17 @@ public:
     std::vector<NativeValue> &values() { return values_; }
     std::vector<std::vector<NativeValue>> &frame_roots() { return frame_roots_; }
     std::size_t retain_program(NativeProgram program);
+    NativeCompilationResult compile_storage(NativeCompilation compilation);
+    const NativeCompiledStorage &compiled_storage(std::size_t id) const;
+    void finish_compilation_context(std::size_t id);
+    void release_compiled_storage(std::size_t id);
+    // Explicit accounting frames; language binding/call semantics are later work.
+    // A failed entry/exit preserves the frame stack; unwinding bypasses exit work.
+    bool enter_frame(NativeFrameCost cost, std::vector<NativeValue> roots = {});
+    bool leave_frame();
+    void unwind_frames(std::size_t depth);
+    std::uint32_t activation_words() const { return activation_words_; }
+    std::uint32_t activation_peak() const { return activation_peak_; }
     void release_program(std::size_t program);
     NativeExecutionResult execute(std::size_t program, std::ostream &output);
     void collect(const std::vector<NativeValue> &temporary_roots = {});
@@ -190,9 +250,24 @@ private:
     std::uint32_t next_handle_ = 0100000;
     std::vector<NativeValue> values_;
     std::vector<std::vector<NativeValue>> frame_roots_;
-    std::vector<std::optional<NativeProgram>> programs_;
+    struct ProgramRecord {
+        NativeProgram program;
+        std::optional<std::size_t> storage;
+    };
+    std::vector<std::optional<ProgramRecord>> programs_;
     std::vector<std::uint16_t> reservations_;
+    std::map<std::uint64_t, NativeBlock> literals_;
     std::size_t collections_ = 0;
+    struct CompilationRecord {
+        NativeCompilation source;
+        NativeCompiledStorage storage;
+        std::vector<NativeBlock> temporary;
+    };
+    std::vector<std::optional<CompilationRecord>> compilations_;
+    struct AccountingFrame { NativeFrameCost cost; std::vector<NativeValue> roots; };
+    std::vector<AccountingFrame> accounting_frames_;
+    std::uint32_t activation_words_ = 0, activation_peak_ = 0;
+    NativeAllocation allocate_storage(std::uint32_t words);
 };
 NativeExecutionResult native_execute(const NativeProgram &, std::ostream &);
 int run_native_shell(std::istream &, std::ostream &, std::ostream &);

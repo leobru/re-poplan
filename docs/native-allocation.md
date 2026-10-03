@@ -67,8 +67,8 @@ storage.
 frame-root records and object payloads. References cost one logical word; pairs
 cost two. Object handles increase monotonically independently of logical
 addresses; reclamation never makes a stale handle refer to a different object.
-There are no native activation semantics yet: frame-root records are a storage
-interface for the later explicit call-frame implementation.
+Explicit accounting frames now retain roots and track entry/restoration peaks;
+POP call/binding semantics remain later work. See [accounting](native-accounting.md).
 
 At the first input boundary, instruction-only startup has arena
 `033064..065777`, one two-word reservation at `065776`, and common extent
@@ -89,10 +89,10 @@ bounds constructor used by primitive tests omits the startup reservation.
 
 The last rule discards an unterminated free tail. It is deliberately preserved
 and represented as `unavailable`, which counts as used in `COREUSED`. It is not
-host-live storage. Default arena limits and differential fixtures end on bitmap
-boundaries; arbitrary partial-bitmap limits have not been differentially proven.
+host-live storage. Differentials now include non-aligned upper limits as well as the default
+bitmap-aligned arena.
 
-`poplan-native-storage` compares startup and 16 cyclic/shared object graphs with
+`poplan-native-storage` compares startup and 32 cyclic/shared object graphs with
 instruction-only collection, checking every rebuilt free extent, bucket clearing,
 subsequent allocation address and accounting. Roots exercise values, programs,
 frames and bindings. Separate tests execute the complete raw
@@ -102,33 +102,21 @@ cover temporary argument roots, released programs, dynamic words, reclamation,
 and runtime-owned numeric execution. The existing allocator differential remains
 responsible for exact allocation/release and raw `COREUSED` checks.
 
-## Allocation-cost inventory
+## Allocation-cost inventory (completed 2026-10-03)
 
-These are costs at source boundaries, not a claim that native operations each
-have the same cost. Addresses and sizes in this table are octal unless expressed
-as a formula.
+See [native-accounting.md](native-accounting.md) for the source/implementation
+matrix: all emitter widths, literal interning, intermediate nodes, function
+descriptors, two environment arrays, code extents, binding saves/restoration,
+argument transfer and argument rebuilding. Each has focused primitive evidence.
 
-| Source | Logical cost established | Native status |
-| --- | --- | --- |
-| `01137` / `01150` dictionary miss | Four words | Implemented and differential-tested |
-| `10277` CONSREF | One word | Native reference storage implemented |
-| `05215` / `05217` pair | Two words | Native pair storage implemented |
-| `05021` function/compiler descriptor | Five words | Recovered from allocation request; constructor not ported |
-| `05035..05040` generated code extent | Length in compiler sizing word `03645` | Aggregate cost depends on original sizing pass; not assigned to probe operations |
-| `05124..05125` emission | Writes into the already allocated extent | No separate allocation per emitted word |
-| `11464..11474` descriptor wrapper | Zero for zero input address; otherwise input low address plus one | Recovered allocation formula; environments not yet lowered |
-| `20110..20123` argument transfer | No stack growth for zero; one word for one argument; n+1 retained words for n greater than one, plus three temporary saved words | Source stack movement recovered; not a complete activation cost |
-| `20124..20140`, `11726..11731`, `11755..11757` | Activation rebuilding and captured binding costs depend on descriptors and calling context | Unresolved aggregate costs; block recursive exhaustion claims |
+Numeric operations now carry exact `05053`/`05064` emission provenance and known
+code-word contributions. Retaining a program charges its compiler storage.
+Explicit frame accounting maintains retained words and distinct entry/exit peaks
+and supports root-preserving failure and error unwind. No BESM instructions are
+stored or executed by these native services.
 
-Probe operations carry primitive provenance and emitter-family annotation
-`05052`; this is not a resolved per-operation emission site. `legacy_words` is
-explicitly unknown, never zero by default. `NativeExecutionResult` reports
-`legacy_accounting_complete = false`. No finished instruction words are decoded
-or recognized to infer these operations.
-
-Remaining work is the complete compiler sizing/lowering map, environment and
-activation accounting, other object layouts, collection depth diagnostics,
-SETPOP recovery, and recursive/closure exhaustion thresholds. The runtime now
-owns numeric execution, but the probe does not yet charge historical compiled
-program or activation costs. These limitations prevent claiming full allocation
-or native language conformance.
+This supersedes the earlier unknown per-emission and activation-cost inventory.
+Whole-session accounting still requires reader scratch scheduling and the actual
+language call/recovery paths. Other object kinds, collection-depth diagnostics,
+SETPOP, recursive thresholds and the documented closure failure remain later
+language milestones; completing storage primitives does not establish them.
