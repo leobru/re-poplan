@@ -124,9 +124,9 @@ std::string format_prreal(Word48 word)
     constexpr std::uint64_t object_tag_mask = 07700000000000000ULL;
     constexpr std::uint64_t integer_tag = 06400000000000000ULL;
     if ((word.raw() & object_tag_mask) == integer_tag) {
-        std::uint64_t payload = word.raw() & bits40;
-        if ((payload & bit40) != 0) {
-            payload |= ~bits40;
+        std::uint64_t payload = word.raw() & bits41;
+        if ((payload & bit41) != 0) {
+            payload |= ~bits41;
         }
         const auto integer = static_cast<std::int64_t>(payload);
         return (integer < 0 ? std::string() : std::string(" "))

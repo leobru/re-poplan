@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <cstdint>
 #include <string_view>
+#include <string>
 #include <vector>
 
 namespace poplan {
@@ -13,6 +14,10 @@ class Machine;
 // Encode host UTF-8 text as the one-byte GOST-10859 representation used by
 // POPLAN terminal buffers.
 std::vector<std::uint8_t> encode_gost_text(std::string_view text);
+
+// Immutable 21301/21354 character data, shared by the native reader and output.
+std::uint8_t native_external_character(std::uint8_t gost);
+std::string native_external_display(std::string_view external);
 
 // Host adapter for the translated Э71 device. This is an I/O demonstration
 // shell, not yet the complete POP-2 evaluator: non-terminating input lines are

@@ -1149,6 +1149,119 @@ void test_native_reals()
             "native real literals reach printing and mixed arithmetic");
 }
 
+void test_native_reader(const char *root)
+{
+    using namespace poplan;
+    // Independent raw character conversion is the oracle for every input byte,
+    // including Cyrillic letters whose external spelling resembles punctuation.
+    auto raw = std::make_unique<Machine>();
+    std::ifstream image(std::string(root) + "/build/poplan.bin", std::ios::binary);
+    raw->load_image(image);
+    raw->set_translated_routines_enabled(false);
+    for (unsigned byte = 0; byte < 256; ++byte) {
+        raw->accumulator() = Word48(byte);
+        raw->reg(015) = 070000;
+        raw->start(021274);
+        unsigned steps = 0;
+        while (raw->program_counter() != 070000 && steps++ < 100) raw->step();
+        require(raw->program_counter() == 070000
+                    && raw->accumulator().raw() == native_external_character(byte),
+                "native character bootstrap agrees with raw 21274 on all 256 bytes");
+    }
+    const auto read = [&](const std::string &path) {
+        std::ifstream input(std::string(root) + path);
+        require(static_cast<bool>(input), "native reader fixture is available");
+        return std::string(std::istreambuf_iterator<char>(input), {});
+    };
+    for (const char *fixture : {"native-bindings", "native-recovery"}) {
+        const auto source = read(std::string("/tests/inputs/") + fixture + ".pop2");
+        const auto expected = read(std::string("/tests/expected/") + fixture + ".out");
+        std::size_t operations = 0, collections = 0;
+        NativeCoreUsage usage{};
+        std::vector<NativeWord> dictionary;
+        for (std::size_t split = 0; split <= source.size(); ++split) {
+            NativeSession session;
+            std::ostringstream output;
+            auto result = session.feed(std::string_view(source).substr(0, split), false, output);
+            require(result.state == NativeSessionResult::State::input_required,
+                    "supported prefix remains resumable at every byte, including UTF-8 splits");
+            const auto before = output.str();
+            const auto used = session.runtime().allocator().core_usage().used;
+            for (unsigned repeat = 0; repeat < 3; ++repeat) session.feed({}, false, output);
+            require(output.str() == before && session.runtime().allocator().core_usage().used == used,
+                    "repeated suspension cannot replay output, interning or allocation");
+            result = session.feed(std::string_view(source).substr(split), true, output);
+            require(result.state == NativeSessionResult::State::finished && result.error.empty(),
+                    "split input reaches explicit EOF");
+            require(output.str() == expected, std::string(fixture) + " output is invariant across every split");
+            if (split == 0) {
+                operations = result.operations;
+                usage = session.runtime().allocator().core_usage();
+                collections = session.runtime().collection_count();
+                dictionary = session.runtime().dictionary().words();
+            } else {
+                require(result.operations == operations && session.runtime().allocator().core_usage().used == usage.used
+                            && session.runtime().collection_count() == collections,
+                        "split input preserves operation counts and storage scheduling");
+                const auto &words = session.runtime().dictionary().words();
+                require(words.size() == dictionary.size(), "suspension does not re-intern words");
+                for (std::size_t i = 0; i < words.size(); ++i)
+                    require(words[i].handle == dictionary[i].handle && words[i].properties == dictionary[i].properties
+                                && words[i].binding.kind == dictionary[i].binding.kind
+                                && words[i].binding.number == dictionary[i].binding.number,
+                            "split input preserves dictionary identity and mutations");
+            }
+        }
+        // Canonicalize dynamic word identities by packed name, comparing
+        // values and classification against the independent instruction path.
+        auto oracle = std::make_unique<Machine>();
+        std::ifstream oracle_image(std::string(root) + "/build/poplan.bin", std::ios::binary);
+        oracle->load_image(oracle_image);
+        oracle->set_translated_routines_enabled(false);
+        std::istringstream input(source);
+        std::ostringstream reference_output;
+        require(run_image_shell(*oracle, input, reference_output) == 0, "raw binding fixture finishes");
+        for (const auto &word : dictionary) {
+            if (word.handle < 02740) continue;
+            oracle->reg(015) = 077700;
+            oracle->reg(017) = 066100;
+            oracle->accumulator() = word.packed_name;
+            oracle->start(01107);
+            unsigned steps = 0;
+            while ((oracle->program_counter() != 077700 || oracle->right_half()) && steps++ < 10000)
+                oracle->step();
+            require(steps < 10000, "raw lookup returns at binding checkpoint");
+            const auto address = oracle->accumulator().address();
+            require(oracle->memory(address) == word.packed_name
+                        && (oracle->memory(address + 2).raw() & ~std::uint64_t{077777})
+                            == (word.properties.raw() & ~std::uint64_t{077777}),
+                    "native declaration and implicit declaration classification match raw records: name "
+                        + std::to_string(word.packed_name.raw()) + " raw "
+                        + std::to_string(oracle->memory(address + 2).raw()) + " native "
+                        + std::to_string(word.properties.raw()));
+            require(oracle->memory(address + 3) == (word.binding.kind == NativeValue::Kind::unbound
+                        ? Word48(06500000000000000ULL) : word.binding.number),
+                    "native binding mutations and recovery preserve raw value bits");
+        }
+        std::cout << fixture << ": " << operations << " native operations\n";
+    }
+    NativeSession live;
+    std::ostringstream output;
+    auto result = live.feed("VARS X; 1->X; X+1->X; X=>\n", false, output);
+    require(result.state == NativeSessionResult::State::input_required && output.str() == "** 2\n",
+            "completed statements execute before EOF");
+    result = live.feed("X+1->X", true, output);
+    const auto x = live.runtime().dictionary().lookup(Word48("X"));
+    require(result.state == NativeSessionResult::State::finished
+                && live.runtime().dictionary().word(x).binding.number == Word48(06400000000000002ULL),
+            "EOF does not execute an unterminated assignment");
+    NativeSession partial;
+    std::ostringstream partial_output;
+    result = partial.feed("2+2=>\nFUNCTION F;", true, partial_output);
+    require(result.state == NativeSessionResult::State::unsupported && partial_output.str() == "** 4\n",
+            "unsupported facilities fail explicitly after preserving earlier statement effects");
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -1158,6 +1271,7 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 3 && std::string(argv[1]) == "--native-reader") { test_native_reader(argv[2]); return 0; }
     if (argc == 3 && std::string(argv[2]) == "--native-accounting") { test_native_accounting(argv[1]); return 0; }
     if (argc == 3 && std::string(argv[2]) == "--native-storage") { test_native_storage(argv[1]); return 0; }
     if (argc == 2 && std::string(argv[1]) == "--disk-host") { test_disk_mounts(); return 0; }

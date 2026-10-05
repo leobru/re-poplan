@@ -1,8 +1,8 @@
 # Image-independent native runtime: development status
 
 The requested fully native runtime is **not complete**. No implementation gate
-has passed in full. `--native` currently exposes an arithmetic development probe,
-not a usable POPLAN replacement. Keep the machine backend as the default.
+has passed in full. `--native` now supports an incremental reader, numeric expressions, bindings
+and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
 
 ## Contract
 
@@ -28,19 +28,19 @@ local to each operation. There is no native architectural register bank.
 | --- | --- | --- |
 | 1: resident inventory | [184 descriptor audit](native-resident-inventory.md), generated from `keyword_descriptors` in `src/poplan.cpp` | Bootstrap names checked against image; callable bindings all unbound |
 | 1: syntax and compiler | `03544`, `03736`, `04001`, `04214`, `04536`, `04665`; canonical descriptions in `subroutines-from-trace.md` | Full branch, syntax-handler and lowering inventory still required |
-| 1: emission sites | `05007`, `05052..05157`, especially `05124`; generated rebinding `11726..11731`, binding `11755..11757` | Need enumerate callers and establish each emitted operation's POP meaning; do not decode completed words |
+| 1: emission sites | `05007`, `05052..05157`, especially `05124`; ordinary call binding `03206..03234` and restoration `03235..03260` | Need enumerate callers and establish each emitted operation's POP meaning; do not decode completed words |
 | 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Reference/pair collection, retry, compiler storage and activation cost primitives implemented; full session scheduling remains open |
 | 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Runtime owns numbers, dictionary and reference/pair payloads with stable handles and explicit roots; other compound payloads remain open |
-| 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Function bindings, aliases, reader conversion and mutable syntax remain open |
+| 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Reader conversion and executable variable bindings implemented; function bindings and mutable syntax remain open |
 | 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; full numeric/scanner/function coverage remains open |
 | 2: real literal reader | `native_parse_real_literal` validates decimal-point / `$` syntax evidenced at `16672..16735`, parses IEEE binary64, then truncates to BESM encoding | Exact encoding, boundary, malformed-input and locale tests; deliberate conversion policy described below |
 | 2: formatting | Shares existing `format_prreal`, preserving existing formatting limitations | Historical probe comparison; complete numeric printing conformance not established |
-| 2: services | Input/output injected as streams | Resumable input, clocks, packed names/characters and console callbacks not ported |
-| 3: development probe | `native_compile_probe` lowers numeric expressions with resident arithmetic priorities and parentheses to constant/binary/print operations | Expression fixture matches three reference modes; binding, general unary operators and general POP syntax remain unsupported |
-| 3: recovery | Unsupported input returns explicit development failure, with no machine fallback | POP diagnostics and SETPOP recovery not implemented; host failures are not presented as compatible POP diagnostics |
+| 2: services | Input/output injected as streams | Resumable console input and packed-name conversion implemented; clocks and console callbacks remain open |
+| 3: reader/compiler | `NativeReader` and `NativeSession` incrementally lower literals, bindings, assignments, arithmetic and printing | [Reader evidence](native-reader.md), split-input checks, raw binding checkpoints and historical fixtures; general POP syntax remains open |
+| 3: recovery | Supported syntax/type diagnostics and explicit SETPOP transfer preserve bindings and token history | Historical recovery fixture; full diagnostic suppression and nested callbacks remain open |
 | 4: frames/control | Not implemented | Functions, branches, loops, recursion, closures, dynamic binding, triangular thresholds and Man-or-Boy required |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
-| 6: host scope | Not implemented beyond development output | Resident primitives, POPLIB, POPMESS, clocks, EOF/suspension, callbacks and MI/MO quirks required |
+| 6: host scope | Not implemented beyond development output | Resident primitives, POPLIB, POPMESS, clocks, callbacks and MI/MO quirks required |
 | 7: completeness | Not passed | Quine, recovered zones, language/standard fixtures, fixed-seed game and expansion probes must pass natively, with inventory coverage |
 
 ## Development interface
@@ -49,19 +49,13 @@ local to each operation. There is no native architectural register bank.
 printf '2+2=>\n' | build/cpp/poplan --native
 ```
 
-Accepted probe syntax is repeated numeric expressions followed by `=>`, with
-unsigned decimal integer tokens (zero included), real literals described below,
-`+ - * /`, and parentheses. Multiplication/division bind more tightly than
-addition/subtraction; operators at equal priority associate to the left.
-Whitespace between tokens is allowed. General unary operators remain absent;
-signed real literals are accepted at the beginning of an expression or inside
-parentheses, so use `1+(-.5)=>` rather than `1+ -.5=>`.
-The entire probe is validated before execution; unsupported source produces a
-nonzero exit and no partial execution. This is a deliberately restricted test
-lowering, not a replacement grammar inferred from the POP-2 manual. Compiler graph storage is charged using the recovered costs in
-[native-accounting.md](native-accounting.md); full session accounting still needs
-the historical reader and call paths. Input is currently collected until EOF;
-interactive suspension is not supported.
+The native shell accepts numeric expressions, `VARS`, variable reads, `->`,
+commas, parentheses, `;`, `=>`, and the small calls `ERASE()` and `SETPOP()`.
+It uses incremental token/compiler state and executes completed statements before
+EOF. Supported errors recover to the next input line; unsupported facilities fail
+explicitly while preserving earlier effects. See [native-reader.md](native-reader.md)
+for exact scope, historical quirks, source evidence and allocation limitations.
+`native_compile_probe` remains a restricted internal test API.
 
 `--native` is mutually exclusive with `--image` and `--io-demo`, and rejects the
 machine-only environment controls even if they are present with empty values.
@@ -78,17 +72,16 @@ The guard covers generated instruction execution because it also goes through
 
 ## Required next work
 
-Finish gate 1 before extending the probe into a language compiler: map every
-syntax handler and emission caller to its POP operation, allocator cost and
-recovery behavior. Establish the compatibility allocator before claiming any
-recursive or compiled-program conformance. The closure failure and recursive
+Continue with named functions and conditionals in step 3 of `PLAN.md`. In
+parallel, complete the syntax/emission inventory and historical reader allocation
+scheduling before claiming full compiled-session or exhaustion conformance. The closure failure and recursive
 threshold evidence in [original-structure.md](original-structure.md) is binding;
 passing small arithmetic expressions does not establish those behaviors.
 
 Primitive comparisons canonicalize logical inputs and compare exact result bits
 and failure/success with instruction-only execution. Storage differentials also
-compare allocation events and compound sharing/cycles. Language diagnostics and
-recovery remain unimplemented. Shared arithmetic
+compare allocation events and compound sharing/cycles. Supported language diagnostics and top-level recovery now have historical fixtures;
+full diagnostic/callback behavior remains open. Shared arithmetic
 also means historical end-to-end comparison remains necessary as a separate
 oracle. A full implementation still needs semantic checkpoints and the entire
 acceptance corpus under all backends.
@@ -333,3 +326,21 @@ Logs: `artifacts/native-accounting/{focused,ctest,smoke,corpus,sanitize-test}.lo
 historical outputs and normalized comparisons are in the same directory.
 The validation worktree includes the pre-existing, separately uncommitted
 machine shadow-arithmetic edits; this milestone does not modify them.
+
+
+## Reader and bindings milestone (2026-10-05)
+
+See [native-reader.md](native-reader.md) for the step 2 implementation and its
+scoped acceptance evidence. Historical full-runtime gates above remain open.
+This milestone adds no machine dispatch entries and changes no saved historical
+profile counts. A signed 41-bit correction in the shared integer formatter is
+included; unrelated pre-existing machine shadow-state edits are preserved.
+
+
+Milestone verification passed: 19 normal CTests (68.79 seconds), 19 ASan/UBSan
+CTests (330.74 seconds, leak detection disabled), `make test`, `make cpp-quine`,
+`make cpp-zone1224`, historical trivial/zone1224 comparisons, both native fixtures
+through the image-independent isolation guard, and `git diff --check`.
+Logs are in `artifacts/native-reader/`. Verification ran with the pre-existing
+uncommitted machine shadow-state edits present; those edits are excluded from
+this milestone commit.

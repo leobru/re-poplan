@@ -483,3 +483,14 @@ retained argument area is n words: four restore pops follow three saved words,
 removing the extra reservation. Source/cost formulas and test scope are in
 `docs/native-accounting.md`. These are new primitive measurements, not revisions
 to saved corpus counts or new hybrid semantic entries.
+
+
+### Native reader and binding milestone (2026-10-05)
+
+The opt-in native shell now has incremental reader/compiler state, variable
+bindings, statement execution and top-level recovery. Source boundaries and
+historical/raw comparisons are recorded in [docs/native-reader.md](docs/native-reader.md).
+Character tables are bootstrap data, and operation provenance is not execution
+PC dispatch. No generated BESM instructions or machine fallback enter this path.
+No new hybrid dispatch entry is introduced, and earlier profile counts remain
+unchanged. Whole-session allocation and recursion conformance remain open.

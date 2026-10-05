@@ -97,6 +97,7 @@ public:
     const std::vector<NativeWord> &words() const { return words_; }
     const std::array<std::uint32_t, 0400> &heads() const { return heads_; }
     void bind(std::uint32_t handle, NativeValue value);
+    void declare(std::uint32_t handle, bool explicit_declaration = true);
 private:
     static std::uint8_t hash(Word48 name);
     NativeWord &mutable_word(std::uint32_t handle);
@@ -146,7 +147,7 @@ NativeNumberResult native_number_binary(NativeBinary, Word48, Word48);
 std::string native_format_number(Word48);
 
 struct NativeOperation {
-    enum class Kind { constant, binary, print };
+    enum class Kind { constant, binary, print, load, store, unary, erase, setpop };
     Kind kind;
     Word48 constant;
     NativeBinary binary = NativeBinary::add;
@@ -156,6 +157,7 @@ struct NativeOperation {
     // contribution to the final code extent, not a separate allocation request.
     std::uint16_t emission_site = 0;
     std::optional<std::uint16_t> legacy_words = std::nullopt;
+    std::uint32_t binding = 0;
 };
 
 struct NativeProgram {
@@ -190,6 +192,9 @@ struct NativeExecutionResult {
     std::size_t operations = 0;
     std::string error;
     bool storage_accounting_complete = false;
+    std::uint16_t diagnostic = 0;
+    NativeValue culprit;
+    bool setpop = false;
     // Full session accounting additionally needs the historical reader and
     // language call/recovery paths; code storage alone does not establish it.
     bool legacy_accounting_complete = false;
@@ -219,11 +224,13 @@ public:
     NativeInternResult intern(Word48 name);
     NativeAllocation intern_literal(Word48 value);
     void bind(std::uint32_t word, NativeValue value);
+    void declare(std::uint32_t word, bool explicit_declaration = true) { dictionary_.declare(word, explicit_declaration); }
     NativeObjectAllocation make_reference(NativeValue value = {});
     NativeObjectAllocation make_pair(NativeValue first = {}, NativeValue second = {});
     const NativeObject &object(NativeValue value) const;
     void store(NativeValue object, std::size_t field, NativeValue value);
     std::vector<NativeValue> &values() { return values_; }
+    void reset_stack() { values_.clear(); below_empty_ = false; }
     std::vector<std::vector<NativeValue>> &frame_roots() { return frame_roots_; }
     std::size_t retain_program(NativeProgram program);
     NativeCompilationResult compile_storage(NativeCompilation compilation);
@@ -249,6 +256,11 @@ private:
     std::map<std::uint32_t, NativeObject> objects_;
     std::uint32_t next_handle_ = 0100000;
     std::vector<NativeValue> values_;
+    // The reference's initially zero cell immediately below the empty POP
+    // stack can be consumed by a missing operand. Further underflow reaches
+    // non-stack storage and is explicitly outside native support.
+    NativeValue empty_stack_cell_{NativeValue::Kind::number, Word48(), 0};
+    bool below_empty_ = false;
     std::vector<std::vector<NativeValue>> frame_roots_;
     struct ProgramRecord {
         NativeProgram program;
@@ -268,6 +280,60 @@ private:
     std::vector<AccountingFrame> accounting_frames_;
     std::uint32_t activation_words_ = 0, activation_peak_ = 0;
     NativeAllocation allocate_storage(std::uint32_t words);
+};
+// A reader owns incomplete UTF-8 and token spelling across input suspension.
+// No dictionary or execution side effects occur until a token is delivered.
+struct NativeToken {
+    enum class Kind { word, number, delimiter, newline, end, need_input, unsupported };
+    Kind kind = Kind::need_input;
+    std::string spelling; // external character codes, not UTF-8
+    Word48 packed;
+    std::size_t line = 1;
+    std::size_t column = 0, end_column = 0;
+};
+class NativeReader {
+public:
+    void feed(std::string_view utf8, bool eof = false);
+    NativeToken next();
+    void discard_line();
+private:
+    std::string utf8_, input_, spelling_;
+    std::size_t cursor_ = 0, line_ = 1, column_ = 0, start_column_ = 0;
+    enum class Mode { idle, word, operators, number };
+    Mode mode_ = Mode::idle;
+    bool eof_ = false, discarding_ = false;
+};
+struct NativeSessionResult {
+    enum class State { input_required, finished, unsupported };
+    State state = State::input_required;
+    std::size_t operations = 0, recoveries = 0;
+    std::string error;
+};
+class NativeSession {
+public:
+    NativeSessionResult feed(std::string_view input, bool eof, std::ostream &output);
+    NativeRuntime &runtime() { return runtime_; }
+private:
+    NativeRuntime runtime_;
+    NativeReader reader_;
+    std::vector<NativeToken> history_;
+    NativeProgram program_;
+    struct Pending { bool group; bool unary; NativeBinary binary; unsigned priority; };
+    std::vector<Pending> pending_;
+    bool operand_ = true, start_ = true, assignment_ = false, assigned_ = false, declaration_ = false;
+    std::size_t token_count_ = 0;
+    std::optional<NativeOperation::Kind> call_;
+    bool call_open_ = false;
+    std::uint16_t deferred_diagnostic_ = 0;
+    std::vector<std::string> lines_{std::string{}};
+    NativeSessionResult result_;
+    bool comment_ = false;
+    std::size_t output_line_ = 0;
+    void accept_token(const NativeToken &, std::ostream &output);
+    void finish_statement(const NativeToken &, std::ostream &output);
+    void reset_compiler();
+    void recover(std::ostream &output, std::uint16_t code,
+                 const NativeToken &token, std::optional<NativeValue> culprit = {});
 };
 NativeExecutionResult native_execute(const NativeProgram &, std::ostream &);
 int run_native_shell(std::istream &, std::ostream &, std::ostream &);

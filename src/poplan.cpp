@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <limits>
 #include <istream>
+#include <sstream>
+#include <iomanip>
 #include <iterator>
 #include <ostream>
 #include <stdexcept>
@@ -1120,6 +1122,14 @@ void NativeDictionary::bind(std::uint32_t handle, NativeValue value)
     mutable_word(handle).binding = value;
 }
 
+void NativeDictionary::declare(std::uint32_t handle, bool explicit_declaration)
+{
+    auto &record = mutable_word(handle);
+    // 17536..17542 preserves collision links and installs the top-level
+    // variable flag (17551), rather than the protected resident-function flag.
+    record.properties = Word48((explicit_declaration ? 00100000000000000ULL : 0) | record.properties.address());
+}
+
 NativeEmissionCost native_emission_cost(NativeEmission emission)
 {
     // 05052..05076 selects one output word per operation, except the label
@@ -1450,7 +1460,14 @@ std::size_t NativeRuntime::retain_program(NativeProgram program)
             switch (operation.kind) {
             case NativeOperation::Kind::constant:
                 compilation.emissions.push_back(NativeEmission::literal); break;
+            case NativeOperation::Kind::load:
+                // 03564..03570 emits 05053 with the binding cell as source.
+                compilation.emissions.push_back(NativeEmission::literal); break;
+            case NativeOperation::Kind::store:
+                compilation.emissions.push_back(NativeEmission::store_binding); break;
             case NativeOperation::Kind::binary: case NativeOperation::Kind::print:
+            case NativeOperation::Kind::unary: case NativeOperation::Kind::erase:
+            case NativeOperation::Kind::setpop:
                 compilation.emissions.push_back(NativeEmission::call_binding); break;
             default: throw std::logic_error("native program: unknown operation kind");
             }
@@ -1479,6 +1496,7 @@ void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
 {
     std::vector<NativeValue> pending = temporary_roots;
     pending.insert(pending.end(), values_.begin(), values_.end());
+    pending.push_back(empty_stack_cell_);
     std::vector<std::uint16_t> marked = reservations_;
     for (const auto &[bits, block] : literals_)
         if (block.words) marked.push_back(block.address);
@@ -1765,56 +1783,487 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
     result.storage_accounting_complete = programs_[program_index]->storage.has_value()
         || program.operations.empty();
     auto &values = values_;
-    // The linear probe has one explicit operation cursor. General activation
-    // frames and legacy code/activation accounting remain separate open gates.
+    const auto pop = [&]() {
+        if (!values.empty()) { const auto value = values.back(); values.pop_back(); return value; }
+        if (below_empty_) {
+            result.error = "native stack underflow beyond the empty-stack cell is not implemented";
+            return NativeValue{};
+        }
+        below_empty_ = true;
+        return empty_stack_cell_;
+    };
+    const auto push = [&](NativeValue value) {
+        if (below_empty_) { empty_stack_cell_ = value; below_empty_ = false; }
+        else values.push_back(value);
+    };
+    // Explicit operation cursor; no BESM execution and no host call recursion.
     for (std::size_t operation = 0; operation < program.operations.size(); ++operation) {
         const auto &instruction = program.operations[operation];
         ++result.operations;
         switch (instruction.kind) {
         case NativeOperation::Kind::constant:
-            values.push_back({NativeValue::Kind::number, instruction.constant, 0});
+            push({NativeValue::Kind::number, instruction.constant, 0});
             break;
+        case NativeOperation::Kind::load:
+            push(dictionary_.word(instruction.binding).binding);
+            break;
+        case NativeOperation::Kind::store: {
+            const auto value = pop();
+            if (!result.error.empty()) return result;
+            bind(instruction.binding, value);
+            break;
+        }
+        case NativeOperation::Kind::erase:
+            pop();
+            if (!result.error.empty()) return result;
+            break;
+        case NativeOperation::Kind::setpop:
+            result.setpop = true;
+            return result;
+        case NativeOperation::Kind::unary:
         case NativeOperation::Kind::binary: {
-            if (values.size() < 2) {
-                result.error = "invalid native graph: binary stack underflow";
+            const auto right_value = pop();
+            const auto left_value = instruction.kind == NativeOperation::Kind::unary
+                ? NativeValue{NativeValue::Kind::number, Word48(06400000000000000ULL), 0} : pop();
+            if (!result.error.empty()) return result;
+            if (right_value.kind != NativeValue::Kind::number || left_value.kind != NativeValue::Kind::number) {
+                result.diagnostic = instruction.binary == NativeBinary::add ? 010000
+                    : instruction.binary == NativeBinary::subtract ? 010001
+                    : instruction.binary == NativeBinary::multiply ? 010002 : 010003;
+                result.culprit = right_value.kind != NativeValue::Kind::number ? right_value : left_value;
                 return result;
             }
-            if (values.back().kind != NativeValue::Kind::number
-                || values[values.size() - 2].kind != NativeValue::Kind::number) {
-                result.error = "native numeric operation requires numbers";
-                return result;
-            }
-            const Word48 right = values.back().number;
-            values.pop_back();
-            const auto number = native_number_binary(instruction.binary, values.back().number, right);
+            const auto number = native_number_binary(instruction.binary, left_value.number, right_value.number);
             if (!number.error.empty()) {
-                result.error = number.error;
+                if (instruction.binary == NativeBinary::divide && (right_value.number.raw() & ((std::uint64_t{1} << 41) - 1)) == 0) {
+                    result.diagnostic = 013016;
+                    result.culprit = {NativeValue::Kind::number,
+                        native_number_binary(NativeBinary::divide, left_value.number,
+                                             Word48(06400000000000001ULL)).value, 0};
+                } else result.error = number.error;
                 return result;
             }
-            values.back().number = number.value;
+            push({NativeValue::Kind::number, number.value, 0});
             break;
         }
         case NativeOperation::Kind::print:
-            if (values.empty()) {
-                result.error = "invalid native graph: print stack underflow";
-                return result;
-            }
             if (std::any_of(values.begin(), values.end(), [](NativeValue value) {
-                    return value.kind != NativeValue::Kind::number; })) {
+                    return value.kind != NativeValue::Kind::number && value.kind != NativeValue::Kind::unbound; })) {
                 result.error = "native printing of nonnumeric values is not implemented";
                 return result;
             }
             output << "**";
-            for (const auto value : values) {
-                const auto text = native_format_number(value.number);
-                output << text;
+            for (std::size_t index = 0; index < values.size(); ++index) {
+                if (index) output << ',';
+                const auto value = values[index];
+                output << (value.kind == NativeValue::Kind::unbound
+                    ? "НЕОПРЕДЕЛЕН" : native_format_number(value.number));
             }
             output << '\n';
-            values.clear();
+            reset_stack();
             break;
         }
     }
     return result;
+}
+
+namespace {
+
+unsigned reader_class(unsigned char byte)
+{
+    // Six-bit fields at 16437..16456, used by 16421/16351. Keep the
+    // external Cyrillic alphabet (including its ASCII-looking punctuation).
+    static constexpr unsigned char classes[128] = {
+        13,13,13,13,13,13,13,13, 13,13,12,13,13,13,13,13,
+        13,13,13,13,13,13,13,13, 1,13,13,13,13,13,13,13,
+        0,3,4,13,10,6,3,8, 5,4,3,3,4,3,7,3,
+        2,2,2,2,2,2,2,2, 2,2,3,4,3,3,3,32,
+        13,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,5,13,4,11,9,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,13
+    };
+    return byte < 128 ? classes[byte] : 13;
+}
+
+Word48 packed_reader_name(std::string_view text)
+{
+    std::uint64_t packed = 0;
+    for (std::size_t index = 0; index < 6; ++index)
+        packed = (packed << 8) | (index < text.size() ? static_cast<unsigned char>(text[index]) : 0);
+    return Word48(packed);
+}
+
+std::string external_source(std::string_view utf8)
+{
+    std::string result;
+    for (auto byte : encode_gost_text(utf8)) result += static_cast<char>(native_external_character(byte));
+    return result;
+}
+
+NativeNumberResult reader_number(std::string_view spelling)
+{
+    if (spelling.find('.') != std::string_view::npos) return native_parse_real_literal(spelling);
+    // 16651..16661 accepts twelve decimal digits. These fit in the positive
+    // part of the signed 41-bit mantissa; the exponent is the integer tag.
+    if (spelling.size() > 12) return {{}, "native integer literal exceeds twelve digits"};
+    std::uint64_t value = 0;
+    constexpr auto maximum = (std::uint64_t{1} << 40) - 1;
+    for (char c : spelling) {
+        if (c < '0' || c > '9' || value > (maximum - (c - '0')) / 10)
+            return {{}, "native integer literal range is not implemented"};
+        value = value * 10 + (c - '0');
+    }
+    return {Word48(06400000000000000ULL | value), {}};
+}
+
+} // namespace
+
+void NativeReader::feed(std::string_view text, bool eof)
+{
+    if (eof_) throw std::logic_error("native reader: input after EOF");
+    if (cursor_) { input_.erase(0, cursor_); cursor_ = 0; }
+    utf8_.append(text);
+    std::size_t used = 0;
+    while (used < utf8_.size()) {
+        const auto lead = static_cast<unsigned char>(utf8_[used]);
+        const std::size_t length = lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
+        if (used + length > utf8_.size() && !eof) break;
+        const auto available = std::min(length, utf8_.size() - used);
+        if (lead == '\n') input_ += '\n';
+        else if (lead == '\t') input_ += ' ';
+        else if (lead != '\r') input_ += external_source(std::string_view(utf8_).substr(used, available));
+        used += available;
+    }
+    utf8_.erase(0, used);
+    eof_ = eof;
+}
+
+NativeToken NativeReader::next()
+{
+    const auto complete = [&](NativeToken::Kind kind) {
+        NativeToken token{kind, spelling_, packed_reader_name(spelling_), line_, start_column_, column_};
+        spelling_.clear();
+        mode_ = Mode::idle;
+        return token;
+    };
+    for (;;) {
+        if (cursor_ == input_.size()) {
+            if (!eof_) return {};
+            if (mode_ != Mode::idle)
+                return complete(mode_ == Mode::number ? NativeToken::Kind::number : NativeToken::Kind::word);
+            return {NativeToken::Kind::end, {}, {}, line_, column_, column_};
+        }
+        const char c = input_[cursor_];
+        const auto cls = reader_class(static_cast<unsigned char>(c));
+        if (discarding_) {
+            ++cursor_;
+            if (c == '\n') { ++line_; column_ = 0; discarding_ = false; }
+            else ++column_;
+            continue;
+        }
+        if (mode_ != Mode::idle) {
+            bool more = mode_ == Mode::word ? cls == 1 || cls == 2
+                : mode_ == Mode::operators ? cls == 3 : cls == 2;
+            if (mode_ == Mode::number) {
+                more = more || (c == '.' && spelling_.find('.') == std::string::npos)
+                    || (c == '$' && spelling_.find('.') != std::string::npos && spelling_.find('$') == std::string::npos)
+                    || ((c == '+' || c == '-') && !spelling_.empty() && spelling_.back() == '$');
+            }
+            if (!more)
+                return complete(mode_ == Mode::number ? NativeToken::Kind::number : NativeToken::Kind::word);
+        } else {
+            if (c == '\n') {
+                ++cursor_;
+                const auto old_line = line_++;
+                column_ = 0;
+                return {NativeToken::Kind::newline, {}, {}, old_line, 0, 0};
+            }
+            if (cls == 0) { ++cursor_; ++column_; continue; }
+            start_column_ = column_;
+            if (cls == 1) mode_ = Mode::word;
+            else if (cls == 3) mode_ = Mode::operators;
+            else if (cls == 2 || c == '.') mode_ = Mode::number;
+            else {
+                spelling_ = c;
+                ++cursor_; ++column_;
+                return complete(c == '(' || c == ')' || c == ',' || c == ';'
+                    ? NativeToken::Kind::delimiter : NativeToken::Kind::unsupported);
+            }
+        }
+        spelling_ += c;
+        ++cursor_; ++column_;
+        if (mode_ == Mode::number && spelling_.size() == 13
+            && spelling_.find_first_not_of("0123456789") == std::string::npos)
+            return complete(NativeToken::Kind::number);
+    }
+}
+
+void NativeReader::discard_line()
+{
+    mode_ = Mode::idle;
+    spelling_.clear();
+    discarding_ = true;
+}
+
+void NativeSession::recover(std::ostream &output, std::uint16_t code,
+                            const NativeToken &token, std::optional<NativeValue> culprit)
+{
+    if (output_line_ == token.line) output << '\n';
+    if (code) {
+        std::ostringstream heading;
+        heading << "****ОШИБКА " << std::oct << std::setfill('0') << std::setw(5) << code << '\n';
+        output << heading.str();
+        if (const auto *message = find_error_message(code)) output << message->text << '\n';
+        if (culprit) {
+            const auto bits = culprit->kind == NativeValue::Kind::unbound
+                ? Word48(06500000000000000ULL) : culprit->number;
+            std::ostringstream raw;
+            raw << std::oct << std::setfill('0') << std::setw(16) << bits.raw();
+            output << raw.str() << ' ' << (culprit->kind == NativeValue::Kind::unbound
+                ? "НЕОПРЕДЕЛЕН" : native_format_number(bits)) << '\n';
+        } else {
+            // 16750 is the resident source-context object, not an execution PC.
+            output << "7200000000016750 [’"
+                   << native_external_display(external_source(lines_.at(token.line - 1)).substr(0, token.end_column))
+                   << "’ [";
+            if (history_.size() < 8) output << std::string(8 - history_.size(), ' ') << ".00000000";
+            bool first = history_.size() == 8;
+            for (const auto &item : history_) {
+                if (!first) output << ' ';
+                first = false;
+                if (item.kind == NativeToken::Kind::number) {
+                    const auto number = reader_number(item.spelling);
+                    output << (number.error.empty() ? native_format_number(number.value) : item.spelling);
+                } else output << native_external_display(item.spelling.substr(0, 6));
+            }
+            output << "]]\n";
+        }
+        output << '\n';
+    }
+    output << "SЕТРОР\n";
+    output_line_ = token.line;
+    runtime_.reset_stack();
+    runtime_.unwind_frames(0);
+    reader_.discard_line();
+    reset_compiler();
+    ++result_.recoveries;
+}
+
+void NativeSession::reset_compiler()
+{
+    program_ = {};
+    pending_.clear();
+    operand_ = start_ = true;
+    assignment_ = assigned_ = declaration_ = false;
+    token_count_ = 0;
+    call_.reset();
+    call_open_ = false;
+    deferred_diagnostic_ = 0;
+}
+
+void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
+{
+    ++token_count_;
+    const auto emit = [&](NativeOperation::Kind kind, Word48 value = {}, NativeBinary binary = NativeBinary::add,
+                          std::uint32_t binding = 0) {
+        NativeOperation operation{kind, value, binary};
+        const auto emission = kind == NativeOperation::Kind::constant ? NativeEmission::literal
+            : kind == NativeOperation::Kind::load ? NativeEmission::literal
+            : kind == NativeOperation::Kind::store ? NativeEmission::store_binding : NativeEmission::call_binding;
+        const auto cost = native_emission_cost(emission);
+        operation.emission_site = cost.site;
+        operation.legacy_words = cost.code_words;
+        operation.binding = binding;
+        operation.provenance = kind == NativeOperation::Kind::constant ? 016651
+            : kind == NativeOperation::Kind::load ? 03301
+            : kind == NativeOperation::Kind::store ? 03303
+            : kind == NativeOperation::Kind::print ? 013454
+            : kind == NativeOperation::Kind::erase ? 03277
+            : kind == NativeOperation::Kind::setpop ? 013362
+            : kind == NativeOperation::Kind::unary ? (binary == NativeBinary::subtract ? 04437 : 04520)
+            : binary == NativeBinary::add ? 06672 : binary == NativeBinary::subtract ? 06702
+            : binary == NativeBinary::multiply ? 06676 : 06706;
+        program_.operations.push_back(operation);
+    };
+    const auto drain = [&] {
+        const auto op = pending_.back(); pending_.pop_back();
+        emit(op.unary ? NativeOperation::Kind::unary : NativeOperation::Kind::binary, {}, op.binary);
+    };
+    const auto unsupported = [&](const std::string &reason) {
+        result_.state = NativeSessionResult::State::unsupported;
+        result_.error = "native compiler incomplete: " + reason;
+    };
+    const auto warning = [&](std::string_view label, const NativeToken &token) {
+        if (output_line_ == token.line) output << '\n';
+        output << label << native_external_display(token.spelling.substr(0, 6)) << '\n';
+        output_line_ = token.line;
+    };
+    if (token.kind == NativeToken::Kind::number && token.spelling.find_first_not_of("0123456789") > 12
+        && token.spelling.size() > 12) {
+        // 16661 diagnoses before returning a reader item; the offending
+        // thirteenth digit is visible in source context, but not token history.
+        auto offending = token;
+        offending.end_column = token.column + 13;
+        recover(output, 00273, offending);
+        return;
+    }
+    history_.push_back(token);
+    if (history_.size() > 8) history_.erase(history_.begin());
+    const std::string text = token.spelling.substr(0, 6);
+    if (deferred_diagnostic_) { recover(output, deferred_diagnostic_, token); return; }
+    if (token.kind == NativeToken::Kind::unsupported) { unsupported("reader facility " + text); return; }
+    if (call_) {
+        if (!call_open_ && text == "(") { call_open_ = true; return; }
+        if (call_open_ && text == ")") {
+            emit(*call_); call_.reset(); operand_ = false; start_ = false; return;
+        }
+        unsupported("only zero-argument ERASE() and SETPOP() calls are implemented"); return;
+    }
+    if (token_count_ == 1 && text == "VARS") { declaration_ = true; return; }
+    if (declaration_ && text == ";") { finish_statement(token, output); return; }
+    if (declaration_ && text == "=>") declaration_ = false;
+    if (declaration_) {
+        if (token.kind != NativeToken::Kind::word) { recover(output, 02022, token); return; }
+        const auto found = runtime_.intern(token.packed);
+        if (!found.handle) { unsupported("dictionary storage exhausted"); return; }
+        const auto &word = runtime_.dictionary().word(found.handle);
+        const auto property = word.properties.raw() >> 41;
+        if (found.handle < 02740) { recover(output, property == 104 ? 02023 : 02025, token); return; }
+        if (word.properties.raw() & 00100000000000000ULL) warning("****ПОВТ.ДЕКЛ. ", token);
+        runtime_.declare(found.handle);
+        return;
+    }
+    if (text == ";" || text == "=>") {
+        if (assignment_) { recover(output, 04060, token); return; }
+        while (!pending_.empty() && !pending_.back().group) drain();
+        if (!pending_.empty()) { recover(output, 04710, token); return; }
+        if (text == "=>") emit(NativeOperation::Kind::print);
+        finish_statement(token, output);
+        return;
+    }
+    if (text == "->") {
+        if (assignment_) { recover(output, 04060, token); return; }
+        while (!pending_.empty() && !pending_.back().group) drain();
+        assignment_ = true; assigned_ = false;
+        return;
+    }
+    if (assigned_) { recover(output, 04700, token); return; }
+    if (text == ",") {
+        if (assignment_) { recover(output, 04060, token); return; }
+        while (!pending_.empty() && !pending_.back().group) drain();
+        operand_ = true; start_ = true;
+        return;
+    }
+    if (text == "(") {
+        if (!operand_ || assignment_) { unsupported("function application"); return; }
+        pending_.push_back({true, false, {}, 0});
+        start_ = true;
+        return;
+    }
+    if (text == ")") {
+        while (!pending_.empty() && !pending_.back().group) drain();
+        if (pending_.empty()) { recover(output, 04600, token); return; }
+        pending_.pop_back(); operand_ = false; start_ = false;
+        return;
+    }
+    if (text == "+" || text == "-" || text == "*" || text == "/") {
+        if (assignment_) { deferred_diagnostic_ = 04040; return; }
+        const bool unary = start_ && (text == "+" || text == "-");
+        const NativeBinary binary = text == "+" ? NativeBinary::add : text == "-" ? NativeBinary::subtract
+            : text == "*" ? NativeBinary::multiply : NativeBinary::divide;
+        const auto property = runtime_.dictionary().word(runtime_.dictionary().lookup(token.packed)).properties;
+        const auto priority = static_cast<unsigned>((property.raw() & 03600000000000000ULL) >> 41);
+        while (!pending_.empty() && !pending_.back().group && pending_.back().priority <= priority) drain();
+        pending_.push_back({false, unary, binary, priority});
+        operand_ = true; start_ = false;
+        return;
+    }
+    if (token.kind == NativeToken::Kind::number) {
+        if (assignment_) { recover(output, 04060, token); return; }
+        if (!operand_) { recover(output, 04010, token); return; }
+        const auto number = reader_number(token.spelling);
+        if (!number.error.empty()) { unsupported(number.error); return; }
+        emit(NativeOperation::Kind::constant, number.value);
+    } else if (token.kind == NativeToken::Kind::word) {
+        const auto found = runtime_.intern(token.packed);
+        if (!found.handle) { unsupported("dictionary storage exhausted"); return; }
+        const auto &word = runtime_.dictionary().word(found.handle);
+        if ((word.properties.raw() >> 41) == 060) {
+            warning("****НЕОПР. ИД-Р ", token);
+            runtime_.declare(found.handle, false);
+        }
+        if (found.handle < 02740 && (word.properties.raw() & 03600000000000000ULL) != 0
+            && (word.properties.raw() >> 41) < 0140) {
+            unsupported("resident operator " + text); return;
+        }
+        if (!operand_ && !assignment_) { recover(output, 04020, token); return; }
+        if (found.handle < 02740 && text != "UNDEF" && text != "FALSE" && text != "TRUE") {
+            if (text == "ERASE" || text == "SETPOP") {
+                call_ = text == "ERASE" ? NativeOperation::Kind::erase : NativeOperation::Kind::setpop;
+                call_open_ = false;
+                return;
+            } else { unsupported("resident facility " + text); return; }
+        } else if (assignment_) {
+            if (found.handle < 02740) { deferred_diagnostic_ = 04040; return; }
+            emit(NativeOperation::Kind::store, {}, {}, found.handle);
+            assignment_ = false; assigned_ = true;
+        } else if (text == "FALSE" || text == "TRUE") {
+            emit(NativeOperation::Kind::constant, Word48(06400000000000000ULL | (text == "TRUE" ? 1 : 0)));
+        } else emit(NativeOperation::Kind::load, {}, {}, found.handle);
+    } else { unsupported("reader token"); return; }
+    operand_ = false; start_ = false;
+}
+
+void NativeSession::finish_statement(const NativeToken &last, std::ostream &output)
+{
+    const auto id = runtime_.retain_program(std::move(program_));
+    std::ostringstream printed;
+    const auto executed = runtime_.execute(id, printed);
+    runtime_.release_program(id);
+    result_.operations += executed.operations;
+    if (!printed.str().empty()) {
+        if (output_line_ == last.line) output << '\n';
+        output << printed.str();
+        output_line_ = last.line;
+    }
+    if (executed.diagnostic) recover(output, executed.diagnostic, last, executed.culprit);
+    else if (executed.setpop) recover(output, 0, last);
+    else if (!executed.error.empty()) {
+        result_.state = NativeSessionResult::State::unsupported;
+        result_.error = "native compiler incomplete: " + executed.error;
+    }
+    reset_compiler();
+}
+
+NativeSessionResult NativeSession::feed(std::string_view text, bool eof, std::ostream &output)
+{
+    if (result_.state != NativeSessionResult::State::input_required) return result_;
+    for (char c : text) {
+        if (c == '\n') lines_.emplace_back();
+        else if (c != '\r') lines_.back() += c == '\t' ? ' ' : c;
+    }
+    reader_.feed(text, eof);
+    for (;;) {
+        auto token = reader_.next();
+        if (token.kind == NativeToken::Kind::need_input) return result_;
+        if (token.kind == NativeToken::Kind::end) {
+            // Console EOF suspends an unfinished compilation; it does not
+            // manufacture a semicolon or execute the accumulated operations.
+            reset_compiler();
+            result_.state = NativeSessionResult::State::finished;
+            return result_;
+        }
+        if (token.kind == NativeToken::Kind::newline) continue;
+        if (token_count_ == 0 && token.packed == Word48("COMMEN")) comment_ = true;
+        if (comment_) {
+            if (token.spelling == ";") comment_ = false;
+            continue;
+        }
+        accept_token(token, output);
+        if (result_.state == NativeSessionResult::State::unsupported) return result_;
+        output.flush();
+    }
 }
 
 NativeExecutionResult native_execute(const NativeProgram &program, std::ostream &output)
@@ -1833,13 +2282,19 @@ int run_native_shell(std::istream &input, std::ostream &output, std::ostream &er
             return 2;
         }
     }
-    const std::string source{std::istreambuf_iterator<char>(input),
-                             std::istreambuf_iterator<char>()};
+    NativeSession session;
+    NativeSessionResult result;
+    char byte;
+    while (input.get(byte)) {
+        result = session.feed(std::string_view(&byte, 1), false, output);
+        if (result.state == NativeSessionResult::State::unsupported) break;
+    }
     if (input.bad()) {
         errors << "poplan: native input read failed\n";
         return 1;
     }
-    const auto result = native_execute(native_compile_probe(source), output);
+    if (result.state != NativeSessionResult::State::unsupported)
+        result = session.feed({}, true, output);
     if (!result.error.empty()) {
         errors << "poplan: " << result.error << '\n';
         return 1;

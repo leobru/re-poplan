@@ -1,0 +1,21 @@
+VARS X;
+19->X;
+X+UNDEF=> 999=>
+X=>
+1 2=> 999=>
+X=>
+2+-3=> 999=>
+X=>
+VARS X; X=>
+NOSUCH=>
+VARS 2; 999=>
+X=>
+1;SETPOP();999=>
+X=>
+1000000000000=> 999=>
+X=>
+IMPLIC=>
+VARS IMPLIC;
+IMPLIC=>
+1->FALSE;999=>
+X=>

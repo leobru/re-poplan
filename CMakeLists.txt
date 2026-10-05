@@ -39,6 +39,9 @@ if(BUILD_TESTING)
     add_test(NAME poplan-popmess-device-state COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --popmess-devices ${CMAKE_SOURCE_DIR}/tests/inputs/popmess-devices.pop2)
     add_test(NAME poplan-popmess-state COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR}/build/poplan.bin --popmess ${CMAKE_SOURCE_DIR}/tests/inputs/popmess-constructors.pop2)
 
+    add_test(NAME poplan-native-reader
+        COMMAND poplan_core_tests --native-reader ${CMAKE_SOURCE_DIR})
+
     add_test(NAME poplan-native-reals COMMAND poplan_core_tests --native-reals)
 
     add_test(NAME poplan-native-allocator

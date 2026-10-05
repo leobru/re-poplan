@@ -582,3 +582,14 @@ all 19 emitter cases and separate entry/exit peaks. See
 is at `03206..03260`; `11726..11757` is packed record access/update. The native
 reader and actual function semantics remain subsequent steps. Neither hybrid
 PC dispatch nor historical profile measurements changed in this milestone.
+
+
+### Native reader and binding milestone (2026-10-05)
+
+The opt-in native shell now has incremental reader/compiler state, variable
+bindings, statement execution and top-level recovery. Source boundaries and
+historical/raw comparisons are recorded in [native-reader.md](native-reader.md).
+Character tables are bootstrap data, and operation provenance is not execution
+PC dispatch. No generated BESM instructions or machine fallback enter this path.
+No new hybrid dispatch entry is introduced, and earlier profile counts remain
+unchanged. Whole-session allocation and recursion conformance remain open.

@@ -1,0 +1,38 @@
+COMMENT Native statement, binding and stack conformance;
+VARS A B;
+2->A;
+A*3->B;
+A,B=>
+B+1->A;
+A=>
+1,2->A->B;
+A,B=>
+1;2;3;=>
+=>
+VARS ABCDEF1;
+17->ABCDEF2;
+ABCDEF3=>
+VARS АБВГДЕ;
+23->абвгдеж;
+АБВГДЕ=>
+VARS UNKNOWN;
+UNKNOWN=>
+UNDEF=>
+FALSE,TRUE=>
+-2=>
++2=>
+-(2+3)=>
+2*(-3)=>
+10;2* -3=>
+(1,2)=>
+2*(3,4)=>
+1;ERASE();=>
+.5$-2=>
+549755813888=>
+999999999999=>
+-999999999999=>
+549755813888+1=>
+2* -3=>
+4=>
+VARS SPILL;
+2* -3;->SPILL;0;SPILL=>

@@ -1,6 +1,7 @@
 # Next Five Steps for Native POPLAN
 
-**Current status:** step 1 storage/accounting foundation complete; next is step 2.
+**Current status:** step 2 reader/binding/recovery semantic milestone implemented;
+next is step 3. Whole-session allocation fidelity remains an explicit open gate.
 
 ## Goal and boundary
 
@@ -160,3 +161,30 @@ silently counted as zero. Next implementation work is step 2.
 Completion verification passed: all 18 normal and 18 ASan/UBSan CTests, the full
 smoke suite, quine, zone1224 with historical comparison, native isolation guard
 and whitespace checks. Logs: `artifacts/native-accounting/`.
+
+
+## Step 2 semantic milestone — 2026-10-05
+
+The shell now incrementally reads and compiles statements into native operations.
+It supports `VARS`, binding reads and assignments, six-character collisions,
+Cyrillic packed names, statement separators, multiple stack results, source-faithful
+unary/operator reductions, `ERASE()`, and top-level diagnostics/SETPOP recovery.
+EOF and arbitrary split input retain compiler state without replaying effects.
+Earlier completed statements remain visible when a later facility is unsupported.
+
+[Reader evidence and limits](docs/native-reader.md) records source boundaries,
+raw binding/character checkpoints, historical fixtures and the tested empty-stack
+quirk. Native integer formatting now uses the full 41-bit signed mantissa.
+Reader temporary-object allocation scheduling, full diagnostic controls, deeper
+underflow into non-stack memory and unported reader facilities remain open;
+this milestone does not establish whole-session exhaustion compatibility.
+The next language implementation is named functions and conditionals (step 3).
+
+
+Milestone verification passed: 19 normal CTests (68.79 seconds), 19 ASan/UBSan
+CTests (330.74 seconds, leak detection disabled), `make test`, `make cpp-quine`,
+`make cpp-zone1224`, historical trivial/zone1224 comparisons, both native fixtures
+through the image-independent isolation guard, and `git diff --check`.
+Logs are in `artifacts/native-reader/`. Verification ran with the pre-existing
+uncommitted machine shadow-state edits present; those edits are excluded from
+this milestone commit.

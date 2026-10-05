@@ -17,6 +17,10 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 normalize = module.normalize
 
+fixtures = [(name, (root / 'tests/inputs' / (name + '.pop2')).read_text(),
+             (root / 'tests/expected' / (name + '.out')).read_text())
+            for name in ('native-bindings', 'native-recovery')]
+
 controls = ('POPLAN_INTERPRET_ONLY', 'POPLAN_DISABLE_TRANSLATED_ROUTINES',
             'POPLAN_CPU_TRACE', 'POPLAN_CPU_DETAIL_TRACE', 'POPLAN_ROUTINE_TRACE',
             'POPLAN_E70_TRACE')
@@ -34,16 +38,23 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
         result = run(executable, ['--native'], source, directory)
         assert result.returncode == 0, result.stderr
         assert result.stdout == expected, repr(result.stdout)
-        for text in ('2+2=> FUNCTION F; END;', '1+', '549755813888+1=>',
-                     '2+3**4=>', '1+2=> junk', '1.+2=>',
-                     '2+3*=>', '(2+3=>', '2+3)=>', '()=>', '2(3)=>',
-                     '2 3=>', '1=> (2+3)', '2*-3=>', '2* -3=>', '2+ -3=>',
-                     '2//3=>', '-(2+3)=>', '-2=>'):
+        # Statements now execute as they arrive. Unsupported later facilities
+        # cannot retract earlier output, and EOF does not invent a delimiter.
+        result = run(executable, ['--native'], '2+2=> FUNCTION F; END;', directory)
+        assert result.returncode != 0 and result.stdout == '** 4\n', result
+        assert 'compiler incomplete' in result.stderr, result.stderr
+        for text in ('1.+2=>', '2//3=>'):
             result = run(executable, ['--native'], text, directory)
-            assert result.returncode != 0 and not result.stdout, result
+            assert result.returncode != 0, result
             assert 'compiler incomplete' in result.stderr, result.stderr
+        for text in ('1+', '2', '(2+3'):
+            result = run(executable, ['--native'], text, directory)
+            assert result.returncode == 0 and not result.stdout, result
         result = run(executable, ['--native'], expressions, directory)
         assert result.returncode == 0 and result.stdout == expression_expected, result
+        for name, text, wanted in fixtures:
+            result = run(executable, ['--native'], text, directory)
+            assert result.returncode == 0 and normalize(result.stdout) == wanted, (name, result)
         # Explicit pending operations, not C++ recursion, handle grouping.
         deep = '(' * 5000 + '2+3' + ')' * 5000 + '=>'
         result = run(executable, ['--native'], deep, directory)
@@ -54,11 +65,11 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
                          '** 3.0000000\n**-.50000000\n')
         result = run(executable, ['--native'], reals, directory)
         assert result.returncode == 0 and result.stdout == real_expected, result
-        for text in ('3.14=> 1.0$+=>', '.=>', '1.0e2=>', '1.0$1000=>', '549755813888.0=>'):
+        for text in ('3.14=> 1.0$+=>', '.=>', '1.0$1000=>', '549755813888.0=>'):
             result = run(executable, ['--native'], text, directory)
-            assert result.returncode != 0 and not result.stdout, result
-        result = run(executable, ['--native'], '1/0=>', directory)
-        assert result.returncode != 0 and not result.stdout, result
+            assert result.returncode != 0, result
+        result = run(executable, ['--native'], '1/0=>\n2+2=>\n', directory)
+        assert result.returncode == 0 and 'ОШИБКА 13016' in result.stdout and result.stdout.endswith('** 4\n'), result
         for control in controls:
             result = run(executable, ['--native'], source, directory,
                          dict(env, **{control: ''}))
@@ -79,7 +90,20 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
         assert normalize(result.stdout) == real_expected, repr(result.stdout)
         result = run(binary, ['--image', str(root / 'build/poplan.bin')], expressions, root, environment)
         assert result.returncode == 0 and normalize(result.stdout) == expression_expected, result
+        for name, text, wanted in fixtures:
+            result = run(binary, ['--image', str(root / 'build/poplan.bin')], text, root, environment)
+            # The instruction-only runner omits catalog explanations in this
+            # fixture; historical POPLAN supplies them. Compare the remaining
+            # diagnostic codes, values, source context and recovery exactly.
+            reference_wanted = wanted
+            if name == 'native-recovery' and 'POPLAN_INTERPRET_ONLY' in environment:
+                for explanation in ('АРГУМЕНТ + НЕ ЧИСЛО', 'НЕТ РАЗДЕЛИТЕЛЯ', 'ДЕКЛАРАЦИЯ НЕ СЛОВА', 'ДЛИНА ЦЕЛОГО>12', 'ПРИСВАИВАНИЕ ЗАЩИЩЕННОЙ ПЕРЕМЕННОЙ'):
+                    reference_wanted = reference_wanted.replace(explanation + '\n', '')
+            assert result.returncode == 0 and normalize(result.stdout) == reference_wanted, (name, result)
     if historical:
         result = run(root / 'tools/run-dispak.sh', ['--bootstrap', str(root / 'poplan.b6')], expressions, root)
         assert result.returncode == 0 and normalize(result.stdout) == expression_expected, result
+        for name, text, wanted in fixtures:
+            result = run(root / 'tools/run-dispak.sh', ['--bootstrap', str(root / 'poplan.b6')], text, root)
+            assert result.returncode == 0 and normalize(result.stdout) == wanted, (name, result)
 print('native probe, raw/hybrid comparison, CLI rejection and execution guard passed')
