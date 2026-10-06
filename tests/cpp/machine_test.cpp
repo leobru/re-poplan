@@ -1240,7 +1240,7 @@ void test_native_reader(const char *root)
         require(static_cast<bool>(input), "native reader fixture is available");
         return std::string(std::istreambuf_iterator<char>(input), {});
     };
-    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery"}) {
+    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery"}) {
         const auto source = read(std::string("/tests/inputs/") + fixture + ".pop2");
         const auto expected = read(std::string("/tests/expected/") + fixture + ".out");
         std::size_t operations = 0, collections = 0;
@@ -1260,6 +1260,8 @@ void test_native_reader(const char *root)
             result = session.feed(std::string_view(source).substr(split), true, output);
             require(result.state == NativeSessionResult::State::finished && result.error.empty(),
                     "split input reaches explicit EOF");
+            require(session.runtime().activation_words() == 0,
+                    "normal return and recovery discard all native activation accounting");
             require(output.str() == expected, std::string(fixture) + " output is invariant across every split");
             if (split == 0) {
                 operations = result.operations;
@@ -1275,7 +1277,8 @@ void test_native_reader(const char *root)
                 for (std::size_t i = 0; i < words.size(); ++i)
                     require(words[i].handle == dictionary[i].handle && words[i].properties == dictionary[i].properties
                                 && words[i].binding.kind == dictionary[i].binding.kind
-                                && words[i].binding.number == dictionary[i].binding.number,
+                                && words[i].binding.number == dictionary[i].binding.number
+                                && words[i].binding.handle == dictionary[i].binding.handle,
                             "split input preserves dictionary identity and mutations");
             }
         }
@@ -1306,6 +1309,11 @@ void test_native_reader(const char *root)
                         + std::to_string(word.packed_name.raw()) + " raw "
                         + std::to_string(oracle->memory(address + 2).raw()) + " native "
                         + std::to_string(word.properties.raw()));
+            if (word.binding.kind == NativeValue::Kind::function) {
+                require((oracle->memory(address + 3).raw() >> 41) == 0154,
+                        "native function binding corresponds to an ordinary raw descriptor");
+                continue;
+            }
             require(oracle->memory(address + 3) == (word.binding.kind == NativeValue::Kind::unbound
                         ? Word48(06500000000000000ULL) : word.binding.number),
                     "native binding mutations and recovery preserve raw value bits");
@@ -1324,9 +1332,56 @@ void test_native_reader(const char *root)
             "EOF does not execute an unterminated assignment");
     NativeSession partial;
     std::ostringstream partial_output;
-    result = partial.feed("2+2=>\nFUNCTION F;", true, partial_output);
+    result = partial.feed("2+2=>\nLAMBDA;", true, partial_output);
     require(result.state == NativeSessionResult::State::unsupported && partial_output.str() == "** 4\n",
             "unsupported facilities fail explicitly after preserving earlier statement effects");
+
+    NativeRuntime functions;
+    const auto reference = functions.make_reference().value;
+    NativeProgram body;
+    body.operations.push_back({NativeOperation::Kind::constant, Word48(06400000000000042ULL)});
+    body.roots.push_back(reference);
+    const auto function = functions.make_function(body);
+    functions.store(reference, 0, function);
+    require(functions.enter_frame(native_binding_frame_cost({}), {function}),
+            "an explicit activation roots its function and saved environment");
+    functions.collect();
+    require(functions.object(function).block.words == 5 && functions.object(reference).fields[0].handle == function.handle,
+            "function descriptor and cyclic program roots survive collection through an activation");
+    const auto name = functions.intern(Word48("F"));
+    functions.bind(name.handle, function);
+    NativeProgram caller;
+    NativeOperation call{NativeOperation::Kind::call, {}};
+    call.binding = name.handle;
+    caller.operations.push_back(call);
+    const auto id = functions.retain_program(caller);
+    std::ostringstream ignored;
+    const auto called = functions.execute(id, ignored);
+    require(called.error.empty() && functions.values().back().number == Word48(06400000000000042ULL),
+            "collected function keeps its executable POP operations and storage");
+    functions.release_program(id);
+    functions.bind(name.handle, {});
+    require(functions.leave_frame(), "activation exits without dropping its caller's accounting");
+    functions.collect();
+    bool reclaimed = false;
+    try { functions.object(function); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed, "unreachable function and reference cycle does not remain rooted by program metadata");
+    reclaimed = false;
+    try { functions.object(reference); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed, "function collection also reclaims its unreachable cyclic environment");
+
+    NativeSession suspended;
+    std::ostringstream suspended_output;
+    suspended.feed("FUNCTI F; 3 END;\nFUNCTI F; 9;", true, suspended_output);
+    auto &owner = suspended.runtime();
+    NativeProgram invoke;
+    call.binding = owner.dictionary().lookup(Word48("F"));
+    invoke.operations.push_back(call);
+    const auto invoke_id = owner.retain_program(invoke);
+    require(owner.execute(invoke_id, suspended_output).error.empty()
+                && owner.values().back().number == Word48(06400000000000003ULL),
+            "EOF in a redefinition does not publish or run an incomplete function body");
+    owner.release_program(invoke_id);
 }
 
 } // namespace

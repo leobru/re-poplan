@@ -1,8 +1,9 @@
 # Next Five Steps for Native POPLAN
 
-**Current status:** step 2 implemented; step 3 comparisons and conditional
-execution implemented. Named functions and call frames are next. Whole-session
-allocation fidelity remains an explicit open gate.
+**Current status:** step 2 implemented; step 3 now includes comparisons,
+conditionals, ordinary named functions, explicit call frames and binding
+restoration. Function diagnostic/grammar edge cases and whole-session allocation
+fidelity remain open; see the step 3 function milestone below.
 
 ## Goal and boundary
 
@@ -212,3 +213,25 @@ quine, zone1224, historical comparisons, image-free guarded execution and
 whitespace checks. Validation and separate native operation counts are recorded
 in `docs/native-control.md`; logs remain outside the build area in
 `artifacts/native-control/`.
+
+
+## Step 3 named-function milestone — 2026-10-06
+
+Implemented ordinary named functions, formals, local declarations, END, RETURN,
+explicit call frames, dynamic lookup/restoration, recursive calls and zero/multiple
+results. Calls share the native POP operation loop with arithmetic and branches.
+Function objects own compiled storage and participate in collection, including
+cyclic roots. Recovered class-mask handling preserves declaration flags and
+normal binding restoration. Historical SETPOP abandons saved bindings: active
+values and classes deliberately survive recovery.
+
+See [native-functions.md](docs/native-functions.md) for source evidence, fixtures
+and remaining boundaries. Step 3's remaining edge cases include malformed
+headers, duplicate/result parameters, nonfunction application and compound
+diagnostic rendering. Primitive scratch/session accounting and exact exhaustion
+remain open; nested definitions and closure rebinding remain step 4.
+
+This function milestone passed all 19 regular and 19 ASan/UBSan CTests, smoke,
+quine, zone1224, historical comparisons, image-free execution guards and
+whitespace checks. `docs/native-functions.md` records the exact boundary and
+separate operation counts; logs are in `artifacts/native-functions/`.

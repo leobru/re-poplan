@@ -2,7 +2,7 @@
 
 This is the first part of step 3 in `PLAN.md`, not completion of that step.
 Named functions, formal/local binding restoration, calls, returns and recursion
-remain unimplemented. Native execution still neither loads the executable image
+were added in the subsequent [function milestone](native-functions.md). Native execution still neither loads the executable image
 nor calls the machine backend.
 
 ## Evidence and implementation
@@ -24,8 +24,10 @@ The pending conditional records, labels and expression boundaries survive input
 suspension. EOF does not execute an unfinished conditional. SETPOP recovery
 clears pending compiler state while preserving established bindings.
 
-General calls, loops, RETURN/EXIT, declarations inside conditional bodies and
-unsupported malformed conditional syntax fail explicitly. No missing syntax
+At this conditional milestone, general calls and RETURN were still absent; the
+subsequent function milestone implements ordinary named calls and RETURN. Loops,
+EXIT, declarations inside conditional bodies and unsupported malformed conditional
+syntax still fail explicitly. No missing syntax
 behavior is inferred from a generic POP grammar. The existing whole-session
 allocation caveat applies: historical reader temporaries, optimizer decisions
 and environment scheduling are not reproduced. Operation storage costs do not

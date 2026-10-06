@@ -122,3 +122,7 @@ Conditional compiler state and comparison recovery were added on 2026-10-06;
 see [native-control.md](native-control.md). The reader test now also checks every
 byte split and raw binding checkpoint of both control fixtures. The earlier
 reader operation counts and validation measurements above remain unchanged.
+
+Ordinary named functions, explicit call frames and dynamic binding restoration
+were subsequently added; see [native-functions.md](native-functions.md). General
+closures and the full language remain outside the implemented boundary.

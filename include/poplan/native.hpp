@@ -98,6 +98,7 @@ public:
     const std::array<std::uint32_t, 0400> &heads() const { return heads_; }
     void bind(std::uint32_t handle, NativeValue value);
     void declare(std::uint32_t handle, bool explicit_declaration = true);
+    Word48 exchange_binding_class(std::uint32_t handle, Word48 classification);
 private:
     static std::uint8_t hash(Word48 name);
     NativeWord &mutable_word(std::uint32_t handle);
@@ -150,7 +151,7 @@ std::string native_format_number(Word48);
 
 struct NativeOperation {
     enum class Kind { constant, binary, print, load, store, unary, erase, setpop,
-                      compare, branch_false, jump, label };
+                      compare, branch_false, jump, label, call, return_value };
     Kind kind;
     Word48 constant;
     NativeBinary binary = NativeBinary::add;
@@ -170,6 +171,16 @@ struct NativeProgram {
     std::vector<NativeOperation> operations;
     std::string error;
     std::vector<NativeValue> roots;
+    // Definition order: formals first, then locals. Entry visits in reverse.
+    std::vector<std::pair<std::uint32_t, NativeBindingSlot>> bindings;
+    bool function = false;
+};
+
+struct NativeFrame {
+    std::size_t program, position = 0;
+    NativeValue function;
+    std::vector<std::pair<std::uint32_t, NativeValue>> saved_bindings;
+    std::vector<Word48> saved_classes;
 };
 
 // One compilation unit after reader decisions and optional optimization.
@@ -239,11 +250,12 @@ public:
     void reset_stack() { values_.clear(); below_empty_ = false; }
     std::vector<std::vector<NativeValue>> &frame_roots() { return frame_roots_; }
     std::size_t retain_program(NativeProgram program);
+    NativeValue make_function(NativeProgram program);
     NativeCompilationResult compile_storage(NativeCompilation compilation);
     const NativeCompiledStorage &compiled_storage(std::size_t id) const;
     void finish_compilation_context(std::size_t id);
     void release_compiled_storage(std::size_t id);
-    // Explicit accounting frames; language binding/call semantics are later work.
+    // Activation accounting also roots active functions and saved binding values.
     // A failed entry/exit preserves the frame stack; unwinding bypasses exit work.
     bool enter_frame(NativeFrameCost cost, std::vector<NativeValue> roots = {});
     bool leave_frame();
@@ -260,6 +272,7 @@ private:
     NativeAllocator allocator_;
     NativeDictionary dictionary_;
     std::map<std::uint32_t, NativeObject> objects_;
+    std::map<std::uint32_t, std::size_t> functions_;
     std::uint32_t next_handle_ = 0100000;
     std::vector<NativeValue> values_;
     // The reference's initially zero cell immediately below the empty POP
@@ -327,6 +340,7 @@ private:
     struct Pending {
         bool group; bool unary; NativeBinary binary; unsigned priority;
         std::optional<NativeComparison> comparison = {};
+        std::uint32_t call = 0;
     };
     std::vector<Pending> pending_;
     struct Conditional {
@@ -336,6 +350,12 @@ private:
         std::vector<std::size_t> exits;
     };
     std::vector<Conditional> conditionals_;
+    struct Definition {
+        std::uint32_t name = 0;
+        bool header = true;
+        std::vector<std::pair<std::uint32_t, NativeBindingSlot>> bindings;
+    };
+    std::optional<Definition> definition_;
     bool operand_ = true, start_ = true, assignment_ = false, assigned_ = false, declaration_ = false;
     std::size_t token_count_ = 0;
     std::optional<NativeOperation::Kind> call_;

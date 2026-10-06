@@ -504,3 +504,13 @@ Nonnumeric comparison probes exposed incorrect zero tests in hybrid `06650`
 and a missing `06656` operand reload. The corrected multiplicative sign checks
 and diagnostic state pass full-state instruction-only differentials. No dispatch
 entries or saved corpus measurements change.
+
+
+### Native named functions and frames (2026-10-06)
+
+Ordinary named functions now use explicit POP activation frames, reverse argument
+binding and forward normal restoration of values/classes. Historical SETPOP
+abandons the saves and retains active bindings. Stable function objects own their
+compiled storage and are collected through native roots. See [function evidence](docs/native-functions.md)
+for verification and remaining syntax/diagnostic/accounting limits. No hybrid
+dispatch entries or historical profile counts change.

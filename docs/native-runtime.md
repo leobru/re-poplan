@@ -2,7 +2,7 @@
 
 The requested fully native runtime is **not complete**. No implementation gate
 has passed in full. `--native` now supports an incremental reader, numeric expressions, bindings, comparisons,
-conditional execution and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
+conditional execution, ordinary named functions and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
 
 ## Contract
 
@@ -30,15 +30,15 @@ local to each operation. There is no native architectural register bank.
 | 1: syntax and compiler | `03544`, `03736`, `04001`, `04214`, `04536`, `04665`; canonical descriptions in `subroutines-from-trace.md` | Full branch, syntax-handler and lowering inventory still required |
 | 1: emission sites | `05007`, `05052..05157`, especially `05124`; ordinary call binding `03206..03234` and restoration `03235..03260` | Need enumerate callers and establish each emitted operation's POP meaning; do not decode completed words |
 | 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Reference/pair collection, retry, compiler storage and activation cost primitives implemented; full session scheduling remains open |
-| 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Runtime owns numbers, dictionary and reference/pair payloads with stable handles and explicit roots; other compound payloads remain open |
-| 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Reader conversion and executable variable bindings implemented; function bindings and mutable syntax remain open |
+| 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Runtime owns numbers, dictionary, reference/pair payloads and compiled function objects with stable handles and explicit roots; strings/lists remain open |
+| 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Reader conversion and executable variable bindings implemented; ordinary function bindings implemented; mutable syntax remains open |
 | 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; full numeric/scanner/function coverage remains open |
 | 2: real literal reader | `native_parse_real_literal` validates decimal-point / `$` syntax evidenced at `16672..16735`, parses IEEE binary64, then truncates to BESM encoding | Exact encoding, boundary, malformed-input and locale tests; deliberate conversion policy described below |
 | 2: formatting | Shares existing `format_prreal`, preserving existing formatting limitations | Historical probe comparison; complete numeric printing conformance not established |
 | 2: services | Input/output injected as streams | Resumable console input and packed-name conversion implemented; clocks and console callbacks remain open |
 | 3: reader/compiler | `NativeReader` and `NativeSession` incrementally lower literals, bindings, assignments, arithmetic and printing | [Reader evidence](native-reader.md), split-input checks, raw binding checkpoints and historical fixtures; general POP syntax remains open |
 | 3: recovery | Supported syntax/type diagnostics and explicit SETPOP transfer preserve bindings and token history | Historical recovery fixture; full diagnostic suppression and nested callbacks remain open |
-| 4: frames/control | Comparisons and nested conditional branches implemented; see [control evidence](native-control.md) | Functions, call frames, loops, recursion, closures, dynamic binding, triangular thresholds and Man-or-Boy remain required |
+| 4: frames/control | Comparisons, conditionals, ordinary named functions, explicit frames, recursion and dynamic binding/restoration implemented; see [function evidence](native-functions.md) | Function grammar/diagnostic edges, loops, closures, exact triangular thresholds and Man-or-Boy remain open |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
 | 6: host scope | Not implemented beyond development output | Resident primitives, POPLIB, POPMESS, clocks, callbacks and MI/MO quirks required |
 | 7: completeness | Not passed | Quine, recovered zones, language/standard fixtures, fixed-seed game and expansion probes must pass natively, with inventory coverage |
@@ -51,7 +51,8 @@ printf '2+2=>\n' | build/cpp/poplan --native
 
 The native shell accepts numeric expressions, `VARS`, variable reads, `->`,
 commas, parentheses, `;`, `=>`, comparisons, nested `IF / THEN / ELSEIF / ELSE / CLOSE`,
-and the small calls `ERASE()` and `SETPOP()`.
+ordinary named functions with formals/local VARS, END and RETURN, and the small
+calls `ERASE()` and `SETPOP()`.
 It uses incremental token/compiler state and executes completed statements before
 EOF. Supported errors recover to the next input line; unsupported facilities fail
 explicitly while preserving earlier effects. See [native-reader.md](native-reader.md)
