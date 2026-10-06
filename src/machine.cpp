@@ -856,6 +856,32 @@ NativeNumberResult native_number_binary(NativeBinary operation,
     }
 }
 
+NativeNumberResult native_number_compare(NativeComparison comparison, Word48 left, Word48 right)
+{
+    // 03374 compares the complete representations, including the integer tag.
+    bool answer = left == right;
+    if (comparison != NativeComparison::equal) {
+        // 06624/06632/06640/06646 subtract the original numeric words and
+        // inspect the additive sign. Do not retag or apply arithmetic's POP
+        // result range check: even the difference of two valid operands can
+        // lie outside that range. Scratch state belongs to this operation.
+        Word48 difference = right, remainder;
+        std::uint8_t mode = 006;
+        NumericScratch scratch{difference, remainder, mode};
+        const bool reverse = comparison == NativeComparison::less
+            || comparison == NativeComparison::greater_equal;
+        try {
+            scratch.arithmetic_add(left, reverse, !reverse);
+        } catch (const MachineError &error) {
+            return {{}, error.what()};
+        }
+        answer = (difference.raw() & bit41) != 0;
+        if (comparison == NativeComparison::less_equal || comparison == NativeComparison::greater_equal)
+            answer = !answer;
+    }
+    return {Word48(06400000000000000ULL | (answer ? 1 : 0)), {}};
+}
+
 std::string native_format_number(Word48 value)
 {
     return format_prreal(value);
@@ -7661,7 +7687,7 @@ std::uint16_t Machine::p06650()
     remainder_ = Word48();
     select_alu_group(rau_multiplicative);
     remainder_ = accumulator_;
-    if (accumulator_.raw() == 0) {
+    if (!accumulator_condition()) {
         hardware_pop_acc();
         select_alu_group(rau_logical);
         registers_[016] = address_add(registers_[016], 1);
@@ -7677,9 +7703,12 @@ std::uint16_t Machine::p06650()
     remainder_ = Word48();
     select_alu_group(rau_multiplicative);
     remainder_ = accumulator_;
-    if (accumulator_.raw() != 0) {
+    if (accumulator_condition()) {
         return registers_[014];
     }
+    // 06656 restores the offending left operand after the sign check.
+    accumulator_ = memory_[address_add(registers_[017], -2)];
+    select_alu_group(rau_logical);
     registers_[015] = 06657;
     return 03014;
 }

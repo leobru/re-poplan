@@ -19,7 +19,7 @@ normalize = module.normalize
 
 fixtures = [(name, (root / 'tests/inputs' / (name + '.pop2')).read_text(),
              (root / 'tests/expected' / (name + '.out')).read_text())
-            for name in ('native-bindings', 'native-recovery')]
+            for name in ('native-bindings', 'native-recovery', 'native-control', 'native-control-recovery')]
 
 controls = ('POPLAN_INTERPRET_ONLY', 'POPLAN_DISABLE_TRANSLATED_ROUTINES',
             'POPLAN_CPU_TRACE', 'POPLAN_CPU_DETAIL_TRACE', 'POPLAN_ROUTINE_TRACE',
@@ -59,6 +59,12 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
         deep = '(' * 5000 + '2+3' + ')' * 5000 + '=>'
         result = run(executable, ['--native'], deep, directory)
         assert result.returncode == 0 and result.stdout == '** 5\n', result
+        nested = 'IF TRUE THEN ' * 300 + '7' + ' ELSE 1/0 CLOSE' * 300 + '=>'
+        result = run(executable, ['--native'], nested, directory)
+        assert result.returncode == 0 and result.stdout == '** 7\n', result
+        # No branch executes while its enclosing compilation is suspended.
+        result = run(executable, ['--native'], 'VARS X; 1->X; IF TRUE THEN 9->X; X=>', directory)
+        assert result.returncode == 0 and not result.stdout, result
         reals = '3.14=> .5=> 3.14$-3=> 3.14$+2=> .5$2=> 0.0=> 123456789.25=> 1.234567890123=> 1.0+2=> -.5=>'.replace(' ', '\n') + '\n'
         real_expected = ('** 3.1400000\n** .50000000\n** .00314000\n** 314.00000\n'
                          '** 50.000000\n** .00000000\n** 123456789.2\n** 1.2345679\n'
@@ -96,8 +102,8 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
             # fixture; historical POPLAN supplies them. Compare the remaining
             # diagnostic codes, values, source context and recovery exactly.
             reference_wanted = wanted
-            if name == 'native-recovery' and 'POPLAN_INTERPRET_ONLY' in environment:
-                for explanation in ('АРГУМЕНТ + НЕ ЧИСЛО', 'НЕТ РАЗДЕЛИТЕЛЯ', 'ДЕКЛАРАЦИЯ НЕ СЛОВА', 'ДЛИНА ЦЕЛОГО>12', 'ПРИСВАИВАНИЕ ЗАЩИЩЕННОЙ ПЕРЕМЕННОЙ'):
+            if name in ('native-recovery', 'native-control-recovery') and 'POPLAN_INTERPRET_ONLY' in environment:
+                for explanation in ('АРГУМЕНТ + НЕ ЧИСЛО', 'НЕТ РАЗДЕЛИТЕЛЯ', 'ДЕКЛАРАЦИЯ НЕ СЛОВА', 'ДЛИНА ЦЕЛОГО>12', 'ПРИСВАИВАНИЕ ЗАЩИЩЕННОЙ ПЕРЕМЕННОЙ', 'Х<У,Х НЕ ЧИСЛО', 'Х<У,У НЕ ЧИСЛО', 'Х>У,У НЕ ЧИСЛО'):
                     reference_wanted = reference_wanted.replace(explanation + '\n', '')
             assert result.returncode == 0 and normalize(result.stdout) == reference_wanted, (name, result)
     if historical:

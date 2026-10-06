@@ -48,8 +48,8 @@ compiler word costs are substituted with zero.
 ## Emission inventory
 
 The native enum records POP-level emission intent. These entries currently
-support storage sizing; only literal/arithmetic/print operations execute in the
-native language probe. Every listed operation uses a two-word intermediate node.
+support storage sizing. The native session also executes binding operations,
+comparisons, conditional branches, jumps and labels; see [control evidence](native-control.md). Every listed operation uses a two-word intermediate node.
 
 | Source selector | Native emission | Final code words |
 | --- | --- | --- |

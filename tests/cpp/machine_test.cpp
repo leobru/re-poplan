@@ -1145,7 +1145,7 @@ void test_native_reals()
     std::ostringstream output;
     const auto executed = poplan::native_execute(real_program, output);
     require(executed.error.empty() && executed.operations == 6
-                && output.str() == "** 3.1400000\n** 3.0000000\n",
+                && output.str() == "** 3.1400000\n\n** 3.0000000\n",
             "native real literals reach printing and mixed arithmetic");
 }
 
@@ -1158,6 +1158,73 @@ void test_native_reader(const char *root)
     std::ifstream image(std::string(root) + "/build/poplan.bin", std::ios::binary);
     raw->load_image(image);
     raw->set_translated_routines_enabled(false);
+    raw->memory(0) = Word48(); // Bootstrap normally clears the loader word.
+    const auto integer = [](std::int64_t value) {
+        return Word48(06400000000000000ULL
+            | (static_cast<std::uint64_t>(value) & ((std::uint64_t{1} << 41) - 1)));
+    };
+    const std::vector<Word48> comparisons = {
+        integer(0), integer(1), integer(-1), integer(999999999999LL), integer(-999999999999LL),
+        Word48(), native_real_from_double(1.0).value, native_real_from_double(-1.0).value,
+        native_real_from_double(.5).value, native_real_from_double(-.5).value,
+        native_real_from_double(1e-18).value, native_real_from_double(-1e-18).value,
+        Word48(native_real_from_double(1.0).value.raw() + 1)
+    };
+    const std::pair<NativeComparison, std::uint16_t> comparison_entries[] = {
+        {NativeComparison::equal, 03374}, {NativeComparison::less, 06626},
+        {NativeComparison::greater, 06620}, {NativeComparison::less_equal, 06634},
+        {NativeComparison::greater_equal, 06642}
+    };
+    for (const auto &[comparison, entry] : comparison_entries) {
+        for (const auto left : comparisons) for (const auto right : comparisons) {
+            raw->reg(006) = 070000;
+            raw->reg(017) = 066001;
+            raw->alu_mode() = 007;
+            raw->memory(070000) = right;
+            raw->memory(070001) = left;
+            raw->start(entry);
+            unsigned steps = 0;
+            while (((raw->program_counter() != 03314 && raw->program_counter() != 06661)
+                    || raw->right_half()) && steps++ < 100) raw->step();
+            const auto native = native_number_compare(comparison, left, right);
+            require(steps < 100 && native.error.empty() && native.value == raw->accumulator()
+                        && raw->reg(006) == 070002 && raw->reg(017) == 066001,
+                    "native comparison returns exact raw Boolean bits with two operands consumed");
+        }
+    }
+    // 06650's two type checks branch in the multiplicative ALU group. Include
+    // tagged nonnumbers: a zero-only test incorrectly accepts UNDEF here.
+    const std::vector<Word48> checked_values = {
+        integer(0), integer(-1), native_real_from_double(.5).value,
+        Word48(06500000000000000ULL), Word48(06600000000006672ULL)
+    };
+    for (const auto left : checked_values) for (const auto right : checked_values) {
+        auto semantic = std::make_unique<Machine>(*raw);
+        auto oracle = std::make_unique<Machine>(*raw);
+        for (auto *machine : {semantic.get(), oracle.get()}) {
+            machine->reg(017) = 066001;
+            machine->reg(014) = 077000;
+            machine->reg(015) = 06661;
+            machine->reg(016) = 014030;
+            machine->alu_mode() = 007;
+            machine->accumulator() = right;
+            machine->memory(066000) = left;
+            machine->start(06650);
+        }
+        semantic->start(semantic->p06650());
+        unsigned steps = 0;
+        while ((oracle->program_counter() != semantic->program_counter() || oracle->right_half())
+               && steps++ < 100) oracle->step();
+        require(steps < 100 && !semantic->right_half()
+                    && semantic->accumulator() == oracle->accumulator()
+                    && semantic->remainder() == oracle->remainder()
+                    && semantic->alu_mode() == oracle->alu_mode(),
+                "06650 numeric and diagnostic paths preserve raw PC and ALU state");
+        for (unsigned reg = 0; reg < 020; ++reg)
+            require(semantic->reg(reg) == oracle->reg(reg), "06650 preserves all registers and stack balance");
+        for (unsigned address = 0; address < Machine::core_words; ++address)
+            require(semantic->memory(address) == oracle->memory(address), "06650 preserves complete memory");
+    }
     for (unsigned byte = 0; byte < 256; ++byte) {
         raw->accumulator() = Word48(byte);
         raw->reg(015) = 070000;
@@ -1173,7 +1240,7 @@ void test_native_reader(const char *root)
         require(static_cast<bool>(input), "native reader fixture is available");
         return std::string(std::istreambuf_iterator<char>(input), {});
     };
-    for (const char *fixture : {"native-bindings", "native-recovery"}) {
+    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery"}) {
         const auto source = read(std::string("/tests/inputs/") + fixture + ".pop2");
         const auto expected = read(std::string("/tests/expected/") + fixture + ".out");
         std::size_t operations = 0, collections = 0;
@@ -3397,6 +3464,8 @@ int main(int argc, char **argv)
             "06650 retains the generated template's comparison state");
 
     auto generated_compare_error = std::make_unique<Machine>();
+    generated_compare_error->accumulator() = Word48(06500000000000000ULL);
+    generated_compare_error->memory(06671) = Word48(0560000000000000ULL);
     generated_compare_error->reg(016) = 02000;
     generated_compare_error->reg(017) = 04100;
     require(generated_compare_error->p06650() == 03014
@@ -3404,7 +3473,7 @@ int main(int argc, char **argv)
                 && generated_compare_error->reg(016) == 02001,
             "06650 selects diagnostic continuation 06654 on its first match");
     require(generated_compare_error->reg(017) == 04100
-                && generated_compare_error->accumulator() == Word48(),
+                && generated_compare_error->accumulator() == Word48(06500000000000000ULL),
             "06650 balances its temporary stack word on the diagnostic path");
 
     const auto compare_generated_template = [](

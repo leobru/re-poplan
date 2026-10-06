@@ -1,7 +1,8 @@
 # Next Five Steps for Native POPLAN
 
-**Current status:** step 2 reader/binding/recovery semantic milestone implemented;
-next is step 3. Whole-session allocation fidelity remains an explicit open gate.
+**Current status:** step 2 implemented; step 3 comparisons and conditional
+execution implemented. Named functions and call frames are next. Whole-session
+allocation fidelity remains an explicit open gate.
 
 ## Goal and boundary
 
@@ -188,3 +189,26 @@ through the image-independent isolation guard, and `git diff --check`.
 Logs are in `artifacts/native-reader/`. Verification ran with the pre-existing
 uncommitted machine shadow-state edits present; those edits are excluded from
 this milestone commit.
+
+
+## Step 3 progress — 2026-10-06
+
+Implemented representation equality, ordered numeric comparisons, and nested
+`IF / THEN / ELSEIF / ELSE / CLOSE` as typed POP operations. Conditional compiler
+state is resumable; skipped branches do not execute side effects. Historical
+truth testing, stack results, output separation and supported diagnostic recovery
+are preserved. See [native-control evidence](docs/native-control.md).
+
+The new probes also exposed and corrected the hybrid `06650` multiplicative
+sign checks and missing left-operand diagnostic reload, verified against complete
+instruction-only machine state.
+
+Step 3 remains **partial**: named functions, formal parameters, local bindings,
+explicit call frames, returns, dynamic restoration and recursive execution are
+next. Steps 4–5 and exact whole-session allocation remain open.
+
+This conditional milestone passed 19 regular and 19 ASan/UBSan CTests, smoke,
+quine, zone1224, historical comparisons, image-free guarded execution and
+whitespace checks. Validation and separate native operation counts are recorded
+in `docs/native-control.md`; logs remain outside the build area in
+`artifacts/native-control/`.

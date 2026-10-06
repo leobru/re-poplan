@@ -116,3 +116,9 @@ through the image-independent isolation guard, and `git diff --check`.
 Logs are in `artifacts/native-reader/`. Verification ran with the pre-existing
 uncommitted machine shadow-state edits present; those edits are excluded from
 this milestone commit.
+
+
+Conditional compiler state and comparison recovery were added on 2026-10-06;
+see [native-control.md](native-control.md). The reader test now also checks every
+byte split and raw binding checkpoint of both control fixtures. The earlier
+reader operation counts and validation measurements above remain unchanged.

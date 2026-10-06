@@ -1,8 +1,8 @@
 # Image-independent native runtime: development status
 
 The requested fully native runtime is **not complete**. No implementation gate
-has passed in full. `--native` now supports an incremental reader, numeric expressions, bindings
-and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
+has passed in full. `--native` now supports an incremental reader, numeric expressions, bindings, comparisons,
+conditional execution and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
 
 ## Contract
 
@@ -38,7 +38,7 @@ local to each operation. There is no native architectural register bank.
 | 2: services | Input/output injected as streams | Resumable console input and packed-name conversion implemented; clocks and console callbacks remain open |
 | 3: reader/compiler | `NativeReader` and `NativeSession` incrementally lower literals, bindings, assignments, arithmetic and printing | [Reader evidence](native-reader.md), split-input checks, raw binding checkpoints and historical fixtures; general POP syntax remains open |
 | 3: recovery | Supported syntax/type diagnostics and explicit SETPOP transfer preserve bindings and token history | Historical recovery fixture; full diagnostic suppression and nested callbacks remain open |
-| 4: frames/control | Not implemented | Functions, branches, loops, recursion, closures, dynamic binding, triangular thresholds and Man-or-Boy required |
+| 4: frames/control | Comparisons and nested conditional branches implemented; see [control evidence](native-control.md) | Functions, call frames, loops, recursion, closures, dynamic binding, triangular thresholds and Man-or-Boy remain required |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
 | 6: host scope | Not implemented beyond development output | Resident primitives, POPLIB, POPMESS, clocks, callbacks and MI/MO quirks required |
 | 7: completeness | Not passed | Quine, recovered zones, language/standard fixtures, fixed-seed game and expansion probes must pass natively, with inventory coverage |
@@ -50,7 +50,8 @@ printf '2+2=>\n' | build/cpp/poplan --native
 ```
 
 The native shell accepts numeric expressions, `VARS`, variable reads, `->`,
-commas, parentheses, `;`, `=>`, and the small calls `ERASE()` and `SETPOP()`.
+commas, parentheses, `;`, `=>`, comparisons, nested `IF / THEN / ELSEIF / ELSE / CLOSE`,
+and the small calls `ERASE()` and `SETPOP()`.
 It uses incremental token/compiler state and executes completed statements before
 EOF. Supported errors recover to the next input line; unsupported facilities fail
 explicitly while preserving earlier effects. See [native-reader.md](native-reader.md)

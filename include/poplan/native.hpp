@@ -144,10 +144,13 @@ NativeNumberResult native_real_from_double(double);
 // Signed decimal real with a required fractional digit and optional $ exponent.
 NativeNumberResult native_parse_real_literal(std::string_view);
 NativeNumberResult native_number_binary(NativeBinary, Word48, Word48);
+enum class NativeComparison { equal, less, greater, less_equal, greater_equal };
+NativeNumberResult native_number_compare(NativeComparison, Word48, Word48);
 std::string native_format_number(Word48);
 
 struct NativeOperation {
-    enum class Kind { constant, binary, print, load, store, unary, erase, setpop };
+    enum class Kind { constant, binary, print, load, store, unary, erase, setpop,
+                      compare, branch_false, jump, label };
     Kind kind;
     Word48 constant;
     NativeBinary binary = NativeBinary::add;
@@ -158,6 +161,9 @@ struct NativeOperation {
     std::uint16_t emission_site = 0;
     std::optional<std::uint16_t> legacy_words = std::nullopt;
     std::uint32_t binding = 0;
+    NativeComparison comparison = NativeComparison::equal;
+    // POP operation index, never a BESM address.
+    std::size_t target = 0;
 };
 
 struct NativeProgram {
@@ -318,8 +324,18 @@ private:
     NativeReader reader_;
     std::vector<NativeToken> history_;
     NativeProgram program_;
-    struct Pending { bool group; bool unary; NativeBinary binary; unsigned priority; };
+    struct Pending {
+        bool group; bool unary; NativeBinary binary; unsigned priority;
+        std::optional<NativeComparison> comparison = {};
+    };
     std::vector<Pending> pending_;
+    struct Conditional {
+        std::size_t boundary;
+        enum class Phase { condition, consequent, alternative } phase = Phase::condition;
+        std::size_t false_branch = 0;
+        std::vector<std::size_t> exits;
+    };
+    std::vector<Conditional> conditionals_;
     bool operand_ = true, start_ = true, assignment_ = false, assigned_ = false, declaration_ = false;
     std::size_t token_count_ = 0;
     std::optional<NativeOperation::Kind> call_;

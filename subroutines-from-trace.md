@@ -494,3 +494,13 @@ Character tables are bootstrap data, and operation provenance is not execution
 PC dispatch. No generated BESM instructions or machine fallback enter this path.
 No new hybrid dispatch entry is introduced, and earlier profile counts remain
 unchanged. Whole-session allocation and recursion conformance remain open.
+
+
+### Native conditional milestone and comparison correction (2026-10-06)
+
+Native comparisons and conditional execution now lower to typed POP operations;
+see [control evidence](docs/native-control.md). Named functions and call frames remain open.
+Nonnumeric comparison probes exposed incorrect zero tests in hybrid `06650`
+and a missing `06656` operand reload. The corrected multiplicative sign checks
+and diagnostic state pass full-state instruction-only differentials. No dispatch
+entries or saved corpus measurements change.
