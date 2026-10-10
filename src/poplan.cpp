@@ -1201,6 +1201,11 @@ NativeFrameCost native_argument_frame_cost(std::uint16_t arguments)
             unsigned(arguments) + 4};
 }
 
+std::uint32_t native_argument_rebuild_extent(std::uint16_t arguments)
+{
+    return arguments ? native_argument_frame_cost(arguments).exit_peak + 1 : 0;
+}
+
 NativeAllocation NativeRuntime::allocate_storage(std::uint32_t words)
 {
     auto allocation = allocator_.try_allocate(words);
@@ -1470,11 +1475,19 @@ std::size_t NativeRuntime::retain_program(NativeProgram program)
             compilation.bindings.push_back({NativeValue::Kind::word, {}, word});
         }
         for (const auto &operation : record.program.operations) {
+            if (operation.rebuilt_arguments) {
+                compilation.emissions.push_back(NativeEmission::rebuild_arguments);
+                compilation.literals.push_back(std::nullopt);
+            }
             compilation.literals.push_back(operation.kind == NativeOperation::Kind::constant
                 ? std::optional<Word48>(operation.constant) : std::nullopt);
             switch (operation.kind) {
             case NativeOperation::Kind::constant:
                 compilation.emissions.push_back(NativeEmission::literal); break;
+            case NativeOperation::Kind::captured_value:
+                compilation.emissions.push_back(NativeEmission::load_capture);
+                compilation.captures.push_back(record.program.roots.at(operation.target));
+                break;
             case NativeOperation::Kind::load:
                 // 03564..03570 emits 05053 with the binding cell as source.
                 compilation.emissions.push_back(NativeEmission::literal); break;
@@ -1848,6 +1861,13 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
         unwind_frames(accounting_base);
         return result;
     };
+    // 01025 -> 02750 enters the completed top-level compilation with one
+    // evaluator save above 066001. 03206/03261 retains its two-word header.
+    // Neither save is a native register or an execution continuation address.
+    if (!enter_frame({3, 3, 3})) {
+        result.error = "native top-level activation storage exhausted";
+        return finish();
+    }
     auto &values = values_;
     const auto pop = [&]() {
         if (!values.empty()) { const auto value = values.back(); values.pop_back(); return value; }
@@ -1884,6 +1904,17 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
         }
         const auto &instruction = program.operations.at(frame.position++);
         ++result.operations;
+        if (instruction.rebuilt_arguments) {
+            const auto extent = native_argument_rebuild_extent(instruction.rebuilt_arguments);
+            if (!enter_frame({0, extent, 0})) {
+                // Historical 20150/20157 reports 13000 with a generated
+                // continuation/address. Exact rendering awaits compiler layout
+                // conformance; do not manufacture that diagnostic value.
+                result.error = "native argument rebuilding storage exhausted (historical diagnostic 13000 rendering incomplete)";
+                return finish();
+            }
+            if (!leave_frame()) throw std::logic_error("native transient frame cannot restore");
+        }
         switch (instruction.kind) {
         case NativeOperation::Kind::call: {
             const auto function = dictionary_.word(instruction.binding).binding;
@@ -1962,6 +1993,9 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
         }
         case NativeOperation::Kind::constant:
             push({NativeValue::Kind::number, instruction.constant, 0});
+            break;
+        case NativeOperation::Kind::captured_value:
+            push(program.roots.at(instruction.target));
             break;
         case NativeOperation::Kind::load:
             push(dictionary_.word(instruction.binding).binding);
@@ -2224,6 +2258,10 @@ void NativeSession::recover(std::ostream &output, std::uint16_t code,
 
 void NativeSession::reset_compiler()
 {
+    if (compilation_roots_) {
+        runtime_.frame_roots().at(*compilation_roots_).clear();
+    }
+    enclosing_.clear();
     program_ = {};
     pending_.clear();
     conditionals_.clear();
@@ -2243,6 +2281,7 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
                           std::uint32_t binding = 0) {
         NativeOperation operation{kind, value, binary};
         const auto emission = kind == NativeOperation::Kind::constant ? NativeEmission::literal
+            : kind == NativeOperation::Kind::captured_value ? NativeEmission::load_capture
             : kind == NativeOperation::Kind::load ? NativeEmission::literal
             : kind == NativeOperation::Kind::store ? NativeEmission::store_binding
             : kind == NativeOperation::Kind::branch_false ? NativeEmission::branch_zero
@@ -2254,6 +2293,7 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         operation.legacy_words = cost.code_words;
         operation.binding = binding;
         operation.provenance = kind == NativeOperation::Kind::constant ? 016651
+            : kind == NativeOperation::Kind::captured_value ? 05126
             : kind == NativeOperation::Kind::load ? 03301
             : kind == NativeOperation::Kind::store ? 03303
             : kind == NativeOperation::Kind::print ? 013454
@@ -2270,9 +2310,20 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
     };
     const auto drain = [&] {
         const auto op = pending_.back(); pending_.pop_back();
+        // The straight-line two-load comparison path stages both operands
+        // before 20124 (05067). Calls and computed operands require their own
+        // compiler scheduling evidence and receive no inferred annotation.
+        const auto staged_value = [](const NativeOperation &operation) {
+            return operation.kind == NativeOperation::Kind::constant
+                || operation.kind == NativeOperation::Kind::load;
+        };
+        const bool rebuild_pair = op.comparison && program_.operations.size() >= 2
+            && staged_value(program_.operations.back())
+            && staged_value(program_.operations[program_.operations.size() - 2]);
         emit(op.comparison ? NativeOperation::Kind::compare
              : op.unary ? NativeOperation::Kind::unary : NativeOperation::Kind::binary, {}, op.binary);
         if (op.comparison) {
+            program_.operations.back().rebuilt_arguments = rebuild_pair ? 2 : 0;
             auto &operation = program_.operations.back();
             operation.comparison = *op.comparison;
             operation.provenance = *op.comparison == NativeComparison::equal ? 03374
@@ -2314,9 +2365,18 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         const auto found = runtime_.intern(token.packed);
         if (!found.handle || found.handle < 02740) { unsupported("function header identifier"); return; }
         if (!definition_->name) {
-            if (runtime_.dictionary().word(found.handle).properties.raw() & 00100000000000000ULL)
-                warning("****ПОВТ.ДЕКЛ. ", token);
-            runtime_.declare(found.handle);
+            if (enclosing_.empty()) {
+                if (runtime_.dictionary().word(found.handle).properties.raw() & 00100000000000000ULL)
+                    warning("****ПОВТ.ДЕКЛ. ", token);
+                runtime_.declare(found.handle);
+            } else {
+                auto &bindings = enclosing_.back().definition.bindings;
+                if (std::any_of(bindings.begin(), bindings.end(),
+                        [&](const auto &binding) { return binding.first == found.handle; })) {
+                    unsupported("duplicate nested function binding"); return;
+                }
+                bindings.push_back({found.handle, {false, false}});
+            }
             definition_->name = found.handle;
         }
         else {
@@ -2329,8 +2389,13 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         return;
     }
     if (text == "FUNCTI" && !declaration_) {
-        if (definition_ || token_count_ != 1 || !program_.operations.empty()) {
-            unsupported("nested function definition"); return;
+        if (token_count_ != 1 || !pending_.empty() || !conditionals_.empty()
+            || (!definition_ && !program_.operations.empty())) {
+            unsupported("function definition outside a statement boundary"); return;
+        }
+        if (definition_) {
+            enclosing_.push_back({std::move(program_), std::move(*definition_)});
+            program_ = {};
         }
         definition_.emplace();
         return;
@@ -2342,8 +2407,27 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         program_.bindings = definition_->bindings;
         const auto function = runtime_.make_function(std::move(program_));
         if (function.kind != NativeValue::Kind::function) { unsupported("function storage exhausted"); return; }
-        runtime_.bind(definition_->name, function);
-        reset_compiler();
+        const auto name = definition_->name;
+        if (enclosing_.empty()) {
+            runtime_.bind(name, function);
+            reset_compiler();
+        } else {
+            if (!compilation_roots_) {
+                compilation_roots_ = runtime_.frame_roots().size();
+                runtime_.frame_roots().emplace_back();
+            }
+            runtime_.frame_roots().at(*compilation_roots_).push_back(function);
+            program_ = std::move(enclosing_.back().program);
+            definition_ = std::move(enclosing_.back().definition);
+            enclosing_.pop_back();
+            emit(NativeOperation::Kind::captured_value);
+            program_.operations.back().target = program_.roots.size();
+            program_.roots.push_back(function);
+            emit(NativeOperation::Kind::store, {}, {}, name);
+            operand_ = start_ = true;
+            assignment_ = assigned_ = declaration_ = false;
+            token_count_ = 0;
+        }
         return;
     }
     if (text == "RETURN" && definition_ && !declaration_) {
@@ -2509,8 +2593,13 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         const auto found = runtime_.intern(token.packed);
         if (!found.handle) { unsupported("dictionary storage exhausted"); return; }
         const auto &word = runtime_.dictionary().word(found.handle);
-        const bool local = definition_ && std::any_of(definition_->bindings.begin(), definition_->bindings.end(),
-            [&](const auto &binding) { return binding.first == found.handle; });
+        const auto defines = [&](const Definition &definition) {
+            return definition.name == found.handle || std::any_of(definition.bindings.begin(), definition.bindings.end(),
+                [&](const auto &binding) { return binding.first == found.handle; });
+        };
+        const bool local = (definition_ && defines(*definition_))
+            || std::any_of(enclosing_.begin(), enclosing_.end(),
+                [&](const auto &context) { return defines(context.definition); });
         if ((word.properties.raw() >> 41) == 060 && !local) {
             warning("****НЕОПР. ИД-Р ", token);
             runtime_.declare(found.handle, false);

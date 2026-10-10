@@ -345,6 +345,20 @@ void test_native_accounting(const char *image_path)
         require(m->reg(017) == 066001
                     && peak - 066001 == native_argument_frame_cost(count).exit_peak,
                 "argument rebuilding releases retained storage with exact peak");
+        require(native_argument_rebuild_extent(count) == peak - 066001 + 1,
+                "20132 addressability includes the word at the stack-pointer peak");
+    }
+    {
+        NativeRuntime boundary;
+        require(boundary.enter_frame({505, 505, 505}), "argument rebuild boundary prefix");
+        const auto extent = native_argument_rebuild_extent(2);
+        require(!boundary.enter_frame({0, extent, 0}) && boundary.activation_words() == 505,
+                "two-argument rebuilding rejects the 067000 access without altering frames");
+        boundary.unwind_frames(0);
+        require(boundary.enter_frame({504, 504, 504})
+                    && boundary.enter_frame({0, extent, 0}) && boundary.leave_frame(),
+                "the immediately preceding rebuild extent fits");
+        boundary.unwind_frames(0);
     }
     {
         NativeRuntime literals(040000, 066000);
@@ -1240,7 +1254,7 @@ void test_native_reader(const char *root)
         require(static_cast<bool>(input), "native reader fixture is available");
         return std::string(std::istreambuf_iterator<char>(input), {});
     };
-    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery"}) {
+    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery", "native-nested", "native-nested-recovery", "native-rebinding", "native-man-or-boy"}) {
         const auto source = read(std::string("/tests/inputs/") + fixture + ".pop2");
         const auto expected = read(std::string("/tests/expected/") + fixture + ".out");
         std::size_t operations = 0, collections = 0;
@@ -1382,6 +1396,68 @@ void test_native_reader(const char *root)
                 && owner.values().back().number == Word48(06400000000000003ULL),
             "EOF in a redefinition does not publish or run an incomplete function body");
     owner.release_program(invoke_id);
+
+    // A completed child must remain rooted while its parent's reader is
+    // suspended, even though no dictionary binding publishes either function.
+    NativeSession nested;
+    std::ostringstream nested_output;
+    result = nested.feed("VARS X F G; 90->X; FUNCTI OUTER X; FUNCTI CHILD; X+1->X; X; END; ",
+                         false, nested_output);
+    require(result.state == NativeSessionResult::State::input_required && nested_output.str().empty(),
+            "nested compilation does not execute its child's definition or body");
+    auto &nested_owner = nested.runtime();
+    nested_owner.collect();
+    result = nested.feed("CHILD; END; OUTER(5)->F; OUTER(6)->G; F=G=>\n", false, nested_output);
+    require(result.state == NativeSessionResult::State::input_required && nested_output.str() == "** 1\n",
+            "collection during nested compilation preserves the single captured descriptor");
+    const auto outer_word = nested_owner.dictionary().lookup(Word48("OUTER"));
+    const auto outer_function = nested_owner.dictionary().word(outer_word).binding;
+    const auto f_word = nested_owner.dictionary().lookup(Word48("F"));
+    const auto child = nested_owner.dictionary().word(f_word).binding;
+    nested_owner.bind(outer_word, {});
+    nested_owner.collect();
+    reclaimed = false;
+    try { nested_owner.object(outer_function); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed && nested_owner.object(child).kind == NativeValue::Kind::function,
+            "escaped child outlives its defining function without retaining an activation snapshot");
+    result = nested.feed("F()=>\nX=>\n", true, nested_output);
+    require(result.state == NativeSessionResult::State::finished
+                && nested_output.str() == "** 1\n** 91\n** 91\n",
+            "escaped child reads and mutates the restored shared binding after collection");
+    nested_owner.bind(f_word, {});
+    nested_owner.bind(nested_owner.dictionary().lookup(Word48("G")), {});
+    nested_owner.collect();
+    reclaimed = false;
+    try { nested_owner.object(child); } catch (const std::logic_error &) { reclaimed = true; }
+    require(reclaimed, "completed compiler contexts do not keep escaped children alive");
+
+    NativeSession abandoned;
+    std::ostringstream abandoned_output;
+    abandoned.feed("FUNCTI OUTER; FUNCTI CHILD; 1; END; ", true, abandoned_output);
+    auto &abandoned_owner = abandoned.runtime();
+    abandoned_owner.collect();
+    require(abandoned_owner.dictionary().word(abandoned_owner.dictionary().lookup(Word48("CHILD"))).binding.kind
+                == NativeValue::Kind::unbound,
+            "EOF discards a completed nested definition inside an unfinished parent");
+    for (const auto &roots : abandoned_owner.frame_roots())
+        require(roots.empty(), "EOF releases suspended compiler roots");
+
+    for (const auto &[fixture, depth] : std::vector<std::pair<std::string, unsigned>>{
+             {"no-local", 125}, {"one-local", 83}, {"five-fakes", 35}, {"nested-numeric-fakes", 27}}) {
+        auto source = read("/tests/inputs/triangular-" + fixture + ".pop2");
+        source.replace(source.find("TRI(10"), 6, "TRI(" + std::to_string(depth));
+        NativeSession exhausted;
+        std::ostringstream exhausted_output;
+        const auto failure = exhausted.feed(source, true, exhausted_output);
+        const auto n = exhausted.runtime().dictionary().lookup(Word48("N"));
+        require(failure.state == NativeSessionResult::State::unsupported
+                    && failure.error.find("argument rebuilding storage exhausted") != std::string::npos
+                    && exhausted_output.str().empty(),
+                "recursive rebuild reaches the measured exhaustion boundary");
+        require(exhausted.runtime().activation_words() == 0
+                    && exhausted.runtime().dictionary().word(n).binding.number == Word48(06400000000000000ULL),
+                "exhaustion discards accounting frames while retaining the innermost active binding");
+    }
 }
 
 } // namespace

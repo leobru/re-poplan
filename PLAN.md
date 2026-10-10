@@ -235,3 +235,48 @@ This function milestone passed all 19 regular and 19 ASan/UBSan CTests, smoke,
 quine, zone1224, historical comparisons, image-free execution guards and
 whitespace checks. `docs/native-functions.md` records the exact boundary and
 separate operation counts; logs are in `artifacts/native-functions/`.
+
+
+## Step 4 nested-function milestone — 2026-10-07
+
+Implemented ordinary nested definitions, shared child descriptors, retained
+program roots, captured-variable mutation, indirect calls and explicit nested
+compiler contexts. Historical probes establish dynamic binding after escape;
+repeated outer calls return the same child function identity. The reduced
+Man-or-Boy fixture reproduces the 1, 0, -1, -2 sequence through that binding
+mechanism. Canonical five-argument K=0..3 results match historical POPLAN.
+
+See [nested-function evidence](docs/native-nested-functions.md) for the status
+matrix, source emission sites, collection/suspension checks and remaining syntax
+boundaries. Step 4's exact exhaustion acceptance remains open. The next work is
+step 5: primitive/session activation accounting, exact triangular and Man-or-Boy
+thresholds, and historical exhaustion diagnostics. Unbounded native probes
+currently terminate with an explicit development failure at the native limit.
+
+This milestone passed 19 regular and 19 ASan/UBSan CTests, smoke, quine,
+zone1224, historical comparisons, native execution guards and whitespace checks.
+Separate native operation counts and exact validation measurements are in the
+nested-function report; logs are in `artifacts/native-nested/`.
+
+
+## Step 5 recursion-boundary milestone — 2026-10-10
+
+Implemented the three-word top-level execution context and the addressable
+extent of ordinary argument rebuilding for the established two-load comparison
+path. The source compiler records staging explicitly; the runtime borrows and
+releases its compatibility storage without executing BESM instructions.
+
+The five triangular variants now match historical last-success/first-failure
+boundaries, including function-valued fake arguments. Canonical and reduced
+Man-or-Boy success/failure pairs and a bounded two-argument decrement sequence
+have native/guard/historical tests. See [recursion status](docs/native-recursion.md).
+
+Step 5 remains partial: historical 13000 rendering and SETPOP recovery require
+exact failure-phase/generated-address provenance. Other argument scheduling and
+primitive scratch paths, whole-session accounting, and exact Man-or-Boy failure
+activations remain open. Native exhaustion stays an explicit development failure.
+
+Verification passed: 20 regular and 20 ASan/UBSan CTests, smoke, quine,
+zone1224, historical fixtures/boundaries, native machine-isolation guards and
+whitespace checks. Exact validation times and exclusions are recorded in the
+recursion report; logs remain in `artifacts/native-recursion/`.

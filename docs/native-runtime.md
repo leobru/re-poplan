@@ -2,7 +2,7 @@
 
 The requested fully native runtime is **not complete**. No implementation gate
 has passed in full. `--native` now supports an incremental reader, numeric expressions, bindings, comparisons,
-conditional execution, ordinary named functions and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
+conditional execution, ordinary named/nested functions and top-level recovery; it is not a complete POPLAN replacement. Keep the machine backend as the default.
 
 ## Contract
 
@@ -38,7 +38,7 @@ local to each operation. There is no native architectural register bank.
 | 2: services | Input/output injected as streams | Resumable console input and packed-name conversion implemented; clocks and console callbacks remain open |
 | 3: reader/compiler | `NativeReader` and `NativeSession` incrementally lower literals, bindings, assignments, arithmetic and printing | [Reader evidence](native-reader.md), split-input checks, raw binding checkpoints and historical fixtures; general POP syntax remains open |
 | 3: recovery | Supported syntax/type diagnostics and explicit SETPOP transfer preserve bindings and token history | Historical recovery fixture; full diagnostic suppression and nested callbacks remain open |
-| 4: frames/control | Comparisons, conditionals, ordinary named functions, explicit frames, recursion and dynamic binding/restoration implemented; see [function evidence](native-functions.md) | Function grammar/diagnostic edges, loops, closures, exact triangular thresholds and Man-or-Boy remain open |
+| 4: frames/control | Comparisons, conditionals, ordinary named functions, explicit frames, recursion and dynamic binding/restoration implemented; see [function evidence](native-functions.md) | Nested definitions and historical shared rebinding now have [focused evidence](native-nested-functions.md); grammar/diagnostic edges and loops remain open; [triangular boundaries](native-recursion.md) match, but exhaustion diagnostics and complete accounting remain open |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
 | 6: host scope | Not implemented beyond development output | Resident primitives, POPLIB, POPMESS, clocks, callbacks and MI/MO quirks required |
 | 7: completeness | Not passed | Quine, recovered zones, language/standard fixtures, fixed-seed game and expansion probes must pass natively, with inventory coverage |
@@ -51,7 +51,7 @@ printf '2+2=>\n' | build/cpp/poplan --native
 
 The native shell accepts numeric expressions, `VARS`, variable reads, `->`,
 commas, parentheses, `;`, `=>`, comparisons, nested `IF / THEN / ELSEIF / ELSE / CLOSE`,
-ordinary named functions with formals/local VARS, END and RETURN, and the small
+ordinary named and nested functions with formals/local VARS, END and RETURN, and the small
 calls `ERASE()` and `SETPOP()`.
 It uses incremental token/compiler state and executes completed statements before
 EOF. Supported errors recover to the next input line; unsupported facilities fail
@@ -74,9 +74,9 @@ The guard covers generated instruction execution because it also goes through
 
 ## Required next work
 
-Continue with named functions and conditionals in step 3 of `PLAN.md`. In
-parallel, complete the syntax/emission inventory and historical reader allocation
-scheduling before claiming full compiled-session or exhaustion conformance. The closure failure and recursive
+Continue with step 5 recursion accounting and the remaining step 4 exhaustion
+gate in `PLAN.md`. Complete the syntax/emission inventory and historical reader
+allocation scheduling before claiming full compiled-session conformance. The closure failure and recursive
 threshold evidence in [original-structure.md](original-structure.md) is binding;
 passing small arithmetic expressions does not establish those behaviors.
 

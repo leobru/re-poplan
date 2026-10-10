@@ -151,3 +151,14 @@ outside this storage milestone.
 
 Validation logs are kept in `artifacts/native-accounting/`; full-suite outcomes
 are recorded in `native-runtime.md`. Historical profile measurements are unchanged.
+
+
+## Runtime integration update — 2026-10-10
+
+The top-level execution context now contributes three retained words. For the
+established two-load comparison path, the compiler annotates ordinary argument
+rebuilding and charges its access extent. `20132` accesses the word at the peak
+stack pointer, so addressability needs n+5 words although the pointer peak is
+n+4. The original argument-frame costs above remain unchanged. See
+[recursion evidence](native-recursion.md) for boundary tests and the remaining
+compiler scheduling/diagnostic limits.

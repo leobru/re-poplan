@@ -19,7 +19,7 @@ normalize = module.normalize
 
 fixtures = [(name, (root / 'tests/inputs' / (name + '.pop2')).read_text(),
              (root / 'tests/expected' / (name + '.out')).read_text())
-            for name in ('native-bindings', 'native-recovery', 'native-control', 'native-control-recovery', 'native-functions', 'native-functions-recovery')]
+            for name in ('native-bindings', 'native-recovery', 'native-control', 'native-control-recovery', 'native-functions', 'native-functions-recovery', 'native-nested', 'native-nested-recovery', 'native-rebinding', 'native-man-or-boy')]
 
 controls = ('POPLAN_INTERPRET_ONLY', 'POPLAN_DISABLE_TRANSLATED_ROUTINES',
             'POPLAN_CPU_TRACE', 'POPLAN_CPU_DETAIL_TRACE', 'POPLAN_ROUTINE_TRACE',

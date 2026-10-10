@@ -1,0 +1,15 @@
+VARS X B F;
+90->X; 77->B;
+FUNCTI OUTER X;
+ FUNCTI B; X+1->X; SETPOP(); END;
+ B->F;
+ B();
+END;
+OUTER(5);
+X=>
+F=B=>
+FUNCTI AGAIN X; F(); END;
+AGAIN(20);
+X=>
+F=B=>
+2+2=>

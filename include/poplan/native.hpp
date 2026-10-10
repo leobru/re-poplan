@@ -134,6 +134,9 @@ struct NativeFrameCost {
 // Peaks include retained words and are relative to the caller's frame base.
 NativeFrameCost native_binding_frame_cost(const std::vector<NativeBindingSlot> &);
 NativeFrameCost native_argument_frame_cost(std::uint16_t arguments);
+// 20132 reads at the peak stack pointer before its stack adjustment. This
+// access needs one more addressable word than the pointer high-water mark.
+std::uint32_t native_argument_rebuild_extent(std::uint16_t arguments);
 
 struct NativeNumberResult {
     Word48 value;
@@ -151,7 +154,7 @@ std::string native_format_number(Word48);
 
 struct NativeOperation {
     enum class Kind { constant, binary, print, load, store, unary, erase, setpop,
-                      compare, branch_false, jump, label, call, return_value };
+                      compare, branch_false, jump, label, call, return_value, captured_value };
     Kind kind;
     Word48 constant;
     NativeBinary binary = NativeBinary::add;
@@ -163,8 +166,12 @@ struct NativeOperation {
     std::optional<std::uint16_t> legacy_words = std::nullopt;
     std::uint32_t binding = 0;
     NativeComparison comparison = NativeComparison::equal;
-    // POP operation index, never a BESM address.
+    // POP operation index for branches, program root index for captured_value;
+    // never a BESM address.
     std::size_t target = 0;
+    // Known straight-line argument staging at the compiler source. Zero means
+    // no established rebuild annotation, not complete session accounting.
+    std::uint16_t rebuilt_arguments = 0;
 };
 
 struct NativeProgram {
@@ -356,6 +363,11 @@ private:
         std::vector<std::pair<std::uint32_t, NativeBindingSlot>> bindings;
     };
     std::optional<Definition> definition_;
+    // Suspended compilation contexts, not POP activation frames. Nested
+    // descriptors are built once and loaded at the declaration's position.
+    struct EnclosingDefinition { NativeProgram program; Definition definition; };
+    std::vector<EnclosingDefinition> enclosing_;
+    std::optional<std::size_t> compilation_roots_;
     bool operand_ = true, start_ = true, assignment_ = false, assigned_ = false, declaration_ = false;
     std::size_t token_count_ = 0;
     std::optional<NativeOperation::Kind> call_;

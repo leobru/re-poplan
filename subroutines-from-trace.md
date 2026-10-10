@@ -514,3 +514,23 @@ abandons the saves and retains active bindings. Stable function objects own thei
 compiled storage and are collected through native roots. See [function evidence](docs/native-functions.md)
 for verification and remaining syntax/diagnostic/accounting limits. No hybrid
 dispatch entries or historical profile counts change.
+
+
+### Native nested functions and rebinding (2026-10-07)
+
+Ordinary nested definitions now retain shared child descriptors and lower
+capture-load/store emissions directly to native operations. Explicit compiler
+contexts preserve suspension; ordinary dynamic frames reproduce the historical
+reduced Man-or-Boy decrement sequence. Canonical K=0..3 outputs match the
+reference. See [nested-function evidence](docs/native-nested-functions.md) for collection, identity,
+mutation, recovery and verification coverage. Exact exhaustion remains open;
+no hybrid dispatch entries or historical profile counts change.
+
+
+### Native recursion boundary accounting (2026-10-10)
+
+Native execution now charges its top-level context and the access extent of
+ordinary argument rebuilding on the established two-load comparison path. The
+triangular boundaries match historical probes; exhaustion rendering/recovery and
+complete scheduling remain open. See [recursion status](docs/native-recursion.md). No hybrid
+dispatch or saved historical instruction counts change.

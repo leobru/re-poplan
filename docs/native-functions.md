@@ -48,16 +48,17 @@ execution after collection, and EOF during an unfinished redefinition.
 
 Step 3 is still bounded: malformed function headers, duplicate formals/locals,
 result-parameter syntax, nonfunction application, and compound diagnostic
-rendering remain explicit development failures. Nested definitions/closures,
-LAMBDA, special functions and updaters remain later work. Functions can return or
-pass ordinary function values, but captured environments and the historical
-closure-rebinding failure are not implemented or claimed.
+rendering remain explicit development failures. At this milestone nested definitions/closures were still open. The subsequent
+[nested-function milestone](native-nested-functions.md) implements ordinary
+nesting and historical shared rebinding. LAMBDA, special functions and updaters
+remain later work.
 
 Whole-session accounting remains incomplete: reader temporaries, compiler
 optimization scheduling, primitive call scratch and exact recursive exhaustion
 still require conformance work. The existing activation limit gives a bounded
 native failure, not a claim of historical threshold/error compatibility.
-`legacy_accounting_complete` remains false. No Man-or-Boy result is claimed.
+`legacy_accounting_complete` remains false. This earlier milestone made no
+Man-or-Boy claim; the nested-function report records the later K=0..3 results.
 
 Logs and experimental output belong in `artifacts/native-functions/`.
 Historical machine-step measurements remain unchanged; native operation counts
