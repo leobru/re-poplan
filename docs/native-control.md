@@ -76,3 +76,12 @@ comparisons, historical trivial/full-zone1224 comparisons, the image-free
 execution guard, and `git diff --check` passed. The zone target alone compares
 hybrid with instruction-only execution; historical conformance was checked
 separately through `tools/run-dispak.sh`.
+
+
+## Boolean condition syntax added — 2026-10-10
+
+Historical AND/OR condition separators and direct NOT calls are now supported.
+They preserve early arm selection and tagged-zero truth, including the unusual
+mixed-chain behavior. See [Boolean evidence](native-booleans.md) for source
+lowering, suspension/recovery fixtures, and the remaining direct-call boundary.
+Earlier operation counts and validation measurements above remain unchanged.

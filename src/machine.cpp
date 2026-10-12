@@ -856,6 +856,21 @@ NativeNumberResult native_number_binary(NativeBinary operation,
     }
 }
 
+NativeNumberResult native_number_intof(Word48 value)
+{
+    Word48 remainder;
+    std::uint8_t mode = 007;
+    NumericScratch scratch{value, remainder, mode};
+    try {
+        // 03447..03450: disable normalization and rounding. Negative
+        // fractions retain the arithmetic-shift floor, not host truncation.
+        scratch.arithmetic_add(Word48(06400000000000000ULL), false, false);
+        return {value, {}};
+    } catch (const MachineError &error) {
+        return {Word48(), error.what()};
+    }
+}
+
 NativeNumberResult native_number_compare(NativeComparison comparison, Word48 left, Word48 right)
 {
     // 03374 compares the complete representations, including the integer tag.

@@ -280,3 +280,39 @@ Verification passed: 20 regular and 20 ASan/UBSan CTests, smoke, quine,
 zone1224, historical fixtures/boundaries, native machine-isolation guards and
 whitespace checks. Exact validation times and exclusions are recorded in the
 recursion report; logs remain in `artifacts/native-recursion/`.
+
+
+## Additional language milestone — 2026-10-10
+
+Implemented historical AND/OR separators in IF and ELSEIF conditions, plus
+direct NOT(...) calls. Explicit false/true branch fixups preserve short-circuit
+side effects, nested conditionals, tagged-zero truth, and multiple stack results.
+These are historical condition separators rather than general Boolean infix
+expressions. Bare NOT function values remain explicitly unsupported.
+
+See [Boolean syntax status](docs/native-booleans.md) for source evidence,
+reference comparisons, suspension tests and recovery coverage. Step 5's exact
+exhaustion rendering/recovery and complete accounting remain open; this language
+addition does not change those claims.
+
+Verification passed: 20 regular and 20 ASan/UBSan CTests, smoke, quine,
+zone1224, historical comparisons, native isolation/suspension checks and
+whitespace checks. Measurements and limitations are recorded in the Boolean
+syntax report; logs remain in `artifacts/native-booleans/`.
+
+## Direct numeric primitives — 2026-10-11
+
+Implemented direct INTOF(...) and SIGN(...) calls using native operations and
+existing operation-local BESM arithmetic. INTOF preserves negative-fraction
+flooring and rejection of integer arguments. SIGN handles integer/real signs and
+zero. Nested calls, ordinary function bodies, multiple stack results, diagnostics
+and input suspension have focused tests.
+
+See [numeric primitive evidence](docs/native-numeric-functions.md). First-class
+resident aliases and complete legacy accounting remain open. This addition does
+not change the partial status of step 5.
+
+Verification passed: 20 regular and 20 ASan/UBSan CTests, smoke, quine,
+zone1224, historical comparisons, native isolation and input-suspension tests,
+and whitespace checks. See the numeric primitive report for measurements;
+logs are in `artifacts/native-numeric-functions/`.

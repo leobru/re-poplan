@@ -1495,6 +1495,8 @@ std::size_t NativeRuntime::retain_program(NativeProgram program)
                 compilation.emissions.push_back(NativeEmission::store_binding); break;
             case NativeOperation::Kind::branch_false:
                 compilation.emissions.push_back(NativeEmission::branch_zero); break;
+            case NativeOperation::Kind::branch_true:
+                compilation.emissions.push_back(NativeEmission::branch_nonzero); break;
             case NativeOperation::Kind::jump:
                 compilation.emissions.push_back(NativeEmission::jump); break;
             case NativeOperation::Kind::label:
@@ -1504,7 +1506,8 @@ std::size_t NativeRuntime::retain_program(NativeProgram program)
             case NativeOperation::Kind::binary: case NativeOperation::Kind::print:
             case NativeOperation::Kind::unary: case NativeOperation::Kind::erase:
             case NativeOperation::Kind::setpop: case NativeOperation::Kind::compare:
-            case NativeOperation::Kind::call:
+            case NativeOperation::Kind::call: case NativeOperation::Kind::logical_not:
+            case NativeOperation::Kind::integer_part: case NativeOperation::Kind::sign:
                 compilation.emissions.push_back(NativeEmission::call_binding); break;
             default: throw std::logic_error("native program: unknown operation kind");
             }
@@ -1951,6 +1954,7 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
         case NativeOperation::Kind::label:
             break;
         case NativeOperation::Kind::branch_false:
+        case NativeOperation::Kind::branch_true:
         case NativeOperation::Kind::jump: {
             bool transfer = instruction.kind == NativeOperation::Kind::jump;
             if (!transfer) {
@@ -1959,6 +1963,7 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
                 // 20073..20107 compares with the complete tagged FALSE word.
                 transfer = value.kind == NativeValue::Kind::number
                     && value.number == Word48(06400000000000000ULL);
+                if (instruction.kind == NativeOperation::Kind::branch_true) transfer = !transfer;
             }
             if (instruction.target >= program.operations.size()
                 || program.operations[instruction.target].kind != NativeOperation::Kind::label)
@@ -1994,6 +1999,40 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
         case NativeOperation::Kind::constant:
             push({NativeValue::Kind::number, instruction.constant, 0});
             break;
+        case NativeOperation::Kind::integer_part:
+        case NativeOperation::Kind::sign: {
+            const auto value = pop();
+            if (!result.error.empty()) return finish();
+            const bool intof = instruction.kind == NativeOperation::Kind::integer_part;
+            if (value.kind != NativeValue::Kind::number
+                || (intof && value.number.raw() >= 06400000000000000ULL)) {
+                result.diagnostic = intof ? 014000 : 010130;
+                result.culprit = value;
+                return finish();
+            }
+            Word48 answer;
+            if (intof) {
+                const auto number = native_number_intof(value.number);
+                if (!number.error.empty()) { result.error = number.error; return finish(); }
+                answer = number.value;
+            } else {
+                // 10371..10377: test the mantissa sign, then its remaining bits.
+                const auto mantissa = value.number.raw() & ((std::uint64_t{1} << 41) - 1);
+                answer = Word48(mantissa & (std::uint64_t{1} << 40)
+                    ? 06437777777777777ULL : 06400000000000000ULL | (mantissa != 0));
+            }
+            push({NativeValue::Kind::number, answer, 0});
+            break;
+        }
+        case NativeOperation::Kind::logical_not: {
+            const auto value = pop();
+            if (!result.error.empty()) return finish();
+            // 03371 compares the complete FALSE word, including its tag.
+            const bool is_false = value.kind == NativeValue::Kind::number
+                && value.number == Word48(06400000000000000ULL);
+            push({NativeValue::Kind::number, Word48(06400000000000000ULL | is_false), 0});
+            break;
+        }
         case NativeOperation::Kind::captured_value:
             push(program.roots.at(instruction.target));
             break;
@@ -2285,6 +2324,7 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
             : kind == NativeOperation::Kind::load ? NativeEmission::literal
             : kind == NativeOperation::Kind::store ? NativeEmission::store_binding
             : kind == NativeOperation::Kind::branch_false ? NativeEmission::branch_zero
+            : kind == NativeOperation::Kind::branch_true ? NativeEmission::branch_nonzero
             : kind == NativeOperation::Kind::jump ? NativeEmission::jump
             : kind == NativeOperation::Kind::label ? NativeEmission::label
             : kind == NativeOperation::Kind::return_value ? NativeEmission::return_value : NativeEmission::call_binding;
@@ -2302,6 +2342,10 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
             : kind == NativeOperation::Kind::call ? 03206
             : kind == NativeOperation::Kind::return_value ? 03235
             : kind == NativeOperation::Kind::branch_false ? 020073
+            : kind == NativeOperation::Kind::branch_true ? 020077
+            : kind == NativeOperation::Kind::logical_not ? 03371
+            : kind == NativeOperation::Kind::integer_part ? 03442
+            : kind == NativeOperation::Kind::sign ? 010365
             : kind == NativeOperation::Kind::jump || kind == NativeOperation::Kind::label ? 04214
             : kind == NativeOperation::Kind::unary ? (binary == NativeBinary::subtract ? 04437 : 04520)
             : binary == NativeBinary::add ? 06672 : binary == NativeBinary::subtract ? 06702
@@ -2440,6 +2484,17 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         unsupported("declaration in a conditional body"); return;
     }
     if (call_) {
+        if (*call_ == NativeOperation::Kind::logical_not
+            || *call_ == NativeOperation::Kind::integer_part || *call_ == NativeOperation::Kind::sign) {
+            const auto name = *call_ == NativeOperation::Kind::logical_not ? "NOT"
+                : *call_ == NativeOperation::Kind::integer_part ? "INTOF" : "SIGN";
+            if (text != "(") { unsupported(std::string(name) + " requires a parenthesized call"); return; }
+            pending_.push_back({true, false, {}, 0});
+            pending_.back().primitive_call = *call_;
+            call_.reset();
+            operand_ = start_ = true;
+            return;
+        }
         if (!call_open_ && text == "(") { call_open_ = true; return; }
         if (call_open_ && text == ")") {
             emit(*call_); call_.reset(); operand_ = false; start_ = false; return;
@@ -2453,6 +2508,24 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         operand_ = start_ = true;
         return;
     }
+    if (!declaration_ && (text == "AND" || text == "OR")) {
+        // 04231..04240 branches directly to this IF's false/true arm.
+        // These are condition separators, not general Boolean operators.
+        if (conditionals_.empty() || conditionals_.back().phase != Conditional::Phase::condition) {
+            recover(output, 04700, token); return;
+        }
+        while (!pending_.empty() && !pending_.back().group) drain();
+        auto &conditional = conditionals_.back();
+        if (pending_.size() != conditional.boundary + 1 || assignment_) {
+            recover(output, 04700, token); return;
+        }
+        auto &terms = text == "AND" ? conditional.false_terms : conditional.true_terms;
+        terms.push_back(program_.operations.size());
+        emit(text == "AND" ? NativeOperation::Kind::branch_false : NativeOperation::Kind::branch_true);
+        operand_ = start_ = true;
+        assigned_ = false;
+        return;
+    }
     if (!declaration_ && (text == "THEN" || text == "ELSE" || text == "ELSEIF" || text == "CLOSE")) {
         if (conditionals_.empty()) { unsupported("unmatched " + text); return; }
         auto &conditional = conditionals_.back();
@@ -2464,6 +2537,12 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
             if (conditional.phase != Conditional::Phase::condition) { unsupported("unexpected THEN"); return; }
             conditional.false_branch = program_.operations.size();
             emit(NativeOperation::Kind::branch_false);
+            if (!conditional.true_terms.empty()) {
+                const auto label = program_.operations.size();
+                emit(NativeOperation::Kind::label);
+                for (const auto branch : conditional.true_terms) program_.operations[branch].target = label;
+                conditional.true_terms.clear();
+            }
             conditional.phase = Conditional::Phase::consequent;
         } else {
             if (conditional.phase == Conditional::Phase::condition) { recover(output, 04740, token); return; }
@@ -2474,8 +2553,11 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
             }
             const auto label = program_.operations.size();
             emit(NativeOperation::Kind::label);
-            if (conditional.phase == Conditional::Phase::consequent)
+            if (conditional.phase == Conditional::Phase::consequent) {
                 program_.operations[conditional.false_branch].target = label;
+                for (const auto branch : conditional.false_terms) program_.operations[branch].target = label;
+                conditional.false_terms.clear();
+            }
             if (text == "CLOSE") {
                 for (const auto exit : conditional.exits) program_.operations[exit].target = label;
                 pending_.pop_back();
@@ -2562,8 +2644,10 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
             unsupported("missing CLOSE before )"); return;
         }
         const auto callee = pending_.back().call;
+        const auto primitive = pending_.back().primitive_call;
         pending_.pop_back(); operand_ = false; start_ = false;
         if (callee) emit(NativeOperation::Kind::call, {}, {}, callee);
+        if (primitive) emit(*primitive);
         return;
     }
     if (text == "+" || text == "-" || text == "*" || text == "/"
@@ -2610,6 +2694,11 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         }
         if (!operand_ && !assignment_) { recover(output, 04020, token); return; }
         if (found.handle < 02740 && text != "UNDEF" && text != "FALSE" && text != "TRUE") {
+            if ((text == "NOT" || text == "INTOF" || text == "SIGN") && !assignment_) {
+                call_ = text == "NOT" ? NativeOperation::Kind::logical_not
+                    : text == "INTOF" ? NativeOperation::Kind::integer_part : NativeOperation::Kind::sign;
+                return;
+            }
             if (text == "ERASE" || text == "SETPOP") {
                 call_ = text == "ERASE" ? NativeOperation::Kind::erase : NativeOperation::Kind::setpop;
                 call_open_ = false;

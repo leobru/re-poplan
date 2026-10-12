@@ -534,3 +534,21 @@ ordinary argument rebuilding on the established two-load comparison path. The
 triangular boundaries match historical probes; exhaustion rendering/recovery and
 complete scheduling remain open. See [recursion status](docs/native-recursion.md). No hybrid
 dispatch or saved historical instruction counts change.
+
+
+### Native Boolean conditions (2026-10-10)
+
+AND/OR condition separators now lower the `04231..04240` decisions to typed
+false/true branches. Direct NOT calls implement `03371` tagged-zero semantics.
+See [Boolean evidence](docs/native-booleans.md) for historical behavior, side effects,
+suspension and recovery coverage. No hybrid dispatch entry or historical
+instruction measurement changes.
+
+
+## Native numeric primitives — 2026-10-11
+
+Image-independent direct INTOF/SIGN calls now lower to typed native operations.
+INTOF follows `03442..03450`; SIGN follows `10365..10401`. Exact-bit primitive
+and historical fixture comparisons are documented in
+[native numeric status](docs/native-numeric-functions.md). No reference-backend dispatch
+entry or historical profile count changes in this milestone.

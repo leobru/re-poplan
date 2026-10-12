@@ -148,13 +148,16 @@ NativeNumberResult native_real_from_double(double);
 // Signed decimal real with a required fractional digit and optional $ exponent.
 NativeNumberResult native_parse_real_literal(std::string_view);
 NativeNumberResult native_number_binary(NativeBinary, Word48, Word48);
+// 03447: convert a checked real using BESM NTR 7 and tagged-zero addition.
+NativeNumberResult native_number_intof(Word48);
 enum class NativeComparison { equal, less, greater, less_equal, greater_equal };
 NativeNumberResult native_number_compare(NativeComparison, Word48, Word48);
 std::string native_format_number(Word48);
 
 struct NativeOperation {
     enum class Kind { constant, binary, print, load, store, unary, erase, setpop,
-                      compare, branch_false, jump, label, call, return_value, captured_value };
+                      compare, branch_false, jump, label, call, return_value, captured_value,
+                      branch_true, logical_not, integer_part, sign };
     Kind kind;
     Word48 constant;
     NativeBinary binary = NativeBinary::add;
@@ -348,6 +351,7 @@ private:
         bool group; bool unary; NativeBinary binary; unsigned priority;
         std::optional<NativeComparison> comparison = {};
         std::uint32_t call = 0;
+        std::optional<NativeOperation::Kind> primitive_call = {};
     };
     std::vector<Pending> pending_;
     struct Conditional {
@@ -355,6 +359,7 @@ private:
         enum class Phase { condition, consequent, alternative } phase = Phase::condition;
         std::size_t false_branch = 0;
         std::vector<std::size_t> exits;
+        std::vector<std::size_t> false_terms = {}, true_terms = {};
     };
     std::vector<Conditional> conditionals_;
     struct Definition {

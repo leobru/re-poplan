@@ -1206,6 +1206,47 @@ void test_native_reader(const char *root)
                     "native comparison returns exact raw Boolean bits with two operands consumed");
         }
     }
+    // Direct numeric resident calls: compare their exact result words, POP
+    // stack consumption, and error selection independently of formatting.
+    std::vector<Word48> numeric_calls = comparisons;
+    for (const double value : {3.9, -3.9, 549755813887.0, -549755813887.0,
+                               1e-19, -1e-19, 1.99999999999, -1.99999999999}) {
+        const auto bits = native_real_from_double(value).value.raw();
+        for (const int offset : {-1, 0, 1}) numeric_calls.emplace_back(bits + offset);
+    }
+    for (const auto kind : {NativeOperation::Kind::integer_part, NativeOperation::Kind::sign}) {
+        const bool intof = kind == NativeOperation::Kind::integer_part;
+        for (const auto value : numeric_calls) {
+            raw->reg(006) = 070000;
+            raw->reg(017) = 066001;
+            raw->alu_mode() = 007;
+            raw->memory(070000) = value;
+            raw->start(intof ? 03442 : 010365);
+            unsigned steps = 0;
+            while ((raw->right_half() || (raw->program_counter() != (intof ? 03314 : 03301)
+                    && raw->program_counter() != 03014)) && steps++ < 100) raw->step();
+            NativeRuntime runtime;
+            runtime.values().push_back({NativeValue::Kind::number, integer(17), 0});
+            runtime.values().push_back({NativeValue::Kind::number, value, 0});
+            NativeProgram program;
+            program.operations.push_back({kind, {}});
+            std::ostringstream output;
+            const auto executed = runtime.execute(runtime.retain_program(std::move(program)), output);
+            require(steps < 100 && executed.error.empty() && raw->reg(006) == 070001
+                        && raw->reg(017) == 066001 && output.str().empty(),
+                    "numeric primitive consumes one raw argument and balances scratch storage");
+            if (raw->program_counter() == 03014) {
+                require(executed.diagnostic == raw->reg(016) && executed.culprit.number == value,
+                        "numeric primitive preserves raw diagnostic and offending bits");
+            } else {
+                const auto answer = intof ? raw->accumulator() : raw->memory(raw->reg(016));
+                require(executed.diagnostic == 0 && runtime.values().size() == 2
+                            && runtime.values()[0].number == integer(17)
+                            && runtime.values()[1].number == answer,
+                        "numeric primitive returns exact raw bits and preserves earlier stack results");
+            }
+        }
+    }
     // 06650's two type checks branch in the multiplicative ALU group. Include
     // tagged nonnumbers: a zero-only test incorrectly accepts UNDEF here.
     const std::vector<Word48> checked_values = {
@@ -1254,7 +1295,7 @@ void test_native_reader(const char *root)
         require(static_cast<bool>(input), "native reader fixture is available");
         return std::string(std::istreambuf_iterator<char>(input), {});
     };
-    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery", "native-nested", "native-nested-recovery", "native-rebinding", "native-man-or-boy"}) {
+    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery", "native-nested", "native-nested-recovery", "native-rebinding", "native-man-or-boy", "native-booleans", "native-booleans-recovery", "native-numeric-functions", "native-numeric-functions-recovery"}) {
         const auto source = read(std::string("/tests/inputs/") + fixture + ".pop2");
         const auto expected = read(std::string("/tests/expected/") + fixture + ".out");
         std::size_t operations = 0, collections = 0;
