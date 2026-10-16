@@ -1,0 +1,4 @@
+functi s; vars q t; '
+functi s; vars q t; ','-> t -> q;
+prstring(q); pr(q); charout(44); pr(t); prstring(t); end; .s;' -> t -> q;
+prstring(q); pr(q); charout(44); pr(t); prstring(t); end; .s;

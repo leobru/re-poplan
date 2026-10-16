@@ -108,3 +108,17 @@ $(BUILD_DIR):
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+# Independent modern interpreter; this target does not depend on image extraction.
+.PHONY: standalone standalone-test standalone-sanitize
+standalone:
+	cmake -S standalone -B $(BUILD_DIR)/standalone -DCMAKE_BUILD_TYPE=Debug
+	cmake --build $(BUILD_DIR)/standalone
+
+standalone-test: standalone
+	ctest --test-dir $(BUILD_DIR)/standalone --output-on-failure
+
+standalone-sanitize:
+	cmake -S standalone -B $(BUILD_DIR)/standalone-sanitize -DCMAKE_BUILD_TYPE=Debug -DPOPLAN_SANITIZERS=ON
+	cmake --build $(BUILD_DIR)/standalone-sanitize
+	ASAN_OPTIONS=detect_leaks=0 ctest --test-dir $(BUILD_DIR)/standalone-sanitize --output-on-failure
