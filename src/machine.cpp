@@ -7774,7 +7774,9 @@ std::uint16_t Machine::p06751_error()
 
 std::uint16_t Machine::p06727_finish_arithmetic()
 {
-    memory_[address_add(registers_[017], -1)] = accumulator_;
+    // 06727: retain the result while checking its range.
+    const Word48 shadow_accumulator = accumulator_;
+    memory_[address_add(registers_[017], -1)] = shadow_accumulator;
     shift_accumulator(1);
     accumulator_ = cyclic_add(accumulator_, memory_[06755]);
     remainder_ = Word48();
@@ -7785,7 +7787,7 @@ std::uint16_t Machine::p06727_finish_arithmetic()
         return 03014;
     }
     registers_[017] = address_add(registers_[017], -1);
-    accumulator_ = memory_[registers_[017]];
+    accumulator_ = shadow_accumulator;
     select_alu_group(rau_logical);
     return registers_[015];
 }
@@ -8299,18 +8301,20 @@ std::uint16_t Machine::p11647()
 
         alu_mode_ = 006;
         arithmetic_add(memory_[0], false, false);
+        // 11660: retain r17 timing across potentially throwing arithmetic.
+        const Word48 divisor_shadow = accumulator_;
         hardware_push_acc();
         accumulator_ = memory_[address_add(registers_[017], -3)];
         select_alu_group(rau_logical);
         arithmetic_add(
             memory_[address_add(registers_[010], 0310)], false, true);
         registers_[017] = address_add(registers_[017], -1);
-        divide(memory_[registers_[017]]);
+        divide(divisor_shadow);
         arithmetic_add(
             memory_[address_add(registers_[010], 0253)], false, false);
-        hardware_push_acc();
+        // 11662..11663: the immediate save/restore leaves this spill behind.
+        memory_[registers_[017]] = accumulator_;
         alu_mode_ = 003;
-        hardware_pop_acc();
         select_alu_group(rau_logical);
         arithmetic_add(
             memory_[address_add(registers_[010], 0272)], false, false);
@@ -8360,18 +8364,20 @@ std::uint16_t Machine::p11651()
 
     alu_mode_ = 006;
     arithmetic_add(memory_[0], false, false);
+    // 11660: retain r17 timing across potentially throwing arithmetic.
+    const Word48 divisor_shadow = accumulator_;
     hardware_push_acc();
     accumulator_ = memory_[address_add(registers_[017], -3)];
     select_alu_group(rau_logical);
     arithmetic_add(
         memory_[address_add(registers_[010], 0310)], false, true);
     registers_[017] = address_add(registers_[017], -1);
-    divide(memory_[registers_[017]]);
+    divide(divisor_shadow);
     arithmetic_add(
         memory_[address_add(registers_[010], 0253)], false, false);
-    hardware_push_acc();
+    // 11662..11663: the immediate save/restore leaves this spill behind.
+    memory_[registers_[017]] = accumulator_;
     alu_mode_ = 003;
-    hardware_pop_acc();
     select_alu_group(rau_logical);
     arithmetic_add(
         memory_[address_add(registers_[010], 0272)], false, false);
@@ -8384,7 +8390,9 @@ std::uint16_t Machine::p11665()
     sti(016);
     sti(015);
     shift_accumulator(-24);
-    hardware_push_acc();
+    // 11666..11670: keep the shifted operand and its observable spill.
+    const Word48 shadow_accumulator = accumulator_;
+    memory_[registers_[017]] = shadow_accumulator;
 
     accumulator_ = memory_[registers_[016]];
     select_alu_group(rau_logical);
@@ -8394,9 +8402,8 @@ std::uint16_t Machine::p11665()
     remainder_ = Word48();
 
     const Word48 before = accumulator_;
-    registers_[017] = address_add(registers_[017], -1);
     accumulator_ = Word48(
-        accumulator_.raw() ^ memory_[registers_[017]].raw());
+        accumulator_.raw() ^ shadow_accumulator.raw());
     remainder_ = before;
     memory_[registers_[016]] = accumulator_;
 
@@ -10497,14 +10504,17 @@ std::uint16_t Machine::p17150()
     registers_[001] = 017150;
     shift_accumulator(-43);
     registers_[016] = 017567;
-    xts(registers_[016]);
+    // 17152..17154: spill before loading, including aliased operands.
+    const Word48 shadow_accumulator = accumulator_;
+    memory_[registers_[017]] = shadow_accumulator;
+    accumulator_ = memory_[registers_[016]];
+    select_alu_group(rau_logical);
     accumulator_ = accumulator_
         & memory_[address_add(registers_[001], 021)];
     remainder_ = Word48();
     const Word48 before = accumulator_;
-    registers_[017] = address_add(registers_[017], -1);
     accumulator_ = Word48(
-        accumulator_.raw() ^ memory_[registers_[017]].raw());
+        accumulator_.raw() ^ shadow_accumulator.raw());
     remainder_ = before;
     memory_[registers_[016]] = accumulator_;
     registers_[015] = 017156;
@@ -13503,11 +13513,14 @@ std::uint16_t Machine::p21075()
     accumulator_ = accumulator_
         & memory_[address_add(registers_[010], 023)];
     remainder_ = Word48();
-    its(014);
-    registers_[017] = address_add(registers_[017], -1);
+    // Balanced ITS operand: retain the spill, use a local shadow.
+    const Word48 first_shadow = accumulator_;
+    memory_[registers_[017]] = first_shadow;
+    accumulator_ = Word48(registers_[014]);
+    select_alu_group(rau_logical);
     const Word48 first_address = accumulator_;
     accumulator_ = Word48(
-        accumulator_.raw() ^ memory_[registers_[017]].raw());
+        accumulator_.raw() ^ first_shadow.raw());
     remainder_ = first_address;
     memory_[address_add(registers_[013], 1)] = accumulator_;
 
@@ -13515,12 +13528,15 @@ std::uint16_t Machine::p21075()
     accumulator_ = accumulator_
         & memory_[address_add(registers_[010], 024)];
     remainder_ = Word48();
-    its(013);
+    // Balanced ITS operand: retain the spill, use a local shadow.
+    const Word48 second_shadow = accumulator_;
+    memory_[registers_[017]] = second_shadow;
+    accumulator_ = Word48(registers_[013]);
+    select_alu_group(rau_logical);
     shift_accumulator(-24);
-    registers_[017] = address_add(registers_[017], -1);
     const Word48 second_address = accumulator_;
     accumulator_ = Word48(
-        accumulator_.raw() ^ memory_[registers_[017]].raw());
+        accumulator_.raw() ^ second_shadow.raw());
     remainder_ = second_address;
     memory_[address_add(registers_[014], 1)] = accumulator_;
 
@@ -14753,11 +14769,14 @@ std::uint16_t Machine::p21107()
     accumulator_ = accumulator_
         & memory_[address_add(registers_[010], 023)];
     remainder_ = Word48();
-    its(016);
-    registers_[017] = address_add(registers_[017], -1);
+    // Balanced ITS operand: retain the spill, use a local shadow.
+    const Word48 first_shadow = accumulator_;
+    memory_[registers_[017]] = first_shadow;
+    accumulator_ = Word48(registers_[016]);
+    select_alu_group(rau_logical);
     Word48 before = accumulator_;
     accumulator_ = Word48(
-        accumulator_.raw() ^ memory_[registers_[017]].raw());
+        accumulator_.raw() ^ first_shadow.raw());
     remainder_ = before;
     memory_[address_add(registers_[010], 027)] = accumulator_;
     accumulator_ = Word48(registers_[014]);
@@ -14771,12 +14790,15 @@ std::uint16_t Machine::p21107()
     accumulator_ = accumulator_
         & memory_[address_add(registers_[010], 024)];
     remainder_ = Word48();
-    its(016);
+    // Balanced ITS operand: retain the spill, use a local shadow.
+    const Word48 second_shadow = accumulator_;
+    memory_[registers_[017]] = second_shadow;
+    accumulator_ = Word48(registers_[016]);
+    select_alu_group(rau_logical);
     shift_accumulator(-24);
-    registers_[017] = address_add(registers_[017], -1);
     before = accumulator_;
     accumulator_ = Word48(
-        accumulator_.raw() ^ memory_[registers_[017]].raw());
+        accumulator_.raw() ^ second_shadow.raw());
     remainder_ = before;
     memory_[address_add(registers_[014], 1)] = accumulator_;
     return registers_[015];

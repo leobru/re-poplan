@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recursion boundary milestone; exhaustion diagnostics are explicitly incomplete."""
+"""Recursion boundaries, supported exhaustion recovery, and bounded checkpoints."""
 import importlib.util
 import os
 from pathlib import Path
@@ -27,10 +27,17 @@ with tempfile.TemporaryDirectory(prefix='poplan-recursion-') as directory:
         for depth in (last, last + 1):
             source = template.replace('TRI(10', 'TRI(' + str(depth))
             wanted = '** ' + str(depth * (depth + 1) // 2) + '\n'
+            recoverable = depth > last and name.startswith('nested-')
+            if recoverable:
+                source += '\nN=>\n2+2=>\n' + template.strip().splitlines()[-1].replace('TRI(10', 'TRI(3') + '\n'
+                wanted_failure = ('****ОШИБКА 13000\n0000000000067000  .00000000\n\nSЕТРОР\n'
+                                  '** 0\n** 4\n** 6\n')
             for executable in (binary, guarded):
                 result = run(executable, ['--native'], source)
                 if depth == last:
                     assert result.returncode == 0 and result.stdout == wanted, (name, depth, result)
+                elif recoverable:
+                    assert result.returncode == 0 and result.stdout == wanted_failure, (name, depth, result)
                 else:
                     assert result.returncode != 0 and not result.stdout, (name, depth, result)
                     assert 'argument rebuilding storage exhausted' in result.stderr, result
@@ -48,20 +55,33 @@ with tempfile.TemporaryDirectory(prefix='poplan-recursion-') as directory:
                 assert result.returncode == 0, result
                 if depth == last:
                     assert normalizer.normalize(result.stdout) == wanted, (name, result)
+                elif recoverable:
+                    # The supervisor prints an emulator instruction before POP's
+                    # diagnostic. It is host tracing, not language output.
+                    actual = normalizer.normalize(result.stdout)
+                    actual = actual[actual.index('****ОШИБКА 13000'):]
+                    assert actual == wanted_failure, (name, result)
                 else:
                     assert 'ОШИБКА 13000' in result.stdout and 'SЕТРОР' in result.stdout, (name, result)
         print(name + ': boundary ' + str(last) + '/' + str(last + 1)
-              + ' passed; exact exhaustion output remains unsupported')
+              + (' passed with recovery' if name.startswith('nested-') else ' passed; continuation rendering remains unsupported'))
 
     for suffix, first_failure, wanted in (('', 4, '** 0\n'), ('-four', 3, '** 0\n'),
                                           ('-three', 2, '** 0\n')):
         template = (root / 'tests/inputs' / ('man-or-boy' + suffix + '.pop2')).read_text()
         for depth in (first_failure - 1, first_failure):
             source = template.replace('A(10,', 'A(' + str(depth) + ',')
+            recoverable = suffix == '-four' and depth == first_failure
+            if recoverable:
+                source += '\nK=>\nB=>\nX1=X2=>\nA(0,ONE,MINUS,MINUS,ONE)=>\nK=>\n'
+                wanted_failure = ('****ОШИБКА 13000\n0000000000000003  .00000000\n\nSЕТРОР\n'
+                                  '**-28\n**НЕОПРЕДЕЛЕН\n** 1\n** 0\n**-28\n')
             for executable in (binary, guarded):
                 result = run(executable, ['--native'], source)
                 if depth < first_failure:
                     assert result.returncode == 0 and result.stdout == wanted, (suffix, depth, result)
+                elif recoverable:
+                    assert result.returncode == 0 and result.stdout == wanted_failure, (suffix, depth, result)
                 else:
                     assert result.returncode != 0 and 'storage exhausted' in result.stderr, (suffix, depth, result)
             if historical:
@@ -72,7 +92,7 @@ with tempfile.TemporaryDirectory(prefix='poplan-recursion-') as directory:
                 else:
                     assert 'ОШИБКА 13000' in result.stdout, (suffix, depth, result)
         print('man-or-boy' + suffix + ': success/failure K=' + str(first_failure - 1)
-              + '/' + str(first_failure) + '; exact failure activation and diagnostic remain open')
+              + '/' + str(first_failure) + ('; partial binding recovery passed' if suffix == '-four' else '; function diagnostic rendering remains open'))
 
     # Bound the inherently recursive two-argument variant in the POP test,
     # never by a fixture-specific runtime recursion rule or timeout outcome.

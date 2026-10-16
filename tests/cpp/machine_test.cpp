@@ -1163,6 +1163,75 @@ void test_native_reals()
             "native real literals reach printing and mixed arithmetic");
 }
 
+void test_native_closures(const char *root)
+{
+    using namespace poplan;
+    const NativeOptions options{true, 0, nullptr};
+    const std::string definitions =
+        "VARS F G H X; 99->X;\n"
+        "FUNCTI HELP; X; END;\n"
+        "FUNCTI MAKE X; FUNCTI B; X+1->X; HELP(); END; B; END;\n"
+        "MAKE(10)->F; F->H; MAKE(20)->G;\n";
+    const std::string calls = "F=H=>\nF=G=>\nF()=>\nH()=>\nG()=>\nX=>\n";
+    const std::string expected = "** 1\n** 0\n** 11\n** 12\n** 21\n** 99\n";
+    NativeSession session(options);
+    std::ostringstream out;
+    const auto feed = [&](const std::string &source) {
+        const auto result = session.feed(source, false, out);
+        require(result.error.empty(), "experimental closure source: " + result.error);
+        require(session.runtime().activation_words() == 0, "completed calls release accounting frames");
+    };
+    feed(definitions);
+    session.runtime().collect();
+    require(session.runtime().environment_cell_count() == 4,
+            "two escaped activations retain independent X and self-referential B cells");
+    feed("UNDEF->MAKE;\n");
+    session.runtime().collect();
+    feed(calls);
+    require(out.str() == expected, "escaped instances share code after their prototype and parent are collected");
+    feed("UNDEF->F; UNDEF->G; UNDEF->H;\n");
+    session.runtime().collect();
+    require(session.runtime().environment_cell_count() == 0,
+            "unreachable self-referential closure environments are reclaimed");
+    require(session.runtime().function_count() == 1, "only the unrelated HELP function remains");
+
+    const auto source = definitions + calls;
+    for (std::size_t split = 0; split <= source.size(); ++split) {
+        NativeSession suspended(options);
+        std::ostringstream output;
+        auto result = suspended.feed(std::string_view(source).substr(0, split), false, output);
+        require(result.error.empty(), "experimental closure prefix compiles");
+        suspended.runtime().collect();
+        const auto before = output.str();
+        suspended.feed({}, false, output);
+        require(output.str() == before, "suspension does not replay closure mutations");
+        result = suspended.feed(std::string_view(source).substr(split), true, output);
+        require(result.state == NativeSessionResult::State::finished && output.str() == expected,
+                "every split preserves closures across compiler suspension and collection");
+    }
+    std::ifstream recovery(std::string(root) + "/tests/inputs/native-nested-recovery.pop2");
+    const std::string recovery_source{std::istreambuf_iterator<char>(recovery), {}};
+    NativeSession recovered(options);
+    std::ostringstream recovery_output;
+    for (const auto c : recovery_source) {
+        const auto result = recovered.feed(std::string_view(&c, 1), false, recovery_output);
+        require(result.error.empty(), "experimental nested SETPOP remains supported");
+        recovered.runtime().collect();
+    }
+    require(recovery_output.str() == "SЕТРОР\n** 6\n** 1\nSЕТРОР\n** 7\n** 1\n** 4\n",
+            "SETPOP retains installed cells, including subsequent captured mutation");
+    std::ifstream man(std::string(root) + "/tests/inputs/man-or-boy.pop2");
+    const std::string man_source{std::istreambuf_iterator<char>(man), {}};
+    NativeSession boy(options);
+    std::ostringstream answer;
+    const auto result = boy.feed(man_source, true, answer);
+    require(result.error.empty() && answer.str() == "**-67\n", "canonical K=10 returns -67");
+    require(boy.runtime().collection_count() > 0, "Man-or-Boy survives collection with active and saved cells");
+    boy.runtime().collect();
+    require(boy.runtime().environment_cell_count() == 0, "completed Man-or-Boy releases all activation cells");
+    std::cout << "experimental Man-or-Boy K=10: " << result.operations << " native operations\n";
+}
+
 void test_native_reader(const char *root)
 {
     using namespace poplan;
@@ -1247,6 +1316,48 @@ void test_native_reader(const char *root)
             }
         }
     }
+    // Predicate oracles inspect tagged values without traversing their payloads.
+    // Adapt both historical callable classes to the native function kind.
+    for (const auto &[kind, entry] : std::vector<std::pair<NativeOperation::Kind, std::uint16_t>>{
+             {NativeOperation::Kind::is_integer, 03403},
+             {NativeOperation::Kind::is_real, 06605},
+             {NativeOperation::Kind::is_function, 06600}}) {
+        NativeRuntime runtime;
+        const auto function = runtime.make_function(NativeProgram{});
+        const auto pair = runtime.make_pair().value;
+        const auto reference = runtime.make_reference().value;
+        std::vector<std::pair<Word48, NativeValue>> inputs;
+        for (const auto bits : numeric_calls)
+            inputs.push_back({bits, {NativeValue::Kind::number, bits, 0}});
+        inputs.push_back({Word48(06500000000000000ULL), {}});
+        inputs.push_back({Word48(06600000000006672ULL), function});
+        inputs.push_back({Word48(06640000000006672ULL), function});
+        inputs.push_back({Word48(07140000000040000ULL), pair});
+        inputs.push_back({Word48(07240000000040000ULL), reference});
+        NativeProgram program;
+        program.operations.push_back({kind, {}});
+        const auto compiled = runtime.retain_program(std::move(program));
+        for (const auto &[bits, value] : inputs) {
+            raw->reg(006) = 070000;
+            raw->reg(017) = 066001;
+            raw->alu_mode() = 007;
+            raw->memory(070000) = bits;
+            raw->start(entry);
+            unsigned steps = 0;
+            const auto stop = entry == 03403 ? 03314 : 03275;
+            while ((raw->program_counter() != stop || raw->right_half()) && steps++ < 100) raw->step();
+            runtime.reset_stack();
+            runtime.values().push_back({NativeValue::Kind::number, integer(23), 0});
+            runtime.values().push_back(value);
+            std::ostringstream output;
+            const auto result = runtime.execute(compiled, output);
+            require(steps < 100 && raw->reg(006) == 070001 && raw->reg(017) == 066001
+                        && result.error.empty() && result.diagnostic == 0 && output.str().empty()
+                        && runtime.values().size() == 2 && runtime.values()[0].number == integer(23)
+                        && runtime.values()[1].number == raw->accumulator(),
+                    "native type predicates agree with raw tags and preserve stack effects");
+        }
+    }
     // 06650's two type checks branch in the multiplicative ALU group. Include
     // tagged nonnumbers: a zero-only test incorrectly accepts UNDEF here.
     const std::vector<Word48> checked_values = {
@@ -1295,7 +1406,7 @@ void test_native_reader(const char *root)
         require(static_cast<bool>(input), "native reader fixture is available");
         return std::string(std::istreambuf_iterator<char>(input), {});
     };
-    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery", "native-nested", "native-nested-recovery", "native-rebinding", "native-man-or-boy", "native-booleans", "native-booleans-recovery", "native-numeric-functions", "native-numeric-functions-recovery"}) {
+    for (const char *fixture : {"native-bindings", "native-recovery", "native-control", "native-control-recovery", "native-functions", "native-functions-recovery", "native-nested", "native-nested-recovery", "native-rebinding", "native-man-or-boy", "native-booleans", "native-booleans-recovery", "native-numeric-functions", "native-numeric-functions-recovery", "native-type-predicates", "native-type-predicates-recovery"}) {
         const auto source = read(std::string("/tests/inputs/") + fixture + ".pop2");
         const auto expected = read(std::string("/tests/expected/") + fixture + ".out");
         std::size_t operations = 0, collections = 0;
@@ -1491,13 +1602,110 @@ void test_native_reader(const char *root)
         std::ostringstream exhausted_output;
         const auto failure = exhausted.feed(source, true, exhausted_output);
         const auto n = exhausted.runtime().dictionary().lookup(Word48("N"));
-        require(failure.state == NativeSessionResult::State::unsupported
-                    && failure.error.find("argument rebuilding storage exhausted") != std::string::npos
-                    && exhausted_output.str().empty(),
-                "recursive rebuild reaches the measured exhaustion boundary");
+        if (fixture == "nested-numeric-fakes")
+            require(failure.state == NativeSessionResult::State::finished
+                        && exhausted_output.str() == "****ОШИБКА 13000\n0000000000067000  .00000000\n\nSЕТРОР\n",
+                    "known rebuild extent recovers with its exact collision value");
+        else
+            require(failure.state == NativeSessionResult::State::unsupported
+                        && failure.error.find("argument rebuilding storage exhausted") != std::string::npos
+                        && exhausted_output.str().empty(),
+                    "unresolved rebuild address remains explicit at the measured boundary");
         require(exhausted.runtime().activation_words() == 0
                     && exhausted.runtime().dictionary().word(n).binding.number == Word48(06400000000000000ULL),
                 "exhaustion discards accounting frames while retaining the innermost active binding");
+    }
+}
+
+void test_native_exhaustion(const char *root)
+{
+    using namespace poplan;
+    const std::vector<std::pair<std::string, unsigned>> cases = {
+        {"triangular-no-local", 125}, {"triangular-one-local", 83},
+        {"triangular-five-fakes", 35}, {"triangular-nested-numeric-fakes", 27},
+        {"triangular-nested-zero-fakes", 27}, {"man-or-boy", 4},
+        {"man-or-boy-four", 3}, {"man-or-boy-three", 2}
+    };
+    for (const auto &[name, depth] : cases) {
+        std::ifstream source_file(std::string(root) + "/tests/inputs/" + name + ".pop2");
+        require(bool(source_file), "exhaustion source fixture exists");
+        std::string source(std::istreambuf_iterator<char>(source_file), {});
+        const bool triangular = name.find("triangular") == 0;
+        const std::string call = triangular ? "TRI(10" : "A(10";
+        source.replace(source.find(call), call.size(), (triangular ? "TRI(" : "A(") + std::to_string(depth));
+        NativeSession native;
+        std::ostringstream output;
+        const auto result = native.feed(source, true, output);
+        const auto failure = native.runtime().last_exhaustion();
+        require(failure.has_value() && native.runtime().activation_words() == 0,
+                "exhaustion records its source phase and unwinds accounting frames");
+        auto raw = std::make_unique<Machine>();
+        std::ifstream image(std::string(root) + "/build/poplan.bin", std::ios::binary);
+        raw->load_image(image); raw->set_translated_routines_enabled(false); raw->boot_static_image();
+        std::istringstream input(source);
+        std::string line;
+        unsigned steps = 0;
+        std::optional<NativeExhaustionPhase> phase;
+        // The C++ oracle does not implement the historical supervisor watchpoint.
+        // Stop at its documented read checks, before the stack decrement, as
+        // DISPAK does. These addresses belong solely to the reference adapter.
+        while (steps++ < 2000000) {
+            const auto pc = raw->program_counter();
+            if (raw->reg(017) == 067000) {
+                if (pc == 020132 && !raw->right_half()) phase = NativeExhaustionPhase::rebuild_extent;
+                if (pc == 020135 && raw->right_half()) phase = NativeExhaustionPhase::rebuild_restore;
+                if (pc == 020136 && !raw->right_half()) phase = NativeExhaustionPhase::rebuild_continuation;
+                if (pc == 03231 && raw->right_half()) phase = NativeExhaustionPhase::binding_count;
+            }
+            if (pc == 020133 && raw->right_half()
+                && ((raw->reg(017) + raw->reg(002) - 3) & 077777) == 067000)
+                phase = NativeExhaustionPhase::rebuild_argument;
+            if (phase) break;
+            if (raw->step() == ExecutionStatus::input_required) {
+                require(bool(std::getline(input, line)), "reference reaches a watchpoint before EOF");
+                raw->queue_console_input(encode_gost_text(line));
+            }
+        }
+        require(phase && *phase == failure->phase, "native exhaustion selects the historical access phase: " + name);
+        if (*phase == NativeExhaustionPhase::rebuild_extent || *phase == NativeExhaustionPhase::binding_count) {
+            std::ostringstream expected;
+            expected << "****ОШИБКА 13000\n" << std::oct << std::setfill('0') << std::setw(16)
+                     << raw->accumulator().raw() << ' ' << native_format_number(raw->accumulator()) << "\n\nSЕТРОР\n";
+            require(result.state == NativeSessionResult::State::finished && output.str() == expected.str(),
+                    "known exhaustion values produce exact POP diagnostics and recovery");
+        } else {
+            require(result.state == NativeSessionResult::State::unsupported && output.str().empty()
+                        && result.error.find("diagnostic 13000 rendering incomplete") != std::string::npos,
+                    "unresolved logical addresses stay explicit instead of fabricated diagnostics");
+        }
+        std::map<std::uint32_t, Word48> native_functions;
+        std::map<std::uint64_t, std::uint32_t> raw_functions;
+        for (const auto &word : native.runtime().dictionary().words()) {
+            if (word.handle < 02740) continue;
+            raw->reg(015) = 077700; raw->reg(017) = 066100;
+            raw->accumulator() = word.packed_name; raw->start(01107);
+            unsigned lookup_steps = 0;
+            while ((raw->program_counter() != 077700 || raw->right_half()) && lookup_steps++ < 10000) raw->step();
+            require(lookup_steps < 10000, "reference lookup completes");
+            const auto address = raw->accumulator().address();
+            const auto raw_value = raw->memory(address + 3);
+            require((raw->memory(address + 2).raw() & ~std::uint64_t{077777})
+                        == (word.properties.raw() & ~std::uint64_t{077777}),
+                    "partial installation preserves historical binding classes: " + name);
+            if (word.binding.kind == NativeValue::Kind::function) {
+                require(FunctionDescriptor::is_function(raw_value), "function kind survives exhaustion");
+                const auto [n, inserted_n] = native_functions.emplace(word.binding.handle, raw_value);
+                const auto [r, inserted_r] = raw_functions.emplace(raw_value.raw(), word.binding.handle);
+                (void)inserted_n; (void)inserted_r;
+                require(n->second == raw_value && r->second == word.binding.handle,
+                        "exhaustion preserves function aliases in both directions");
+            } else {
+                require(raw_value == (word.binding.kind == NativeValue::Kind::unbound
+                            ? Word48(06500000000000000ULL) : word.binding.number),
+                        "exhaustion preserves partially installed bindings: " + name);
+            }
+        }
+        std::cout << name << ": phase and bindings match; " << result.operations << " native operations\n";
     }
 }
 
@@ -1510,6 +1718,8 @@ int main(int argc, char **argv)
     using poplan::MachineError;
     using poplan::Word48;
 
+    if (argc == 3 && std::string(argv[2]) == "--native-closures") { test_native_closures(argv[1]); return 0; }
+    if (argc == 3 && std::string(argv[2]) == "--native-exhaustion-state") { test_native_exhaustion(argv[1]); return 0; }
     if (argc == 3 && std::string(argv[1]) == "--native-reader") { test_native_reader(argv[2]); return 0; }
     if (argc == 3 && std::string(argv[2]) == "--native-accounting") { test_native_accounting(argv[1]); return 0; }
     if (argc == 3 && std::string(argv[2]) == "--native-storage") { test_native_storage(argv[1]); return 0; }

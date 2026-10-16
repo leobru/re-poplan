@@ -1,9 +1,73 @@
+# Standalone modern POPLAN
+
+**Current objective (2026-10-13):** create an independent interpreter under
+`standalone/`, using separately tagged int64 and IEEE binary64 values, native
+objects and corrected captured cells. This subproject may add its own C++ files.
+Preserve both existing backends and their earlier measurements.
+
+The initial standalone implementation runs the language/standard-function
+fixtures, quine, Man-or-Boy K=10, recovered example library and fixed-seed game.
+It is **not yet language-complete**. Build with `make standalone-test`.
+[Architecture, tests and remaining gaps](standalone/docs/status.md) are the
+current handoff. Next steps, in order:
+
+1. **Implemented, audits remain:** resumable compiler/readers, incremental CLI,
+   authoritative PROGLIST/NEXTCH, direct token values, macro and supplier timing.
+2. **Implemented, audits remain:** lazy functional lists, mutation/sharing,
+   traversal and callback continuations; iterative object formatting.
+3. **In progress:** computed calls, REFOF, BOUNDSLIST updates, updater identity,
+   protected functions, character forms, CANCEL binding identity and error
+   callbacks/reset are implemented. LENGTH and DATALENGTH now follow their
+   distinct list/strip contracts, with type and lazy-supplier tests. APPDATA shares
+   DATALIST component extraction; COPY rejects interned words and functions.
+   UPDATER supports arbitrary elements and explicit clearing; partial updaters
+   capture independent arguments, and compositions require explicit updaters. The callback
+   mutation difference is recorded in the status matrix. SECTION/ENDSEC, SWITCH and full mutable
+   syntax/special functions remain unresolved.
+4. **In progress:** [184-resident ledger](standalone/docs/language-inventory.md),
+   byte-split/GC/interactive tests and historical semantic probes are in place.
+   Complete per-entry branch audits and remaining diagnostic/input contracts
+   before claiming full language coverage. Protected resident identifier assignment, declaration, references, local
+   shadowing and cancellation are now implemented and tested; syntax identifier
+   classification remains open. Update dispatch now rejects
+   unpaired primitives before they can execute ordinary side effects.
+
+The closure investigation and historical-baseline plan below remain the record
+for the compatibility-native backend; they are not standalone limitations.
+
+---
+
 # Next Five Steps for Native POPLAN
 
-**Current status:** step 2 implemented; step 3 now includes comparisons,
-conditionals, ordinary named functions, explicit call frames and binding
-restoration. Function diagnostic/grammar edge cases and whole-session allocation
-fidelity remain open; see the step 3 function milestone below.
+**Current objective (2026-10-12):** use native execution to discover and validate
+a correction to closure rebinding. Preserve historical native behavior as a
+selectable baseline. Exact exhaustion matching is no longer a prerequisite.
+
+## Closure investigation roadmap
+
+1. Add independent historical/experimental closure selection and relaxed native
+   activation limits; keep machine execution unchanged.
+2. Associate nested function instances with mutable cells from their defining
+   activation, retaining dynamic lookup for unrelated routines.
+3. Compare semantic binding checkpoints at the first Man-or-Boy divergence;
+   verify captured mutation, restoration, identity, recovery and collection.
+4. Require canonical K=0..10 results, including -67 at K=10, and independent
+   call/depth checks. Preserve historical tests and run full verification.
+5. Use the native evidence to investigate an original-runtime correction;
+   do not claim a BESM patch merely because the native experiment succeeds.
+
+The first four items are implemented; see
+[the experiment and validation](docs/native-closure-experiment.md).
+Five unresolved address-bearing exhaustion diagnostics and broader historical
+session accounting remain documented but deferred. Other native language
+features remain incomplete.
+
+## Original historical-baseline milestones
+
+The following sequence and dated reports record the work that established the
+baseline. Their requirements to preserve the closure failure and exact native
+exhaustion are superseded by the investigation objective above. Earlier numerical
+measurements remain unchanged.
 
 ## Goal and boundary
 
@@ -316,3 +380,68 @@ Verification passed: 20 regular and 20 ASan/UBSan CTests, smoke, quine,
 zone1224, historical comparisons, native isolation and input-suspension tests,
 and whitespace checks. See the numeric primitive report for measurements;
 logs are in `artifacts/native-numeric-functions/`.
+
+## Native type predicates — 2026-10-11
+
+Implemented direct ISINTE, ISREAL and ISFUNC calls. Their native operations
+preserve historical numeric tags, function classification, multiple stack
+results and incremental input state. ISREAL excludes tagged integers. Six-character
+name significance, nested calls, escaped functions and error recovery have
+historical fixtures; raw primitive tests cover 126 adapted values/predicates.
+
+See [type-predicate status](docs/native-type-predicates.md). First-class resident
+predicate aliases and the outstanding step-5 accounting/exhaustion work remain
+open; special-function classification does not implement special-function calls.
+
+Verification passed: 20 regular and 20 ASan/UBSan CTests, smoke, quine,
+zone1224, historical comparisons, native isolation/input-suspension tests,
+and whitespace checks. Measurements and remaining limitations are in the
+predicate report; logs remain in `artifacts/native-type-predicates/`.
+
+
+## Step 5 failure-state and recovery milestone — 2026-10-12
+
+Corrected ordered-comparison staging and simple call-argument rebuilding. Runtime
+rebuild checks now follow historical read-watchpoint phases rather than rejecting
+all high-water crossings. Partial binding installation preserves the mutations
+made before exhaustion. All eight scoped cases match raw failure phases, binding
+classes/values and function sharing. Canonical Man-or-Boy now fails with K=-24;
+the three-argument variant with K=-34. Four-argument Man-or-Boy retains K=-28 and
+B=UNDEF after its partial binding failure.
+
+Exact 13000 diagnostics and SETPOP recovery are implemented for both nested
+triangular failures and four-argument Man-or-Boy, including subsequent arithmetic
+and user calls. See [exhaustion evidence](docs/native-exhaustion.md).
+
+Step 5 is still not complete: three generated-continuation diagnostics and two
+function-descriptor diagnostics need exact compiler layout. Reader/compiler
+lifetimes, computed argument scheduling and remaining primitive scratch/access
+phases also remain open. No guessed address or zero-cost assumption closes these
+gaps; `legacy_accounting_complete` remains false.
+
+Verification passed: 21 regular and 21 ASan/UBSan CTests, smoke, quine,
+zone1224, historical fixture/boundary/recovery comparisons, native isolation,
+and whitespace checks. Logs and checkpoints remain in `artifacts/native-step5/`.
+The five unresolved address-bearing failures are not counted as exact diagnostic
+or recovery passes.
+
+
+## Closure correction experiment — 2026-10-12
+
+Implemented the selectable activation-associated environment experiment and
+independent relaxed activation limit. Canonical Man-or-Boy K=0..10 now matches
+the correct-closure reference in experimental mode, including -67 at K=10,
+1,750 calls and maximum nesting 1,024. Historical mode remains the default.
+The reduced trace isolates installation of the outer K cell containing 1 after
+the inner activation reached 0. Mutation persists through shared cells and
+normal restoration; SETPOP retains installed cells. Collection handles escaped
+instances, shared compiled bodies and unreachable environment cycles.
+
+Verification passed: 23 regular CTests and smoke, 23 ASan/UBSan CTests
+(600.12 seconds, leak detection disabled), historical comparisons, quine,
+zone1224, image-free isolation guards and whitespace checks. Expanded focused
+checks include shadowing, sibling captures, input suspension, deep recursion,
+recovery and the independent host reference. See
+[the experiment report](docs/native-closure-experiment.md) for limits and evidence.
+The next investigation is an original-runtime representation/correction, not
+completion of the deferred historical native exhaustion diagnostics.

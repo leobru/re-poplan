@@ -19,7 +19,7 @@ normalize = module.normalize
 
 fixtures = [(name, (root / 'tests/inputs' / (name + '.pop2')).read_text(),
              (root / 'tests/expected' / (name + '.out')).read_text())
-            for name in ('native-bindings', 'native-recovery', 'native-control', 'native-control-recovery', 'native-functions', 'native-functions-recovery', 'native-nested', 'native-nested-recovery', 'native-rebinding', 'native-man-or-boy', 'native-booleans', 'native-booleans-recovery', 'native-numeric-functions', 'native-numeric-functions-recovery')]
+            for name in ('native-bindings', 'native-recovery', 'native-control', 'native-control-recovery', 'native-functions', 'native-functions-recovery', 'native-nested', 'native-nested-recovery', 'native-rebinding', 'native-man-or-boy', 'native-booleans', 'native-booleans-recovery', 'native-numeric-functions', 'native-numeric-functions-recovery', 'native-type-predicates', 'native-type-predicates-recovery')]
 
 controls = ('POPLAN_INTERPRET_ONLY', 'POPLAN_DISABLE_TRANSLATED_ROUTINES',
             'POPLAN_CPU_TRACE', 'POPLAN_CPU_DETAIL_TRACE', 'POPLAN_ROUTINE_TRACE',
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
         assert 'compiler incomplete' in result.stderr, result.stderr
         result = run(executable, ['--native'], 'FUNCTI F; 1 END; F+1=>', directory)
         assert result.returncode != 0 and 'compound diagnostic rendering' in result.stderr, result
-        for text in ('NOT=>', 'NOT->F;', 'INTOF=>', 'INTOF->F;', 'SIGN=>', 'SIGN->F;'):
+        for text in ('NOT=>', 'NOT->F;', 'INTOF=>', 'INTOF->F;', 'SIGN=>', 'SIGN->F;', 'ISINTE=>', 'ISREAL->F;', 'ISFUNC=>'):
             result = run(executable, ['--native'], text, directory)
             assert result.returncode != 0 and 'requires a parenthesized call' in result.stderr, result
         for text in ('1.+2=>', '2//3=>'):
@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix='poplan-native-') as directory:
             # fixture; historical POPLAN supplies them. Compare the remaining
             # diagnostic codes, values, source context and recovery exactly.
             reference_wanted = wanted
-            if name in ('native-recovery', 'native-control-recovery', 'native-functions-recovery', 'native-booleans-recovery', 'native-numeric-functions-recovery') and 'POPLAN_INTERPRET_ONLY' in environment:
+            if name in ('native-recovery', 'native-control-recovery', 'native-functions-recovery', 'native-booleans-recovery', 'native-numeric-functions-recovery', 'native-type-predicates-recovery') and 'POPLAN_INTERPRET_ONLY' in environment:
                 for explanation in ('АРГУМЕНТ + НЕ ЧИСЛО', 'НЕТ РАЗДЕЛИТЕЛЯ', 'ДЕКЛАРАЦИЯ НЕ СЛОВА', 'ДЛИНА ЦЕЛОГО>12', 'ПРИСВАИВАНИЕ ЗАЩИЩЕННОЙ ПЕРЕМЕННОЙ', 'Х<У,Х НЕ ЧИСЛО', 'Х<У,У НЕ ЧИСЛО', 'Х>У,У НЕ ЧИСЛО', 'ОШИБКА В ИМПЕРАТИВЕ', 'INТОF(Х),Х НЕ ВЕЩЕСТВЕННОЕ', 'SIGN(Х) Х НЕ ЧИСЛО'):
                     reference_wanted = reference_wanted.replace(explanation + '\n', '')
             assert result.returncode == 0 and normalize(result.stdout) == reference_wanted, (name, result)

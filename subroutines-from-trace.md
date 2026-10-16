@@ -552,3 +552,22 @@ INTOF follows `03442..03450`; SIGN follows `10365..10401`. Exact-bit primitive
 and historical fixture comparisons are documented in
 [native numeric status](docs/native-numeric-functions.md). No reference-backend dispatch
 entry or historical profile count changes in this milestone.
+
+
+## Native type predicates — 2026-10-11
+
+Direct ISINTE (`03403`), ISREAL (`06605`) and ISFUNC (`06600`) now have
+image-independent native operations, with historical fixtures and 126 raw
+primitive comparisons. See [predicate evidence](docs/native-type-predicates.md). No hybrid
+dispatch entry or earlier historical profile count changed. First-class resident
+aliases and general special-function execution remain unsupported.
+
+
+## Native exhaustion phases — 2026-10-12
+
+Native rebuilding follows read-watchpoint phases at `20132..20136`; ordered
+comparisons rebuild their result, while simple calls rebuild their arguments.
+Partial binding installation at `03217..03231` preserves pre-failure mutations.
+Eight failure-state checkpoints and three exact recovery cases are documented
+in [exhaustion evidence](docs/native-exhaustion.md). No hybrid dispatch change.
+Exact address-bearing diagnostics and full session accounting remain open.

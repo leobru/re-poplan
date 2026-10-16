@@ -1,5 +1,9 @@
 # Native nested functions and historical rebinding
 
+The historical behavior documented below remains the default native baseline.
+The [selectable closure experiment](native-closure-experiment.md) supersedes bug
+reproduction as the ultimate goal; exact native exhaustion work is deferred.
+
 The ordinary nested-function milestone of step 4 is implemented. Nested
 `FUNCTI` definitions compile to stable native function objects. An enclosing
 program retains each child descriptor and loads it at the declaration's position,

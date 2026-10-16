@@ -6,12 +6,16 @@ conditional execution, ordinary named/nested functions and top-level recovery; i
 
 ## Contract
 
-The new backend must preserve language semantics, evaluation order, exact numeric
-bits, identity, mutation, diagnostics, recovery and the documented closure failure.
-The requested double-first real-literal conversion is an explicit exception to
-bitwise agreement with the historical decimal scanner (see below).
-It must eventually reproduce legacy allocation, code and activation costs and
-exhaustion thresholds. Native operations must never execute BESM instructions,
+The native backend is also the experimental vehicle for correcting closure
+rebinding. `--native` preserves historical binding behavior by default;
+`--native-closures=experimental` enables activation-associated closures.
+See [the closure experiment](native-closure-experiment.md) for deliberate identity,
+escaped-binding and mutation differences. Exact native exhaustion thresholds are
+no longer a prerequisite; relaxed activation limits are independently selectable.
+Preserve evaluation order, exact numeric operations and supported diagnostics and
+recovery outside those explicit differences. The requested double-first real
+literal reader remains an exception to historical decimal-scanner bit equality.
+Native operations must never execute BESM instructions,
 recognize finished instruction words, dispatch via historical PCs, load the
 executable image, or fall back to `Machine`. Console, clocks, POPLIB source loading
 and established POPMESS behavior are in scope; other historical devices are not.
@@ -32,13 +36,14 @@ local to each operation. There is no native architectural register bank.
 | 1: object/allocation model | `01107` dictionary, `05215` pair allocation, `05430` common-list allocation, `11464` descriptor wrapper | Free-block selection/release and common-list accounting implemented; see [allocation evidence](native-allocation.md). Reference/pair collection, retry, compiler storage and activation cost primitives implemented; full session scheduling remains open |
 | 2: values | `NativeValue` reserves number, word, string, pair, list, reference, function kinds and stable integer handles | Runtime owns numbers, dictionary, reference/pair payloads and compiled function objects with stable handles and explicit roots; strings/lists remain open |
 | 2: dictionary | Native bootstrap retains resident packed names, class and property words | [Packed-name interning](native-dictionary.md), collision order and four-word allocation implemented. Reader conversion and executable variable bindings implemented; ordinary function bindings implemented; mutable syntax remains open |
-| 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; [INTOF/SIGN direct calls](native-numeric-functions.md) implemented; full numeric/scanner/function coverage remains open |
+| 2: arithmetic | Existing normalization/add/multiply/divide extracted into `NumericScratch` in `src/machine.cpp`; native `06712` normalization, integer retagging and `06727` range check | Bitwise primitive differentials include signed limits, zero, negative and real operands; [INTOF/SIGN direct calls](native-numeric-functions.md) implemented; [ISINTE/ISREAL/ISFUNC](native-type-predicates.md) direct calls implemented; full numeric/scanner/function coverage remains open |
 | 2: real literal reader | `native_parse_real_literal` validates decimal-point / `$` syntax evidenced at `16672..16735`, parses IEEE binary64, then truncates to BESM encoding | Exact encoding, boundary, malformed-input and locale tests; deliberate conversion policy described below |
 | 2: formatting | Shares existing `format_prreal`, preserving existing formatting limitations | Historical probe comparison; complete numeric printing conformance not established |
 | 2: services | Input/output injected as streams | Resumable console input and packed-name conversion implemented; clocks and console callbacks remain open |
 | 3: reader/compiler | `NativeReader` and `NativeSession` incrementally lower literals, bindings, assignments, arithmetic and printing | [Reader evidence](native-reader.md), split-input checks, raw binding checkpoints and historical fixtures; general POP syntax remains open |
 | 3: recovery | Supported syntax/type diagnostics and explicit SETPOP transfer preserve bindings and token history | Historical recovery fixture; full diagnostic suppression and nested callbacks remain open |
-| 4: frames/control | Comparisons, conditionals (including [AND/OR/NOT](native-booleans.md)), ordinary named functions, explicit frames, recursion and dynamic binding/restoration implemented; see [function evidence](native-functions.md) | Nested definitions and historical shared rebinding now have [focused evidence](native-nested-functions.md); grammar/diagnostic edges and loops remain open; [triangular boundaries](native-recursion.md) match, but exhaustion diagnostics and complete accounting remain open |
+| 4: frames/control | Comparisons, conditionals (including [AND/OR/NOT](native-booleans.md)), ordinary named functions, explicit frames, recursion and dynamic binding/restoration implemented; see [function evidence](native-functions.md) | Nested definitions and historical shared rebinding now have [focused evidence](native-nested-functions.md); grammar/diagnostic edges and loops remain open; [triangular boundaries](native-recursion.md) and [exhaustion phases/bindings](native-exhaustion.md) match; three failure cases recover exactly, while address-bearing diagnostics and complete accounting remain open |
+| Closure correction experiment | Selectable defining-activation cells, shared compiled bodies, dynamic helper lookup and environment restoration | [Man-or-Boy and cell/checkpoint tests](native-closure-experiment.md); original BESM correction remains an investigation |
 | 5: dynamic language | Not implemented | Macros, runtime compiler/evaluator, composition, partial application, accessors/updaters and mutable syntax required |
 | 6: host scope | Not implemented beyond development output | Resident primitives, POPLIB, POPMESS, clocks, callbacks and MI/MO quirks required |
 | 7: completeness | Not passed | Quine, recovered zones, language/standard fixtures, fixed-seed game and expansion probes must pass natively, with inventory coverage |

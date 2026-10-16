@@ -105,6 +105,14 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/native-probe.py
                 $<TARGET_FILE:poplan> $<TARGET_FILE:poplan_native_guard>
                 ${CMAKE_SOURCE_DIR})
+    add_test(NAME poplan-native-exhaustion-state
+        COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR} --native-exhaustion-state)
+    add_test(NAME poplan-native-closure-cells
+        COMMAND poplan_core_tests ${CMAKE_SOURCE_DIR} --native-closures)
+    add_test(NAME poplan-native-closure-experiment
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/native-closures.py
+                $<TARGET_FILE:poplan> $<TARGET_FILE:poplan_native_guard>
+                ${CMAKE_SOURCE_DIR})
     add_test(NAME poplan-native-recursion
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/native-recursion.py
                 $<TARGET_FILE:poplan> $<TARGET_FILE:poplan_native_guard>

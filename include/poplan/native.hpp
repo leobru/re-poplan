@@ -157,7 +157,8 @@ std::string native_format_number(Word48);
 struct NativeOperation {
     enum class Kind { constant, binary, print, load, store, unary, erase, setpop,
                       compare, branch_false, jump, label, call, return_value, captured_value,
-                      branch_true, logical_not, integer_part, sign };
+                      branch_true, logical_not, integer_part, sign,
+                      is_integer, is_real, is_function };
     Kind kind;
     Word48 constant;
     NativeBinary binary = NativeBinary::add;
@@ -175,6 +176,7 @@ struct NativeOperation {
     // Known straight-line argument staging at the compiler source. Zero means
     // no established rebuild annotation, not complete session accounting.
     std::uint16_t rebuilt_arguments = 0;
+    bool rebuild_result = false;
 };
 
 struct NativeProgram {
@@ -191,6 +193,16 @@ struct NativeFrame {
     NativeValue function;
     std::vector<std::pair<std::uint32_t, NativeValue>> saved_bindings;
     std::vector<Word48> saved_classes;
+    std::map<std::uint32_t, std::uint64_t> environment;
+    std::vector<std::uint64_t> saved_cells;
+    std::uint64_t activation = 0;
+};
+
+struct NativeOptions {
+    bool experimental_closures = false;
+    // Zero preserves historical activation checks (experimental default: 16384).
+    std::size_t activation_limit = 0;
+    std::ostream *binding_trace = nullptr;
 };
 
 // One compilation unit after reader decisions and optional optimization.
@@ -215,6 +227,18 @@ struct NativeCompilationResult {
 // parentheses, and =>. Mutable syntax and general unary operators are absent.
 // This is deliberately not presented as the completed POP reader/compiler.
 NativeProgram native_compile_probe(const std::string &source);
+enum class NativeExhaustionPhase { rebuild_extent, rebuild_argument, rebuild_restore, rebuild_continuation,
+                                   binding_target, binding_value, binding_count, binding_table };
+struct NativeExhaustion {
+    NativeExhaustionPhase phase;
+    std::uint32_t activation_words;
+    std::uint16_t arguments;
+    std::size_t argument_index = 0;
+};
+// Read-watchpoint checks in source order; offsets are logical accounting slots,
+// not an emulated hardware stack. Writes beyond the watchpoint do not trap.
+std::optional<NativeExhaustion> native_rebuild_exhaustion(std::uint32_t base, std::uint16_t arguments);
+
 struct NativeExecutionResult {
     std::size_t operations = 0;
     std::string error;
@@ -243,6 +267,7 @@ struct NativeObjectAllocation {
 class NativeRuntime {
 public:
     NativeRuntime();
+    explicit NativeRuntime(NativeOptions);
     NativeRuntime(std::uint16_t first, std::uint16_t limit);
     NativeRuntime(const NativeRuntime &) = delete;
     NativeRuntime &operator=(const NativeRuntime &) = delete;
@@ -272,17 +297,33 @@ public:
     void unwind_frames(std::size_t depth);
     std::uint32_t activation_words() const { return activation_words_; }
     std::uint32_t activation_peak() const { return activation_peak_; }
+    const std::optional<NativeExhaustion> &last_exhaustion() const { return last_exhaustion_; }
     void release_program(std::size_t program);
     NativeExecutionResult execute(std::size_t program, std::ostream &output);
     void collect(const std::vector<NativeValue> &temporary_roots = {});
     std::size_t collection_count() const { return collections_; }
+    std::size_t environment_cell_count() const { return cells_.size(); }
+    std::size_t function_count() const { return functions_.size(); }
 private:
     NativeObjectAllocation allocate_object(NativeValue::Kind, std::vector<NativeValue>);
     void validate(NativeValue) const;
     NativeAllocator allocator_;
     NativeDictionary dictionary_;
     std::map<std::uint32_t, NativeObject> objects_;
-    std::map<std::uint32_t, std::size_t> functions_;
+    struct FunctionRecord {
+        std::size_t program;
+        std::map<std::uint32_t, std::uint64_t> environment;
+        std::uint64_t defining_activation = 0;
+        bool instance = false;
+    };
+    std::map<std::uint32_t, FunctionRecord> functions_;
+    NativeOptions options_;
+    struct BindingCell { NativeValue value; Word48 binding_class; };
+    std::map<std::uint64_t, BindingCell> cells_;
+    std::map<std::uint32_t, std::uint64_t> active_cells_;
+    std::uint64_t next_cell_ = 1, next_activation_ = 1;
+    NativeValue instantiate_function(NativeValue, const NativeFrame &);
+    void trace_binding(const char *, std::uint32_t, std::uint64_t, NativeValue);
     std::uint32_t next_handle_ = 0100000;
     std::vector<NativeValue> values_;
     // The reference's initially zero cell immediately below the empty POP
@@ -305,9 +346,14 @@ private:
         std::vector<NativeBlock> temporary;
     };
     std::vector<std::optional<CompilationRecord>> compilations_;
-    struct AccountingFrame { NativeFrameCost cost; std::vector<NativeValue> roots; };
+    struct AccountingFrame {
+        NativeFrameCost cost;
+        std::vector<NativeValue> roots;
+        std::vector<std::uint64_t> cells;
+    };
     std::vector<AccountingFrame> accounting_frames_;
     std::uint32_t activation_words_ = 0, activation_peak_ = 0;
+    std::optional<NativeExhaustion> last_exhaustion_;
     NativeAllocation allocate_storage(std::uint32_t words);
 };
 // A reader owns incomplete UTF-8 and token spelling across input suspension.
@@ -340,6 +386,7 @@ struct NativeSessionResult {
 };
 class NativeSession {
 public:
+    explicit NativeSession(NativeOptions options = {}) : runtime_(options) {}
     NativeSessionResult feed(std::string_view input, bool eof, std::ostream &output);
     NativeRuntime &runtime() { return runtime_; }
 private:
@@ -352,6 +399,7 @@ private:
         std::optional<NativeComparison> comparison = {};
         std::uint32_t call = 0;
         std::optional<NativeOperation::Kind> primitive_call = {};
+        std::size_t argument_start = 0;
     };
     std::vector<Pending> pending_;
     struct Conditional {
@@ -369,7 +417,8 @@ private:
     };
     std::optional<Definition> definition_;
     // Suspended compilation contexts, not POP activation frames. Nested
-    // descriptors are built once and loaded at the declaration's position.
+    // descriptors are built once; experimental execution instantiates them at
+    // the declaration with the current defining environment.
     struct EnclosingDefinition { NativeProgram program; Definition definition; };
     std::vector<EnclosingDefinition> enclosing_;
     std::optional<std::size_t> compilation_roots_;
@@ -389,7 +438,7 @@ private:
                  const NativeToken &token, std::optional<NativeValue> culprit = {});
 };
 NativeExecutionResult native_execute(const NativeProgram &, std::ostream &);
-int run_native_shell(std::istream &, std::ostream &, std::ostream &);
+int run_native_shell(std::istream &, std::ostream &, std::ostream &, NativeOptions = {});
 
 } // namespace poplan
 #endif

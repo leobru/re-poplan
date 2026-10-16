@@ -1,20 +1,34 @@
 # Faithful C++ POPLAN Port
 
+## Independent modern interpreter (2026-10-13)
+
+`standalone/` now builds its own `poplan-native` executable, with tagged int64 and
+IEEE binary64 numbers, Unicode text, host objects, explicit frames and corrected
+captured cells. Its link graph contains no machine implementation or image loader.
+It has its own C++ sources and CMake project under the user-approved independent
+subproject boundary. `make standalone-test` recreates its build and runs its tests.
+
+This is an initial implementation, not a claim of complete POPLAN support.
+See [standalone status and remaining work](../standalone/docs/status.md).
+The address-preserving reference backend and compatibility-native backend below
+retain their existing contracts and measurements.
+
 The target is a C++ reproduction of the complete BESM-6 POPLAN system. It is
 not an independently designed POP-2 parser or interpreter.
 
 ## Separate image-independent backend
 
 The opt-in `--native` development path and its open implementation gates are
-tracked in [native-runtime.md](native-runtime.md). It currently supports only
-numeric literal printing and arithmetic expressions with resident operator
-precedence and parentheses. Real literals
-are parsed into IEEE double before BESM encoding, as explicitly requested;
-this differs from the reference scanner's digit-by-digit arithmetic.
-Native logical allocation/release and packed-name
-interning now have instruction-only differential tests, but are not yet connected
-to a full native reader/compiler. The fully native language runtime remains
-incomplete. The contract below continues to govern the independent machine reference backend.
+tracked in [native-runtime.md](native-runtime.md). It supports numeric expressions,
+bindings, conditions, ordinary named/nested functions and recovery. Real literals
+use the requested IEEE-double-first conversion before BESM encoding.
+
+Native mode now also offers a [selectable closure-rebinding experiment](native-closure-experiment.md).
+Its goal is to discover a correction, with historical native behavior retained
+as the baseline and independently relaxed activation limits. The experiment
+retains defining-activation cells and restores the appropriate binding view on
+closure calls. It does not change the machine backend or establish a BESM patch.
+The contract below continues to govern the independent machine reference backend.
 
 ## POPMESS console and mounted disks (2026-10-01)
 
@@ -651,3 +665,22 @@ INTOF follows `03442..03450`; SIGN follows `10365..10401`. Exact-bit primitive
 and historical fixture comparisons are documented in
 [native numeric status](native-numeric-functions.md). No reference-backend dispatch
 entry or historical profile count changes in this milestone.
+
+
+## Native type predicates — 2026-10-11
+
+Direct ISINTE (`03403`), ISREAL (`06605`) and ISFUNC (`06600`) now have
+image-independent native operations, with historical fixtures and 126 raw
+primitive comparisons. See [predicate evidence](native-type-predicates.md). No hybrid
+dispatch entry or earlier historical profile count changed. First-class resident
+aliases and general special-function execution remain unsupported.
+
+
+## Native exhaustion phases — 2026-10-12
+
+Native rebuilding follows read-watchpoint phases at `20132..20136`; ordered
+comparisons rebuild their result, while simple calls rebuild their arguments.
+Partial binding installation at `03217..03231` preserves pre-failure mutations.
+Eight failure-state checkpoints and three exact recovery cases are documented
+in [exhaustion evidence](native-exhaustion.md). No hybrid dispatch change.
+Exact address-bearing diagnostics and full session accounting remain open.

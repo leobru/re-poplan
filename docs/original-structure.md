@@ -154,8 +154,11 @@ These experiments rule out a memory-limit-only fix for the erroneous
 execution. They do not show that a correct execution requires more memory.
 The reduced arity-3 trace below identifies failed closure-environment
 rebinding as the primary defect; storage exhaustion is its consequence. A
-faithful C++ reproduction is needed to determine whether correcting that
-binding operation is sufficient and localized.
+faithful C++ reproduction was needed to separate the causes. The subsequent
+[native closure experiment](native-closure-experiment.md) establishes that
+activation-associated mutable cells and environment installation suffice for the
+scoped ordinary-function tests, including canonical K=10. It does not establish
+that the corresponding BESM representation or patch is localized.
 
 ## Recursive Triangular Numbers
 

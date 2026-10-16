@@ -1,6 +1,10 @@
 # Native recursion accounting: step 5 progress
 
-Native execution now reproduces the measured triangular success/failure
+This report records the 2026-10-10 boundary milestone. The subsequent
+[exhaustion milestone](native-exhaustion.md) supersedes its high-water-only
+execution checks and adds exact recovery for three cases.
+
+At this milestone, native execution reproduced the measured triangular success/failure
 boundaries. Step 5 is **not complete**: failures still report an explicit native
 development limitation instead of claiming historical diagnostic/recovery
 conformance. Full compiler argument scheduling and primitive scratch accounting

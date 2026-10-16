@@ -1206,6 +1206,25 @@ std::uint32_t native_argument_rebuild_extent(std::uint16_t arguments)
     return arguments ? native_argument_frame_cost(arguments).exit_peak + 1 : 0;
 }
 
+std::optional<NativeExhaustion> native_rebuild_exhaustion(std::uint32_t base, std::uint16_t arguments)
+{
+    if (!arguments) return {};
+    constexpr std::uint32_t watched = 067000 - 066001;
+    // 20132 checks the pre-decrement access, before consuming its operand.
+    if (base + arguments + 4 == watched)
+        return NativeExhaustion{NativeExhaustionPhase::rebuild_extent, base, arguments};
+    // 20133 visits transferred values in source order, skipping the saved
+    // incoming scratch value at offset zero.
+    for (std::size_t index = 0; index < arguments; ++index)
+        if (base + index + 1 == watched)
+            return NativeExhaustion{NativeExhaustionPhase::rebuild_argument, base, arguments, index};
+    if (base + arguments + 3 == watched)
+        return NativeExhaustion{NativeExhaustionPhase::rebuild_restore, base, arguments};
+    if (base + arguments + 2 == watched)
+        return NativeExhaustion{NativeExhaustionPhase::rebuild_continuation, base, arguments};
+    return {};
+}
+
 NativeAllocation NativeRuntime::allocate_storage(std::uint32_t words)
 {
     auto allocation = allocator_.try_allocate(words);
@@ -1336,8 +1355,11 @@ bool NativeRuntime::enter_frame(NativeFrameCost cost, std::vector<NativeValue> r
     // Startup hardware area 066001..066777; 067000 is the collision watchpoint.
     constexpr std::uint32_t capacity = 067000 - 066001;
     const auto peak = cost.entry_peak;
-    if (peak > capacity || activation_words_ > capacity - peak) return false;
-    accounting_frames_.push_back({cost, std::move(roots)});
+    if (options_.activation_limit) {
+        if (accounting_frames_.size() > options_.activation_limit
+            || peak > std::numeric_limits<std::uint32_t>::max() - activation_words_) return false;
+    } else if (peak > capacity || activation_words_ > capacity - peak) return false;
+    accounting_frames_.push_back({cost, std::move(roots), {}});
     activation_peak_ = std::max(activation_peak_, activation_words_ + peak);
     activation_words_ += cost.retained;
     return true;
@@ -1349,7 +1371,8 @@ bool NativeRuntime::leave_frame()
     const auto cost = accounting_frames_.back().cost;
     const auto base = activation_words_ - cost.retained;
     constexpr std::uint32_t capacity = 067000 - 066001;
-    if (cost.exit_peak > capacity || base > capacity - cost.exit_peak) return false;
+    if (!options_.activation_limit
+        && (cost.exit_peak > capacity || base > capacity - cost.exit_peak)) return false;
     activation_peak_ = std::max(activation_peak_, base + cost.exit_peak);
     activation_words_ = base;
     accounting_frames_.pop_back();
@@ -1379,6 +1402,13 @@ NativeRuntime::NativeRuntime() : NativeRuntime(033064, 066000)
 NativeRuntime::NativeRuntime(std::uint16_t first, std::uint16_t limit)
     : allocator_(first, limit), dictionary_(allocator_)
 {}
+
+NativeRuntime::NativeRuntime(NativeOptions options) : NativeRuntime()
+{
+    options_ = options;
+    if (options_.experimental_closures && !options_.activation_limit)
+        options_.activation_limit = 16384;
+}
 
 void NativeRuntime::validate(NativeValue value) const
 {
@@ -1459,6 +1489,27 @@ void NativeRuntime::bind(std::uint32_t word, NativeValue value)
 {
     validate(value);
     dictionary_.bind(word, value);
+    const auto cell = active_cells_.find(word);
+    if (cell != active_cells_.end()) cells_.at(cell->second).value = value;
+    trace_binding("write", word, cell == active_cells_.end() ? 0 : cell->second, value);
+}
+
+void NativeRuntime::trace_binding(const char *event, std::uint32_t word,
+                                  std::uint64_t cell, NativeValue value)
+{
+    if (!options_.binding_trace) return;
+    auto &out = *options_.binding_trace;
+    out << "BIND " << event << " word=" << word << " name=";
+    const auto name = dictionary_.word(word).packed_name.raw();
+    for (int shift = 40; shift >= 0; shift -= 8) {
+        const auto byte = static_cast<unsigned char>(name >> shift);
+        if (byte) out << static_cast<char>(byte);
+    }
+    out << " cell=" << cell << " value=";
+    if (value.kind == NativeValue::Kind::number) out << native_format_number(value.number);
+    else if (value.kind == NativeValue::Kind::unbound) out << "UNDEF";
+    else out << "handle:" << value.handle;
+    out << '\n';
 }
 
 std::size_t NativeRuntime::retain_program(NativeProgram program)
@@ -1475,7 +1526,7 @@ std::size_t NativeRuntime::retain_program(NativeProgram program)
             compilation.bindings.push_back({NativeValue::Kind::word, {}, word});
         }
         for (const auto &operation : record.program.operations) {
-            if (operation.rebuilt_arguments) {
+            if (operation.rebuilt_arguments && !operation.rebuild_result) {
                 compilation.emissions.push_back(NativeEmission::rebuild_arguments);
                 compilation.literals.push_back(std::nullopt);
             }
@@ -1508,8 +1559,14 @@ std::size_t NativeRuntime::retain_program(NativeProgram program)
             case NativeOperation::Kind::setpop: case NativeOperation::Kind::compare:
             case NativeOperation::Kind::call: case NativeOperation::Kind::logical_not:
             case NativeOperation::Kind::integer_part: case NativeOperation::Kind::sign:
+            case NativeOperation::Kind::is_integer: case NativeOperation::Kind::is_real:
+            case NativeOperation::Kind::is_function:
                 compilation.emissions.push_back(NativeEmission::call_binding); break;
             default: throw std::logic_error("native program: unknown operation kind");
+            }
+            if (operation.rebuilt_arguments && operation.rebuild_result) {
+                compilation.emissions.push_back(NativeEmission::rebuild_arguments);
+                compilation.literals.push_back(std::nullopt);
             }
         }
         const auto allocation = compile_storage(std::move(compilation));
@@ -1542,7 +1599,21 @@ NativeValue NativeRuntime::make_function(NativeProgram program)
     const auto handle = next_handle_++;
     const auto block = compiled_storage(*programs_[id]->storage).descriptor;
     objects_.emplace(handle, NativeObject{NativeValue::Kind::function, block, {}});
-    functions_.emplace(handle, id);
+    functions_.emplace(handle, FunctionRecord{id, {}, 0, false});
+    return {NativeValue::Kind::function, {}, handle};
+}
+
+NativeValue NativeRuntime::instantiate_function(NativeValue prototype, const NativeFrame &frame)
+{
+    if (next_handle_ == std::numeric_limits<std::uint32_t>::max())
+        throw std::overflow_error("native function handle overflow");
+    const auto handle = next_handle_++;
+    functions_.emplace(handle, FunctionRecord{functions_.at(prototype.handle).program,
+                                             frame.environment, frame.activation, true});
+    objects_.emplace(handle, NativeObject{NativeValue::Kind::function, {}, {}});
+    if (options_.binding_trace)
+        *options_.binding_trace << "CLOSURE function=" << handle << " prototype=" << prototype.handle
+                                << " defining=" << frame.activation << '\n';
     return {NativeValue::Kind::function, {}, handle};
 }
 
@@ -1553,8 +1624,9 @@ void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
     pending.push_back(empty_stack_cell_);
     std::vector<std::uint16_t> marked = reservations_;
     std::vector<std::size_t> function_programs, function_storage;
-    for (const auto &[handle, id] : functions_) {
+    for (const auto &[handle, function] : functions_) {
         (void)handle;
+        const auto id = function.program;
         function_programs.push_back(id);
         function_storage.push_back(*programs_.at(id)->storage);
     }
@@ -1588,6 +1660,15 @@ void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
         pending.insert(pending.end(), frame.roots.begin(), frame.roots.end());
     for (const auto &frame : frame_roots_)
         pending.insert(pending.end(), frame.begin(), frame.end());
+    std::vector<std::uint64_t> marked_cells;
+    const auto mark_cell = [&](std::uint64_t id) {
+        if (!id || std::find(marked_cells.begin(), marked_cells.end(), id) != marked_cells.end()) return;
+        marked_cells.push_back(id);
+        pending.push_back(cells_.at(id).value);
+    };
+    for (const auto &[word, id] : active_cells_) { (void)word; mark_cell(id); }
+    for (const auto &frame : accounting_frames_)
+        for (const auto id : frame.cells) mark_cell(id);
     std::vector<std::uint32_t> visited;
     while (!pending.empty()) {
         const auto value = pending.back(); pending.pop_back();
@@ -1597,24 +1678,40 @@ void NativeRuntime::collect(const std::vector<NativeValue> &temporary_roots)
         if (std::find(visited.begin(), visited.end(), value.handle) != visited.end()) continue;
         visited.push_back(value.handle);
         const auto &payload = object(value);
-        marked.push_back(payload.block.address);
+        if (payload.block.words) marked.push_back(payload.block.address);
         if (value.kind == NativeValue::Kind::function) {
-            const auto &program = *programs_.at(functions_.at(value.handle));
+            const auto &function = functions_.at(value.handle);
+            const auto &program = *programs_.at(function.program);
             mark_compilation(compilations_.at(*program.storage));
             pending.insert(pending.end(), program.program.roots.begin(), program.program.roots.end());
+            for (const auto &[word, id] : function.environment) { (void)word; mark_cell(id); }
         }
         pending.insert(pending.end(), payload.fields.begin(), payload.fields.end());
     }
     allocator_.collect(marked);
+    std::vector<std::size_t> released_programs;
     for (auto it = objects_.begin(); it != objects_.end();) {
         // A zero extent is the pending host-only record of allocate_object.
-        if (it->second.block.words && std::find(visited.begin(), visited.end(), it->first) == visited.end()) {
+        // Experimental function instances also have zero logical extent.
+        if ((it->second.block.words || functions_.count(it->first))
+            && std::find(visited.begin(), visited.end(), it->first) == visited.end()) {
             if (it->second.kind == NativeValue::Kind::function) {
-                release_program(functions_.at(it->first));
+                released_programs.push_back(functions_.at(it->first).program);
                 functions_.erase(it->first);
             }
             it = objects_.erase(it);
         } else ++it;
+    }
+    std::sort(released_programs.begin(), released_programs.end());
+    released_programs.erase(std::unique(released_programs.begin(), released_programs.end()), released_programs.end());
+    for (const auto id : released_programs) {
+        if (std::none_of(functions_.begin(), functions_.end(),
+                [&](const auto &entry) { return entry.second.program == id; })) release_program(id);
+    }
+    for (auto it = cells_.begin(); it != cells_.end();) {
+        if (std::find(marked_cells.begin(), marked_cells.end(), it->first) == marked_cells.end())
+            it = cells_.erase(it);
+        else ++it;
     }
     ++collections_;
 }
@@ -1857,8 +1954,9 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
     }
     result.storage_accounting_complete = programs_[program_index]->storage.has_value()
         || initial_program.operations.empty();
+    last_exhaustion_.reset();
     const auto accounting_base = accounting_frames_.size();
-    std::vector<NativeFrame> frames{{program_index, 0, {}, {}, {}}};
+    std::vector<NativeFrame> frames{{program_index, 0, {}, {}, {}, {}, {}, 0}};
     const auto finish = [&]() {
         // SETPOP abandons binding saves; it does not perform normal returns.
         unwind_frames(accounting_base);
@@ -1899,25 +1997,47 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
                 for (std::size_t i = frame.saved_bindings.size(); i-- > 0;) {
                     const auto &saved = frame.saved_bindings[i];
                     dictionary_.exchange_binding_class(saved.first, frame.saved_classes[i]);
-                    bind(saved.first, saved.second);
+                    auto value = saved.second;
+                    std::uint64_t cell = 0;
+                    if (options_.experimental_closures) {
+                        cell = frame.saved_cells[i];
+                        if (cell) {
+                            active_cells_[saved.first] = cell;
+                            value = cells_.at(cell).value;
+                        } else active_cells_.erase(saved.first);
+                    }
+                    // Restore the active view, not an old copy of a mutated cell.
+                    dictionary_.bind(saved.first, value);
+                    trace_binding("restore", saved.first, cell, value);
                 }
+                if (options_.binding_trace)
+                    *options_.binding_trace << "RETURN activation=" << frame.activation << '\n';
             }
             frames.pop_back();
             continue;
         }
         const auto &instruction = program.operations.at(frame.position++);
         ++result.operations;
-        if (instruction.rebuilt_arguments) {
-            const auto extent = native_argument_rebuild_extent(instruction.rebuilt_arguments);
-            if (!enter_frame({0, extent, 0})) {
-                // Historical 20150/20157 reports 13000 with a generated
-                // continuation/address. Exact rendering awaits compiler layout
-                // conformance; do not manufacture that diagnostic value.
-                result.error = "native argument rebuilding storage exhausted (historical diagnostic 13000 rendering incomplete)";
-                return finish();
+        const auto rebuild = [&]() {
+            if (!instruction.rebuilt_arguments) return true;
+            if (options_.activation_limit) return true;
+            last_exhaustion_ = native_rebuild_exhaustion(activation_words_, instruction.rebuilt_arguments);
+            if (last_exhaustion_) {
+                // Continuation and object addresses still need exact compiler
+                // layout before their diagnostic can be rendered faithfully.
+                if (last_exhaustion_->phase == NativeExhaustionPhase::rebuild_extent) {
+                    result.diagnostic = 013000;
+                    result.culprit = {NativeValue::Kind::number, Word48(067000), 0};
+                } else {
+                    result.error = "native argument rebuilding storage exhausted (historical diagnostic 13000 rendering incomplete)";
+                }
+                return false;
             }
-            if (!leave_frame()) throw std::logic_error("native transient frame cannot restore");
-        }
+            activation_peak_ = std::max(activation_peak_, activation_words_
+                + native_argument_frame_cost(instruction.rebuilt_arguments).exit_peak);
+            return true;
+        };
+        if (!instruction.rebuild_result && !rebuild()) return finish();
         switch (instruction.kind) {
         case NativeOperation::Kind::call: {
             const auto function = dictionary_.word(instruction.binding).binding;
@@ -1925,25 +2045,103 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
                 result.error = "native application of a nonfunction is not implemented";
                 return finish();
             }
-            const auto id = functions_.at(function.handle);
+            const auto &function_record = functions_.at(function.handle);
+            const auto id = function_record.program;
             const auto &callee = programs_.at(id)->program;
+            if (options_.activation_limit && frames.size() > options_.activation_limit) {
+                result.error = "native activation limit exceeded";
+                return finish();
+            }
             std::vector<NativeBindingSlot> slots;
             std::vector<NativeValue> roots{function};
             for (const auto &[word, slot] : callee.bindings) {
                 slots.push_back(slot);
                 roots.push_back(dictionary_.word(word).binding);
             }
-            if (!enter_frame(native_binding_frame_cost(slots), std::move(roots))) {
-                result.error = "native function activation storage exhausted";
-                return finish();
+            // 03217..03231 installs bindings incrementally. A watchpoint
+            // does not roll back earlier installs or the failing slot's class.
+            // Check source read phases, not the final frame's aggregate peak.
+            NativeFrame next{id, 0, function, {}, {}, {}, {}, next_activation_++};
+            if (options_.binding_trace)
+                *options_.binding_trace << "CALL activation=" << next.activation
+                    << " function=" << function.handle << " defining=" << function_record.defining_activation << '\n';
+            if (options_.experimental_closures) {
+                next.environment = function_record.environment;
+                const auto install = [&](std::uint32_t word, std::uint64_t cell) {
+                    next.saved_bindings.emplace_back(word, dictionary_.word(word).binding);
+                    next.saved_classes.push_back(dictionary_.exchange_binding_class(word, cells_.at(cell).binding_class));
+                    const auto previous = active_cells_.find(word);
+                    next.saved_cells.push_back(previous == active_cells_.end() ? 0 : previous->second);
+                    roots.push_back(dictionary_.word(word).binding);
+                    active_cells_[word] = cell;
+                    dictionary_.bind(word, cells_.at(cell).value);
+                    trace_binding("install", word, cell, cells_.at(cell).value);
+                };
+                for (const auto &[word, cell] : function_record.environment) install(word, cell);
+                for (auto binding = callee.bindings.rbegin(); binding != callee.bindings.rend(); ++binding) {
+                    if (next_cell_ == std::numeric_limits<std::uint64_t>::max())
+                        throw std::overflow_error("native binding cell handle overflow");
+                    const auto cell = next_cell_++;
+                    const auto value = binding->second.argument ? pop() : NativeValue{};
+                    if (!result.error.empty()) return finish();
+                    cells_.emplace(cell, BindingCell{value, {}});
+                    next.environment[binding->first] = cell;
+                    install(binding->first, cell);
+                }
+                if (!enter_frame(native_binding_frame_cost(slots), std::move(roots))) {
+                    result.error = "native activation limit exceeded";
+                    return finish();
+                }
+                auto &cell_roots = accounting_frames_.back().cells;
+                cell_roots = next.saved_cells;
+                for (const auto &[word, cell] : next.environment) { (void)word; cell_roots.push_back(cell); }
+                frames.push_back(std::move(next));
+                break;
             }
-            NativeFrame next{id, 0, function, {}, {}};
-            for (auto binding = callee.bindings.rbegin(); binding != callee.bindings.rend(); ++binding) {
+            std::uint32_t retained = 2;
+            std::size_t installed = 0;
+            constexpr std::uint32_t watched = 067000 - 066001;
+            const auto binding_failure = [&](NativeExhaustionPhase phase, NativeValue culprit, bool renderable) {
+                last_exhaustion_ = NativeExhaustion{phase, activation_words_,
+                    static_cast<std::uint16_t>(slots.size()), installed};
+                if (renderable) { result.diagnostic = 013000; result.culprit = culprit; }
+                else result.error = "native binding installation storage exhausted (historical diagnostic 13000 rendering incomplete)";
+            };
+            for (auto binding = callee.bindings.rbegin(); binding != callee.bindings.rend(); ++binding, ++installed) {
                 const auto word = binding->first;
                 next.saved_bindings.emplace_back(word, dictionary_.word(word).binding);
                 next.saved_classes.push_back(dictionary_.exchange_binding_class(word, {}));
-                bind(word, binding->second.argument ? pop() : NativeValue{});
+                bind(word, {});
+                retained += 2;
+                if (!binding->second.argument) continue;
+                activation_peak_ = std::max(activation_peak_, activation_words_ + retained + 3);
+                const auto argument = pop();
                 if (!result.error.empty()) return finish();
+                const auto temporary_base = activation_words_ + retained;
+                if (!options_.activation_limit && temporary_base == watched) {
+                    binding_failure(NativeExhaustionPhase::binding_target, argument,
+                        argument.kind == NativeValue::Kind::number || argument.kind == NativeValue::Kind::unbound);
+                    return finish();
+                }
+                bind(word, argument);
+                if (!options_.activation_limit && temporary_base + 3 == watched) {
+                    binding_failure(NativeExhaustionPhase::binding_value, argument,
+                        argument.kind == NativeValue::Kind::number || argument.kind == NativeValue::Kind::unbound);
+                    return finish();
+                }
+                if (!options_.activation_limit && temporary_base + 2 == watched) {
+                    binding_failure(NativeExhaustionPhase::binding_count,
+                        {NativeValue::Kind::number, Word48(slots.size() - installed), 0}, true);
+                    return finish();
+                }
+                if (!options_.activation_limit && temporary_base + 1 == watched) {
+                    binding_failure(NativeExhaustionPhase::binding_table, {}, false);
+                    return finish();
+                }
+            }
+            if (!enter_frame(native_binding_frame_cost(slots), std::move(roots))) {
+                result.error = "native function activation storage exhausted (unported access phase)";
+                return finish();
             }
             frames.push_back(std::move(next));
             break;
@@ -1994,11 +2192,28 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
                 answer = compared.value;
             }
             push({NativeValue::Kind::number, answer, 0});
+            if (instruction.rebuild_result && !rebuild()) return finish();
             break;
         }
         case NativeOperation::Kind::constant:
             push({NativeValue::Kind::number, instruction.constant, 0});
             break;
+        case NativeOperation::Kind::is_integer:
+        case NativeOperation::Kind::is_real:
+        case NativeOperation::Kind::is_function: {
+            const auto value = pop();
+            if (!result.error.empty()) return finish();
+            // 03403 masks the integer tag; 06605 accepts only real words.
+            // 06600's two callable descriptor classes share the native kind.
+            const bool answer = instruction.kind == NativeOperation::Kind::is_function
+                ? value.kind == NativeValue::Kind::function
+                : value.kind == NativeValue::Kind::number
+                    && (instruction.kind == NativeOperation::Kind::is_integer
+                        ? (value.number.raw() & 07740000000000000ULL) == 06400000000000000ULL
+                        : value.number.raw() < 06400000000000000ULL);
+            push({NativeValue::Kind::number, Word48(06400000000000000ULL | answer), 0});
+            break;
+        }
         case NativeOperation::Kind::integer_part:
         case NativeOperation::Kind::sign: {
             const auto value = pop();
@@ -2034,10 +2249,18 @@ NativeExecutionResult NativeRuntime::execute(std::size_t program_index, std::ost
             break;
         }
         case NativeOperation::Kind::captured_value:
-            push(program.roots.at(instruction.target));
+            push(options_.experimental_closures
+                ? instantiate_function(program.roots.at(instruction.target), frame)
+                : program.roots.at(instruction.target));
+            // Bound garbage from returned activations during a long evaluation.
+            // The just-created closure is already rooted on the POP value stack.
+            if (options_.experimental_closures && next_handle_ % 256 == 0) collect();
             break;
         case NativeOperation::Kind::load:
             push(dictionary_.word(instruction.binding).binding);
+            trace_binding("read", instruction.binding,
+                active_cells_.count(instruction.binding) ? active_cells_.at(instruction.binding) : 0,
+                dictionary_.word(instruction.binding).binding);
             break;
         case NativeOperation::Kind::store: {
             const auto value = pop();
@@ -2346,6 +2569,9 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
             : kind == NativeOperation::Kind::logical_not ? 03371
             : kind == NativeOperation::Kind::integer_part ? 03442
             : kind == NativeOperation::Kind::sign ? 010365
+            : kind == NativeOperation::Kind::is_integer ? 03403
+            : kind == NativeOperation::Kind::is_real ? 06605
+            : kind == NativeOperation::Kind::is_function ? 06600
             : kind == NativeOperation::Kind::jump || kind == NativeOperation::Kind::label ? 04214
             : kind == NativeOperation::Kind::unary ? (binary == NativeBinary::subtract ? 04437 : 04520)
             : binary == NativeBinary::add ? 06672 : binary == NativeBinary::subtract ? 06702
@@ -2354,9 +2580,9 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
     };
     const auto drain = [&] {
         const auto op = pending_.back(); pending_.pop_back();
-        // The straight-line two-load comparison path stages both operands
-        // before 20124 (05067). Calls and computed operands require their own
-        // compiler scheduling evidence and receive no inferred annotation.
+        // Equality rebuilds both simple operands before the resident call.
+        // Ordered comparison uses its specialized numeric entry, then rebuilds
+        // one Boolean result. Computed operands need separate scheduling evidence.
         const auto staged_value = [](const NativeOperation &operation) {
             return operation.kind == NativeOperation::Kind::constant
                 || operation.kind == NativeOperation::Kind::load;
@@ -2367,7 +2593,9 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         emit(op.comparison ? NativeOperation::Kind::compare
              : op.unary ? NativeOperation::Kind::unary : NativeOperation::Kind::binary, {}, op.binary);
         if (op.comparison) {
-            program_.operations.back().rebuilt_arguments = rebuild_pair ? 2 : 0;
+            program_.operations.back().rebuilt_arguments = rebuild_pair
+                ? (*op.comparison == NativeComparison::equal ? 2 : 1) : 0;
+            program_.operations.back().rebuild_result = rebuild_pair && *op.comparison != NativeComparison::equal;
             auto &operation = program_.operations.back();
             operation.comparison = *op.comparison;
             operation.provenance = *op.comparison == NativeComparison::equal ? 03374
@@ -2485,9 +2713,14 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
     }
     if (call_) {
         if (*call_ == NativeOperation::Kind::logical_not
-            || *call_ == NativeOperation::Kind::integer_part || *call_ == NativeOperation::Kind::sign) {
+            || *call_ == NativeOperation::Kind::integer_part || *call_ == NativeOperation::Kind::sign
+            || *call_ == NativeOperation::Kind::is_integer || *call_ == NativeOperation::Kind::is_real
+            || *call_ == NativeOperation::Kind::is_function) {
             const auto name = *call_ == NativeOperation::Kind::logical_not ? "NOT"
-                : *call_ == NativeOperation::Kind::integer_part ? "INTOF" : "SIGN";
+                : *call_ == NativeOperation::Kind::integer_part ? "INTOF"
+                : *call_ == NativeOperation::Kind::sign ? "SIGN"
+                : *call_ == NativeOperation::Kind::is_integer ? "ISINTE"
+                : *call_ == NativeOperation::Kind::is_real ? "ISREAL" : "ISFUNC";
             if (text != "(") { unsupported(std::string(name) + " requires a parenthesized call"); return; }
             pending_.push_back({true, false, {}, 0});
             pending_.back().primitive_call = *call_;
@@ -2634,6 +2867,7 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         } else if (!operand_ || assignment_) { unsupported("function application"); return; }
         pending_.push_back({true, false, {}, 0});
         pending_.back().call = callee;
+        pending_.back().argument_start = program_.operations.size();
         operand_ = start_ = true;
         return;
     }
@@ -2645,8 +2879,19 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         }
         const auto callee = pending_.back().call;
         const auto primitive = pending_.back().primitive_call;
+        const auto argument_start = pending_.back().argument_start;
+        const auto argument_count = program_.operations.size() - argument_start;
+        const bool simple_arguments = callee && argument_count <= 077777
+            && std::all_of(program_.operations.begin() + argument_start, program_.operations.end(),
+                [](const NativeOperation &operation) {
+                    return operation.kind == NativeOperation::Kind::constant
+                        || operation.kind == NativeOperation::Kind::load;
+                });
         pending_.pop_back(); operand_ = false; start_ = false;
-        if (callee) emit(NativeOperation::Kind::call, {}, {}, callee);
+        if (callee) {
+            emit(NativeOperation::Kind::call, {}, {}, callee);
+            if (simple_arguments) program_.operations.back().rebuilt_arguments = argument_count;
+        }
         if (primitive) emit(*primitive);
         return;
     }
@@ -2694,9 +2939,13 @@ void NativeSession::accept_token(const NativeToken &token, std::ostream &output)
         }
         if (!operand_ && !assignment_) { recover(output, 04020, token); return; }
         if (found.handle < 02740 && text != "UNDEF" && text != "FALSE" && text != "TRUE") {
-            if ((text == "NOT" || text == "INTOF" || text == "SIGN") && !assignment_) {
+            if ((text == "NOT" || text == "INTOF" || text == "SIGN"
+                 || text == "ISINTE" || text == "ISREAL" || text == "ISFUNC") && !assignment_) {
                 call_ = text == "NOT" ? NativeOperation::Kind::logical_not
-                    : text == "INTOF" ? NativeOperation::Kind::integer_part : NativeOperation::Kind::sign;
+                    : text == "INTOF" ? NativeOperation::Kind::integer_part
+                    : text == "SIGN" ? NativeOperation::Kind::sign
+                    : text == "ISINTE" ? NativeOperation::Kind::is_integer
+                    : text == "ISREAL" ? NativeOperation::Kind::is_real : NativeOperation::Kind::is_function;
                 return;
             }
             if (text == "ERASE" || text == "SETPOP") {
@@ -2778,7 +3027,7 @@ NativeExecutionResult native_execute(const NativeProgram &program, std::ostream 
     return runtime.execute(runtime.retain_program(program), output);
 }
 
-int run_native_shell(std::istream &input, std::ostream &output, std::ostream &errors)
+int run_native_shell(std::istream &input, std::ostream &output, std::ostream &errors, NativeOptions options)
 {
     for (const char *control : {"POPLAN_INTERPRET_ONLY", "POPLAN_DISABLE_TRANSLATED_ROUTINES",
                                "POPLAN_CPU_TRACE", "POPLAN_CPU_DETAIL_TRACE",
@@ -2788,7 +3037,7 @@ int run_native_shell(std::istream &input, std::ostream &output, std::ostream &er
             return 2;
         }
     }
-    NativeSession session;
+    NativeSession session(options);
     NativeSessionResult result;
     char byte;
     while (input.get(byte)) {
