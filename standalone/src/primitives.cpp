@@ -310,6 +310,7 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     else if (name == "ISLIST" || name == "ISLINK") {
       bool empty = empty_list(v);
       b = empty || (v.object() && object(v).kind == Object::Kind::pair &&
+                    !object(v).plain_pair &&
                     (object(v).fields[1].nil_value() ||
                      (object(v).fields[1].object() &&
                       object(object(v).fields[1]).kind == Object::Kind::pair)));
@@ -446,7 +447,9 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "CONS" || name == "CONSPA" || name == "::") {
     auto b = pop(), a = pop();
-    push(pair(a, b));
+    auto v = pair(a, b);
+    object(v).plain_pair = name == "CONSPA";
+    push(v);
     return;
   }
   if (name == "FRONT" || name == "BACK" || name == "HD" || name == "TL") {
@@ -504,22 +507,8 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
       if (!o.type.object() || object(o.type).kind == Object::Kind::word)
         throw Fault("cannot change standard class");
       object(o.type).type = type;
-    } else if (v.integer())
-      push(word("INTEGER"));
-    else if (v.real())
-      push(word("REAL"));
-    else {
-      auto &o = object(v);
-      push(o.type.object()
-               ? (object(o.type).kind == Object::Kind::word
-                      ? o.type
-                      : object(o.type).type)
-               : word(o.kind == Object::Kind::function    ? "FUNCTION"
-                      : o.kind == Object::Kind::word      ? "WORD"
-                      : o.kind == Object::Kind::pair      ? "PAIR"
-                      : o.kind == Object::Kind::reference ? "REF"
-                                                          : "CSTRIP"));
-    }
+    } else
+      push(data_word(v));
     return;
   }
   if (name == "COPY") {
@@ -1306,7 +1295,10 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "PR" || name == "PRINT" || name == "PRSTRI") {
     auto v = pop();
-    output_text(format(v, name == "PRSTRI"));
+    // 07777..10001 checks the built-in character-strip class before output.
+    if (name == "PRSTRI" && !character_strip(v))
+      throw Fault("PRSTRING requires a character strip");
+    print_value(v, name == "PRSTRI");
     if (name == "PRINT")
       push(v);
     return;

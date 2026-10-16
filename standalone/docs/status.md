@@ -1,6 +1,6 @@
 # Standalone implementation status
 
-Date: 2026-10-15. The implementation lives entirely in this directory. Existing
+Date: 2026-10-16. The implementation lives entirely in this directory. Existing
 machine and compatibility-native code remains independent. This work supersedes
 the legacy representation/accounting requirements only for this new executable.
 
@@ -16,7 +16,7 @@ the legacy representation/accounting requirements only for this new executable.
 | Generated functions | Partial application/composition, updaters, records, strips, arrays including supplied storage callbacks | Standard-function fixture, nominal class/width tests, custom initializer test |
 | Readers | Resumable ITEMREAD/LISTREAD/NUMBERREAD; macros, NONMAC, quoted-word markers, doubled string quotes, Unicode character literals | Signed bounds, nested lists, supplier timing and split-input tests |
 | Runtime source | Authoritative PROGLIST/NEXTCH; typed POPVAL/MACRESULTS, interleaved COMPILE, generic CARRYON, source loading | Source replacement/chaining/cursor mutation; POPVAL identity/preservation; supplier ordering; libraries |
-| Output | Iterative object formatting, decimal/EXP PRREAL fields, Unicode consumers, GENOUT | Deep acyclic/cyclic objects, quine, output redirection and UTF-8 files |
+| Output | Resumable print tasks, historical list/string traversal order, decimal/EXP PRREAL fields, Unicode consumers reloaded per character, GENOUT | Supplier/callback mutation probes, detached-tail roots, deep/cyclic objects, partial output on failure, callback suspension/GC and UTF-8 files |
 | Lists | Lazy memoized FNTOLIST, list predicates, updaters, traversals, callback ordering; concatenation shares its second operand | Infinite supplier prefix, deferred effects, mutation/sharing, equality and suspended ITEMREAD supplier |
 | Recovery | ERRFUN callbacks, nested-handler guard, active-variable preservation on SETPOP/errors | Custom handler, nested failure, captured cells and lexer error after completed-command effects |
 | Host services | Streams, clocks, console/file POPMESS, explicit unsupported-device errors | C++ injected-service test and CLI service cases |
@@ -117,3 +117,32 @@ Malformed UTF-8 timing (2026-10-15): valid source prefixes are tokenized before
 reporting malformed or truncated suffixes. Complete earlier commands execute
 once; the reader error is deferred to its source position. Session tests cover
 six malformed/truncated encodings at every byte split, with GC and recovery.
+
+Output consumer rebinding (2026-10-15): each scheduled character loads the current
+CUCHOUT binding after the preceding callback finishes. A callback can redirect
+the remaining text, perform nested printing or suspend for input. GENOUT retains
+its dynamic binding scope. All output primitives, invalid replacement consumers,
+Unicode split-input feeds and collection have focused tests. Manual §8.3 and
+historical PRSTRING probes establish the change. This milestone preceded the
+streaming printer below.
+
+Streaming printing (2026-10-15): PR, PRINT, PRSTRING and the print arrow now
+interleave traversal and output through explicit VM print tasks. Historical
+`07704..07727` emits '[' before forcing and captures TL before printing HD;
+`10005..10014` reads string characters one at a time. Historical/instruction-only
+probes confirm head mutation after '[', saved-tail link behavior, live mutation
+of that tail's contents and string updates. Tests cover lazy suppliers, nested
+printing, every-byte suspension/GC, detached tails, partial-output errors, cycles,
+2,000-level nesting and bounded printing of infinite lists. This milestone left
+printer argument types and non-list DATAWORD presentation for the increment below.
+
+Printer contracts (2026-10-16): PRSTRING validates the built-in character-strip
+class, accepting strings and INITC storage while rejecting ordinary/custom strips,
+lists, pairs, references, numbers, words and functions before output/forcing.
+Character strips print with quotes under PR and without them under PRSTRING;
+their Unicode components are read progressively. Non-list structures print their
+current DATAWORD, including mutable record/strip labels and the six-character
+FUNCTI function label. CONSPAIR objects retain their construction kind across
+COPY and print PAIR even with a NIL tail; common lists still print brackets.
+Historical/raw probes, 19 additional conformance cases and split-input/GC tests
+cover the change. Remaining pair/list access and comparison contracts are in the TODO.

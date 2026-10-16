@@ -1,4 +1,4 @@
-# Standalone language inventory — 2026-10-15
+# Standalone language inventory — 2026-10-16
 
 This is a completeness ledger, not a coverage percentage. It includes all 184
 resident dictionary spellings (six-character significance). The evidence snapshot
@@ -104,11 +104,11 @@ boundaries, not fallback paths.
 | `02064` | `PARTAP` | Implemented; audit open | Historical updater probes and `tests/conformance.py`: independent frozen partial updaters, no implicit composition updater, explicit replacement. Further branches remain open. |
 | `02070` | `POPMES` | Modern replacement | Console and UTF-8 host files; historical device descriptors rejected. |
 | `02074` | `POPVAL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02100` | `PR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02104` | `PRINT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02100` | `PR` | Implemented; audit open | Historical `07704..07727`, `10025..10030`: streaming list/string order and non-list DATAWORD labels; plain pairs, references, mutable classes, INITC, suspension/GC and error prefixes tested. Further branches remain open. |
+| `02104` | `PRINT` | Implemented; audit open | Uses the resumable PR task path and retains the supplied value. Standard-function and callback corpus; remaining PR contracts apply. |
 | `02110` | `PRREAL` | Implemented; audit open | Decimal field width and EXP significant precision; modern IEEE rendering. |
 | `02114` | `PROGLI` | Implemented; audit open | Authoritative list cursor shared by compiler/readers, with in-place cursor mutation and deferred input. |
-| `02120` | `PRSTRI` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02120` | `PRSTRI` | Implemented; audit open | Historical `07773..10014`: accepts literal strings/built-in INITC, rejects other classes before output/forcing; progressive Unicode component reads, mutation, suspension/GC and recovery tested. |
 | `02124` | `REALOF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02130` | `RECORD` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02134` | `SAMEDA` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |

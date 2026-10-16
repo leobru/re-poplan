@@ -52,7 +52,23 @@ execution without keeping completed programs alive forever.
 
 Host streams and clock providers are supplied to Runtime. GENOUT wraps a print
 function in an invocation with a dynamically rebound CUCHOUT cell. Printing
-schedules Unicode scalar values through that consumer. POPMESS file functions own
+schedules Unicode scalar values and reloads CUCHOUT for each character, after the
+previous consumer invocation returns. Generated load operations retain the output
+identifier through suspension and collection; nested GENOUT calls retain their
+dynamic binding scope. PR, PRINT, PRSTRING and the print arrow run explicit
+print-task stacks attached to VM frames. A task emits punctuation, forces a lazy
+node, captures its head/tail before printing the head, or reads one current string
+character. NeedList leaves the forcing task intact; input suspension resumes the
+consumer's own frame. The collector traces task values and active cycle markers,
+including tails detached by callbacks. No host recursion traverses printed objects.
+Runtime::format drains the same task algorithm for host snapshot/diagnostic uses.
+DATAWORD and non-list printing share one class lookup. Ordinary CONSPAIR objects
+retain a construction marker distinct from common-list nodes, preserved by COPY;
+printing never guesses this distinction from the tail's current shape. Strings
+and built-in INITC strips share the character-output path, while generated strip
+classes retain their nominal identity even if named CSTRIP. PRSTRING validates
+that class before scheduling output. All text uses Unicode scalar values.
+POPMESS file functions own
 host stream objects and close explicitly or when their last object becomes
 unreachable. No value is interpreted as a host pointer or a device address.
 

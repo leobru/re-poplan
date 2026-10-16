@@ -69,6 +69,43 @@ int main() {
            "** 1\n");
     splits("(LAMBDA X;X+1 END)(4)=>", "** 5\n");
     splits("FUNCTION F X;LAMBDA Y;X+Y END END;F(3)(4)=>", "** 7\n");
+    splits("FUNCTION TAKE C;C->FIRST;CHAROUT->CUCHOUT END;TAKE->CUCHOUT;"
+           "PRSTRING('λёж');FIRST=>", "ёж** 955\n");
+    splits("FUNCTION TAKE C;CHAROUT(C);ITEMREAD()->X;CHAROUT->CUCHOUT END;"
+           "TAKE->CUCHOUT;PRSTRING('λё');17\nX=>", "λё** 17\n");
+    splits("FUNCTION S;CHAROUT(95);ITEMREAD()->V;IF V=\"DONE\" THEN TERMIN "
+           "ELSE V CLOSE END;PR(FNTOLIST(S));17 DONE\n", "[_17_]");
+    splits("[1 2]->L;FUNCTION C X;IF X=49 THEN NIL->TL(L);UNDEF->L;"
+           "ITEMREAD()->Y CLOSE;CHAROUT(X) END;C->CUCHOUT;PR(L);17\n"
+           "CHAROUT->CUCHOUT;Y=>", "[1 2]** 17\n");
+    splits("'12'->S;FUNCTION C X;IF X=49 THEN ITEMREAD()->Y;Y->SUBSCC(2,S) "
+           "CLOSE;CHAROUT(X) END;C->CUCHOUT;PRSTRING(S);57\n", "19");
+    splits("INITC(2)->S;955->SUBSCC(1,S);1078->SUBSCC(2,S);FUNCTION C X;"
+           "IF X=955 THEN ITEMREAD()->Y;Y->SUBSCC(2,S) CLOSE;CHAROUT(X) END;"
+           "C->CUCHOUT;PRSTRING(S);1105\n", "λё");
+    splits("RECORDFNS(\"POINT\",[0])->X->D->C;C(7)->R;PR(R);"
+           "\"DOT\"->DATAWORD(R);PR(R);", "POINTDOT");
+    Session printer_type;
+    printer_type.runtime.feed("printer-type", "0->N;FUNCTION S;N+1->N;"
+                              "ITEMREAD() END;PRSTRING(FNTOLIST(S));");
+    printer_type.runtime.collect();
+    printer_type.runtime.feed("printer-type", "N=>", true);
+    check(printer_type.runtime.diagnostics == 1 &&
+              printer_type.output.str() == "** 0\n" &&
+              printer_type.errors.str().find("PRSTRING requires a character strip") !=
+                  std::string::npos,
+          "PRSTRING type rejection forced a supplier or lost recovery");
+    Session print_failure;
+    print_failure.runtime.feed("printer", "[1]->L;FUNCTION C X;CHAROUT(X);"
+                               "IF X=49 THEN ITEMREAD();1/0 CLOSE END;"
+                               "C->CUCHOUT;PR(L);");
+    check(print_failure.output.str() == "[1",
+          "printer did not suspend after its emitted prefix");
+    print_failure.runtime.collect();
+    print_failure.runtime.feed("printer", "17\n4=>", true);
+    check(print_failure.runtime.diagnostics == 1 &&
+              print_failure.output.str() == "[1** 4\n",
+          "printer failure replayed output or retained pending tasks");
     Session unicode;
     unicode.runtime.feed("utf", std::string("2+2=> ") + char(0xce));
     check(unicode.output.str() == "** 4\n",

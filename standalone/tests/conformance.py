@@ -60,12 +60,75 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('LISTREAD()->L;[[1 2] CAT]\nL=>;NUMBERREAD()->X;-9223372036854775808\nX=>', '** [[1 2] CAT]\n** -9223372036854775808\n')
     run('VARS T P;\'[2.5,3]->"ABC"\'->T;0->P;FUNCTION CH;P+1->P;IF P>DATALENGTH(T) THEN TERMIN ELSE SUBSCC(P,T) CLOSE END;INCHARITEM(CH)->R;R(),R(),R(),R(),R(),R(),R(),R(),R(),R()=>', '** [, 2.5, ,, 3, ], ->, ", ABC, ", TERMIN\n')
     run('VARS TOTAL;0->TOTAL;FUNCTION SAVE X;X+TOTAL->TOTAL END;GENOUT(PR,SAVE)->P;P(12);TOTAL=>', '** 99\n')
+    run("FUNCTION TAKE C;C->FIRST;CHAROUT->CUCHOUT END;TAKE->CUCHOUT;PRSTRING('ABC');FIRST=>",
+        'BC** 65\n')
+    run("FUNCTION TAKE C;CHAROUT->CUCHOUT;PRSTRING('x');CHAROUT(C) END;TAKE->CUCHOUT;PRSTRING('ABC');",
+        'xABC')
+    run("FUNCTION TAKE C;C->FIRST;CHAROUT->CUCHOUT END;GENOUT(PRSTRING,TAKE)('ABC');FIRST=>;PRSTRING('Z');",
+        'BC** 65\nZ')
+    run("FUNCTION TAKE C;UNDEF->CUCHOUT END;TAKE->CUCHOUT;PRSTRING('ABC');\n4=>",
+        '** 4\n', 'compound value required')
+    for expression, expected in [('PR(12)', '2'), ('PRINT(12)->R', '2'),
+                                 ('PRREAL(1.5,1,1)', '.5'), ('PRBIN(5,3)', '01'),
+                                 ('PROCT(9,3)', '11'), ('SP(3)', '  '), ('NL(3)', '\n\n'),
+                                 ('12=>', '* 12\n')]:
+        run('FUNCTION TAKE C;CHAROUT->CUCHOUT END;TAKE->CUCHOUT;' + expression + ';', expected)
     run('PRBIN(5,4);NL(1);PROCT(9,3);NL(1);', '0101\n011\n')
+    for value in ['17', '1.5', 'NIL', '[1 2]', '"WORD"', 'CONSREF(1)',
+                  'CONSPAIR(1,NIL)', 'INIT(2)', 'SIN']:
+        run('PRSTRING(' + value + ');\n4=>', '** 4\n', 'PRSTRING requires a character strip')
+    run('INITC(2)->S;49->SUBSCC(1,S);50->SUBSCC(2,S);PRSTRING(S);S=>',
+        "12** '12'\n")
+    run("PRSTRING('');PRSTRING(INITC(0));INITC(0)=>", "** ''\n")
+    run('STRIPFNS("CSTRIP",8)->S->I;PRSTRING(I(1));\n4=>',
+        '** 4\n', 'PRSTRING requires a character strip')
+    run('CONSPAIR(1,NIL)->P;P,COPY(P),CONSREF(7),INIT(2),CONS(1,NIL),1::NIL=>',
+        '** PAIR, PAIR, REF, STRIP, [1], [1]\n')
+    run('CONSPAIR(1,NIL)->P;ISLIST(P),ISLINK(P),ISLIST(CONS(1,NIL)),ISLINK(CONS(1,NIL))=>',
+        '** 0, 0, 1, 1\n')
+    run('RECORDFNS("POINT",[0])->X->D->C;C(7)->R;R=>;"DOT"->DATAWORD(R);R,PRINT(R)=R=>',
+        '** POINT\nDOT** DOT, 1\n')
+    run('STRIPFNS("BYTE",8)->S->I;I(2)->R;R=>;"OCTET"->DATAWORD(R);R=>;DATALIST(R)=>',
+        '** BYTE\n** OCTET\n** [0 0]\n')
+    run('CONSREF(1)->R;R->CONT(R);PR(R);', 'REF')
+    run('SIN,DATAWORD(SIN)=>', '** FUNCTI, FUNCTI\n')
+    run('INITC(2)->S;49->SUBSCC(1,S);50->SUBSCC(2,S);FUNCTION C X;IF X=49 THEN 57->SUBSCC(2,S) CLOSE;CHAROUT(X) END;C->CUCHOUT;PRSTRING(S);',
+        '19')
     run('EQUAL([1 [2 3]],[1 [2 3]])=>', '** 1\n')
     run('CONSPAIR(1,NIL)->A;A->BACK(A);CONSPAIR(1,NIL)->B;B->BACK(B);EQUAL(A,B)=>', '** 1\n')
     run('NIL="NIL",ISWORD(NIL),DATAWORD(NIL),ISLINK([1]),ISLINK(CONSREF(1))=>', '** 1, 1, WORD, 1, 0\n')
     run('0->N;FUNCTION S;N+1->N;N END;FNTOLIST(S)->L;N=>;HD(L),N,HD(L),N=>;TL(L)->T;N=>;HD(T),N=>;9->HD(T);HD(T),N=>', '** 0\n** 1, 1, 1, 1\n** 1\n** 2, 2\n** 9, 2\n')
     run('0->N;FUNCTION S;N+1->N;IF N>2 THEN TERMIN ELSE N CLOSE END;FNTOLIST(S)->L;L=>;N,NULL(TL(TL(L))),N=>', '** [1 2]\n** 3, 1, 3\n')
+    run("0->N;FUNCTION S;N+1->N;CHAROUT(95);IF N>2 THEN TERMIN ELSE N CLOSE END;PR(FNTOLIST(S));",
+        '[_1_ 2_]')
+    run("0->N;FUNCTION S;N+1->N;CHAROUT(95);IF N>2 THEN TERMIN ELSE N CLOSE END;FNTOLIST(S)=>",
+        '** [_1_ 2_]\n')
+    run('0->N;FUNCTION S;STACKLENGTH()->N;TERMIN END;PRINT(FNTOLIST(S));N=>',
+        '[]** [], 1\n')
+    run("[1 2]->L;FUNCTION C X;IF X=91 THEN 9->HD(L) CLOSE;CHAROUT(X) END;C->CUCHOUT;PR(L);",
+        '[9 2]')
+    run("[1 2]->L;FUNCTION C X;IF X=49 THEN [9]->TL(L) CLOSE;CHAROUT(X) END;C->CUCHOUT;PR(L);",
+        '[1 2]')
+    run("[1 2]->L;FUNCTION C X;IF X=49 THEN 9->HD(TL(L)) CLOSE;CHAROUT(X) END;C->CUCHOUT;PR(L);",
+        '[1 9]')
+    run("[1 2]->L;FUNCTION C X;IF X=32 THEN 9->HD(TL(L)) CLOSE;CHAROUT(X) END;C->CUCHOUT;PR(L);",
+        '[1 9]')
+    run("'12'->S;FUNCTION C X;IF X=49 THEN 57->SUBSCC(2,S) CLOSE;CHAROUT(X) END;C->CUCHOUT;PRSTRING(S);",
+        '19')
+    run("'12'->S;FUNCTION C X;IF X=39 THEN 57->SUBSCC(1,S) CLOSE;CHAROUT(X) END;C->CUCHOUT;PR(S);",
+        "'92'")
+    run("0->N;FUNCTION S;N+1->N;IF N=1 THEN 1 ELSE 1/0 CLOSE END;PR(FNTOLIST(S));\n4=>",
+        '[1** 4\n', 'division by zero')
+    run("[1]->L;FUNCTION C X;CHAROUT(X);IF X=49 THEN 1/0 CLOSE END;C->CUCHOUT;PR(L);\n4=>",
+        '[1** 4\n', 'division by zero')
+    run("[1]->L;L->TL(L);PR(L);", '[1 <cycle>]')
+    run("[1]->L;L->HD(L);PR(L);", '[<cycle>]')
+    run("[1]->L;[%L,L%]=>", '** [[1] [1]]\n')
+    run("FUNCTION C X;IF X=91 THEN CHAROUT->CUCHOUT;PR([7]);C->CUCHOUT CLOSE;CHAROUT(X) END;C->CUCHOUT;PR([1]);",
+        '[7][1]')
+    streamed = run('FUNCTION S;1 END;PR(FNTOLIST(S));', error='operation limit',
+                   args=('--max-operations', '200'))
+    assert streamed.startswith('[1') and not streamed.endswith(']'), streamed
     run('0->N;FUNCTION S;N+1->N;PR(N);IF N>2 THEN TERMIN ELSE N CLOSE END;APPLIST(FNTOLIST(S),LAMBDA X;PR(X*10) END);', '1102203')
     run('0->N;FUNCTION S;N+1->N;IF N>2 THEN TERMIN ELSE N CLOSE END;EQUAL(FNTOLIST(S),[1 2])=>', '** 1\n')
     run('NEWARRAY([1 2 1 3],LAMBDA X Y;10*X+Y END)->A;[1 2 1 2]->BOUNDSLIST(A);A(2,1),BOUNDSLIST(A)=>', '** 13, [1 2 1 2]\n')

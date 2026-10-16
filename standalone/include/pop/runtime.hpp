@@ -99,6 +99,7 @@ struct Operation {
     define,
     ret,
     print,
+    print_step,
     begin_list,
     end_list,
     partial,
@@ -164,9 +165,24 @@ struct Object {
   bool macro = false, closed = false, forcing = false;
   bool protected_function = false;
   bool updater_assigned = false;
+  // Ordinary CONSPAIR objects and common-list nodes share two fields, but
+  // retain distinct construction kinds even when their tails happen to be NIL.
+  bool plain_pair = false;
   Handle protected_cell = 0;
   std::shared_ptr<std::iostream> stream;
   explicit Object(Kind k) : kind(k) {}
+};
+struct PrintTask {
+  enum class Kind { value, list_node, list_read, text, leave, characters };
+  Kind kind;
+  Value item;
+  std::string text;
+  std::size_t index = 0, limit = 0;
+};
+struct PrintState {
+  std::vector<PrintTask> tasks;
+  std::set<Handle> visiting;
+  bool raw = false;
 };
 struct Frame {
   std::shared_ptr<Program> program;
@@ -180,6 +196,7 @@ struct Frame {
   };
   std::vector<Loop> loops;
   std::vector<Value> callees{};
+  std::shared_ptr<PrintState> printer{};
 };
 class Runtime;
 class Compiler {
@@ -257,6 +274,8 @@ public:
   std::vector<Value> items(Value) const;
   std::vector<Value> data_fields(Value) const;
   std::vector<Value> data_components(Value) const;
+  Value data_word(Value) const;
+  bool character_strip(Value) const;
   bool empty_list(Value) const;
   void force_list(Value);
   Value function(std::shared_ptr<Program>);
@@ -283,6 +302,7 @@ public:
   bool run(std::size_t stop_depth = 0);
   void unwind(bool restore_bindings = true);
   void output_text(const std::string &);
+  void print_value(Value, bool = false);
   Value token_value(Token);
   std::vector<std::weak_ptr<Program>> compiling;
   void invoke(const std::string &, Object * = nullptr, bool = false);
@@ -354,6 +374,8 @@ private:
   Location lex_location_;
   void lex_available();
   void queue_parser();
+  void start_print(std::shared_ptr<PrintState>);
+  std::string next_print(PrintState &) const;
 };
 } // namespace pop
 #endif

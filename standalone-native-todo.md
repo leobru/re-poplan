@@ -1,6 +1,6 @@
 # Standalone native POPLAN: remaining work
 
-Status: 2026-10-15. Applies to `standalone/poplan-native`, relative to documented
+Status: 2026-10-16. Applies to `standalone/poplan-native`, relative to documented
 POPLAN language behavior and the BESM-6 reference implementation. It does **not**
 list missing features in historical POPLAN or untranslated hybrid-backend code.
 
@@ -68,10 +68,31 @@ syntax needs additional documentation or recovery from compiler listings/probes.
   macros, NONMAC, mutable operators, POPVAL/MACRESULTS, COMPILE/CARRYON and source
   replacement/chaining, especially combinations with suspension, cancellation,
   recovery and collection. These features are implemented, not wholesale omissions.
-- [ ] **Printing and callbacks:** formatting currently builds the complete text
-  before scheduling output consumers. Establish required printer/supplier ordering
-  and implement resumable streaming where the current approach changes observable
-  effects, including mutation or failures during printing.
+- [x] **Output consumer rebinding (completed 2026-10-15):** each output character
+  reloads CUCHOUT, so a consumer can redirect subsequent characters, including
+  during nested printing and GENOUT. Tests cover all output primitives, invalid
+  replacement consumers, Unicode, byte-split input suspension and collection.
+  Manual §8.3 and historical PRSTRING probes establish the per-character lookup.
+- [x] **Streaming printing and callbacks (completed 2026-10-15):** explicit print
+  tasks interleave list forcing, character reads and output callbacks. Historical
+  `07704..07727` and `10005..10014`, instruction-only execution and historical
+  probes establish bracket-before-forcing, saved-tail traversal, live tail-content
+  mutation and progressive string reads. Tests include input suspension, GC of
+  detached saved tails, nested printing, partial output on failure, cycles, deep
+  objects and operation limits for infinite lazy lists.
+- [x] **Printer argument types and structure labels (completed 2026-10-16):**
+  PRSTRING accepts literal strings and built-in INITC character strips, rejecting
+  other values before output or list forcing. PR/PRINT/=> print ordinary pairs,
+  references and non-character strips/records through shared DATAWORD lookup;
+  function labels use FUNCTI. COPY preserves the plain-pair/list-node distinction.
+  Historical `07773..10001`, `10025..10030`, manual §8.4 and historical/raw
+  probes establish the cases. Character strips retain progressive Unicode
+  reads, callback suspension and GC coverage.
+- [ ] **Ordinary pairs versus common lists:** finish the access/comparison branch
+  audit now that construction kind is retained for printing and list predicates.
+  Historical HD rejects an ordinary CONSPAIR object and EQUAL distinguishes it
+  from a common-list node; native HD/TL/NULL and EQUAL still share broader paths.
+  SAMEDATA can be true for the two kinds because both have DATAWORD PAIR.
 - [x] **Malformed UTF-8 timing (completed 2026-10-15):** complete commands before
   malformed bytes now execute before the deferred reader error. The lexer retains
   the valid UTF-8 prefix without inventing an EOF at its boundary. Session tests
@@ -116,6 +137,8 @@ intentional host-limit behavior, not missing historical instruction execution.
   when bytes arrive, and some finite-list traversals restart after forcing another
   lazy node. Effects are memoized. Audit scaling and replace repeated work with
   explicit cursor state where necessary; this is not evidence of missing syntax.
+  Progressive string printing also decodes the current string for each character
+  to observe Unicode mutations; audit its scaling without caching stale contents.
 
 ## 5. Known differences and deliberate exclusions
 
@@ -156,7 +179,7 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **116 conformance checks**, **4/4 standalone tests**,
+Current verified baseline: **163 conformance checks**, **4/4 standalone tests**,
 **4/4 standalone sanitizer tests**, **23/23 reference tests**, and Make/historical
 workload checks pass. These results establish the tested baseline, not completeness.
 

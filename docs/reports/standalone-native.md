@@ -237,3 +237,178 @@ Final validation: **4/4** standalone tests and **4/4** ASan/UBSan tests pass
 `make cpp-quine`, `make cpp-zone1224`, historical/hybrid trivial checks,
 recovered example/game comparisons and whitespace checks pass. All command
 exit statuses were checked. No machine backend implementation changed.
+
+## Output consumer rebinding — 2026-10-15
+
+Closed the per-character output-consumer lookup gap within the printing audit.
+Previously `output_text` captured CUCHOUT once for the entire formatted text.
+When a callback handled `A` and assigned CHAROUT to CUCHOUT, that same callback
+still received `B` and `C`. The pre-fix regression therefore reported the last
+character, 67, rather than emitting `BC` and recording the first character, 65.
+
+Manual §8.3 specifies mutable CUCHOUT as the current character consumer. A
+historical PRSTRING probe confirms that replacement takes effect between
+characters. An encoding-independent `123` probe agrees on emitted `23` and the
+first character code 49, after removing historical prompts and print-arrow line
+breaks. This comparison does not claim identical historical text formatting.
+
+Generated character-output operations now load the current CUCHOUT binding
+before each call. The identifier is rooted by the operation graph, and callbacks
+use the existing VM frames and input suspension. The direct CHAROUT path remains
+available when no user callback executes. No new execution engine is involved.
+
+Twelve additional conformance checks cover PRSTRING, nested printing, GENOUT,
+invalid replacement consumers, PR, PRINT, PRREAL, PRBIN, PROCT, SP, NL and the
+print arrow. Two session cases cover Unicode rebinding and an ITEMREAD callback
+at every two-way byte split and in bytewise feeds, with collection while
+suspended. The conformance count is now 128. Object formatting still builds its
+complete text before scheduling consumers; supplier/mutation interleaving and
+streaming remain open, as recorded in the TODO.
+
+Evidence and validation logs are retained in
+`artifacts/standalone-output-consumers/`, outside the build area.
+
+Final verification: **4/4** standalone tests pass (29.47 seconds), including
+**128** conformance checks; **4/4** ASan/UBSan tests pass (192.88 seconds,
+`detect_leaks=0`). All **23/23** reference CTests pass, as do `make test`,
+`make cpp-quine`, `make cpp-zone1224`, the historical callback probe and
+historical/hybrid trivial checks. Fresh standalone example/game output agrees
+with the saved historical runs (11 numeric rows and all 12 board rows, both
+computer moves and normal exit). Whitespace checks pass. Each command's final
+exit status was checked. The reference backends are unchanged by this increment.
+
+## Resumable printing from historical traversal — 2026-10-15
+
+Implemented the streaming-printing TODO using the original printer's calls and
+continuations as semantic evidence. Native output had previously forced and
+formatted an entire object before invoking any character consumers. The failing
+pre-fix test printed `___[1 2]` when a lazy supplier emitted `_`; the original
+prints the opening bracket first and interleaves supplier effects with elements.
+
+### Historical boundaries used
+
+| Original boundary | Established behavior | Native counterpart |
+| --- | --- | --- |
+| `07667..07673` | Obtain and classify the value being printed | Start a print-task frame for PR/PRINT and arrow values |
+| `12630..12634` | Duplicate PRINT's argument before entering PR | Retain the supplied value on the POP value stack while the printer and suppliers run |
+| `07704..07707` | Emit '[' through `07652` before list forcing/classification at `10353` | Emit the bracket before processing the first list-node task |
+| `07711..07714`, `07722..07725` | Classify/force the tail, output its separator, then obtain the next head | Separate list-node classification and post-separator read tasks |
+| `07714..07716` | Call `17021` for HD and `17013` for TL, saving TL before recursively printing HD | Capture the two values in source order, retaining the saved tail as a task root |
+| `07720..07722` | Resume from the saved tail after head printing | Subsequent callbacks see mutations of that tail's contents, but replacing the old node's TL does not redirect traversal |
+| `10005..10014` | Read each string character via the subscript call before dispatching its consumer | Read the current Unicode string at each character task |
+| `07661..07663`, `10011..10012` | Reload and call the current character consumer | Existing per-character CUCHOUT load/call operations |
+
+Historical and instruction-only probes agree on six cases: lazy-supplier markers,
+head mutation on '[', tail-link replacement during head output, mutation of a
+saved tail's head, mutation during the separator, and progressive string updates.
+Standalone agrees after allowing its established numeric spaces/line formatting.
+The saved historical instruction trace and extracted boundary records confirm
+the call order; evidence lives in `artifacts/standalone-stream-print/`.
+
+The hybrid backend disagrees with historical/instruction-only execution on the
+numeric-character callback mutation probes (saved `tail_mutation-hybrid.out` and
+`space_mutation-hybrid.out`). Those outputs are not used as the semantic oracle.
+No hybrid fix is claimed by this standalone change.
+
+### Native execution and tests
+
+PR, PRINT, PRSTRING and the print arrow now schedule an explicit print-task stack
+attached to a VM frame. A task emits a punctuation/text chunk, obtains one list
+node or current string character, or leaves a cycle-detection scope. NeedList
+keeps its task intact until the supplier finishes. User callbacks suspend in
+their own frames; no already emitted bracket, character or supplier effect is
+replayed. Faults and SETPOP unwind the print frame through existing recovery.
+Collection traces task values and active object handles, so replacing a list's
+tail and dropping its global binding while a callback waits for input cannot
+collect the original saved tail. Host `Runtime::format` uses the same traversal
+algorithm for synchronous snapshot formatting.
+
+Sixteen additional conformance cases cover the historical timing differences,
+the arrow, nested printing, output prefixes surviving faults, shared/cyclic
+objects and operation-budget termination of an infinite lazy list. Three session
+programs run at every two-way byte split and bytewise with GC, covering supplier
+input, a detached tail and string mutation after callback input. An explicit
+failure while suspended checks that recovery drops pending print tasks. A C++
+test prints 2,000 nested lists with a small frame budget, exercising collection
+without recursive host traversal. A historical/raw STACKLENGTH probe also checks
+PRINT's saved value during supplier execution. The total conformance count is 144.
+
+Canonical Man-or-Boy remains **-67**, now **14,987 native operations** with maximum
+frame depth **1,122**. The extra print tasks explain the operation-count change;
+the previous **14,983** and earlier **14,413 / 1,024** measurements remain intact.
+These are native-operation counts, not historical machine steps.
+
+The existing non-list reference/record/strip presentation and permissive
+PRSTRING argument types remain explicit follow-up contracts in the TODO and
+resident ledger. This increment establishes traversal/callback ordering, not
+complete printer or language conformance. Progressive Unicode string reads
+currently decode the string for each character; scaling remains an efficiency
+audit, separate from the verified mutation behavior.
+
+Final verification: all **4/4** standalone tests pass (47.85 seconds); all
+**4/4** ASan/UBSan tests pass (244.68 seconds, leak detection disabled). After
+the final test-only additions, **144** conformance checks pass again in ordinary
+execution and under ASan/UBSan (39.69 seconds, UBSan halt-on-error enabled).
+All **23/23** reference CTests pass (101.99 seconds), as do `make test`,
+`make cpp-quine`, `make cpp-zone1224`, the six historical/raw timing probes,
+historical/hybrid trivial checks and example/game comparisons against saved
+historical output. Whitespace checks pass, and every command's final exit status
+was inspected. No machine or compatibility-native implementation changed.
+
+## Printer argument classes and DATAWORD output — 2026-10-16
+
+Completed the remaining-printer-contracts TODO from the streaming milestone.
+Historical `07777..10001` accepts the built-in character-strip class and sends
+other arguments to diagnostic 14260 before reading any character. Both literal
+strings and INITC objects have that class; a generated strip merely named CSTRIP
+does not. Historical/raw probes confirm those distinctions and recovery.
+
+Native PRSTRING now checks the same semantic class before scheduling output or
+forcing a lazy list. The existing progressive character task handles literal
+Unicode text and INITC's Unicode scalar components. PR quotes either kind;
+PRSTRING omits the quotes. Invalid Unicode component values still fail explicitly
+through the existing scalar conversion rules, without historical GOST conversion.
+Uninitialized zero components consequently print U+0000; their byte output is not
+claimed identical to historical zero-character rendering.
+
+The original PR branch at `10025..10030` calls DATAWORD (`10463`) then PR for
+non-list, non-character structures, as manual §8.4 describes. Native DATAWORD and
+printing now share a class lookup. Ordinary pairs, references and ordinary strips
+print PAIR, REF and STRIP; generated records/strips print their mutable class word.
+Function output now uses FUNCTI, matching the interned six-character DATAWORD,
+instead of the earlier hardcoded FUNCTION display. The affected function fixture
+was updated to the historically established spelling.
+
+CONSPAIR and common-list construction previously used identical host pair objects,
+so the printer could not distinguish an ordinary pair with a NIL tail from a list.
+A native construction marker now preserves that distinction through COPY.
+CONSPAIR output is PAIR, while CONS/:: and source lists retain bracket output.
+List predicates and finite-list extraction respect this marker; handles and shared
+fields are unchanged. Remaining ordinary-pair accessor/comparison behavior is a
+separate explicit TODO: for example historical HD rejects ordinary pairs and
+EQUAL distinguishes them from common-list nodes, while SAMEDATA can accept both
+as the PAIR data class. This increment does not claim that broader audit complete.
+
+Nineteen conformance checks cover invalid PRSTRING argument classes, empty
+strings/INITC, generated nominal classes, pair COPY, list predicates, references,
+mutable record/strip labels, PRINT identity, function labels and character-strip
+mutation. The total is **163**. Session cases exercise Unicode component mutation
+after input suspension, label changes and rejection of a lazy list without
+calling its supplier, with collection between feeds.
+
+Five normalized historical/raw/native comparisons establish record, pair and
+function labels, initialized character strips and pair/list predicates. Two
+additional rejection comparisons establish type-error recovery. Prompt/spacing,
+quote glyphs and the documented mixed Cyrillic/Latin output mappings are normalized;
+modern diagnostic text remains intentionally distinct. Evidence and validation
+logs are in `artifacts/standalone-printer-contracts/`, outside the build area.
+
+Final verification: all **4/4** ordinary standalone tests pass (45.33 seconds),
+including **163** conformance checks. All **4/4** ASan/UBSan tests pass
+(321.22 seconds, leak detection disabled), covering the same 163 checks and
+Unicode callback/suspension/collection cases. All **23/23** reference tests pass
+(119.33 seconds), as do `make test`, `make cpp-quine`, `make cpp-zone1224`,
+historical/raw printer comparisons, historical/hybrid trivial checks and fresh
+example/game comparisons with the saved historical outputs. Whitespace checks
+pass; each final command exit status was checked. The reference backends were
+not changed, and earlier measurements remain intact.

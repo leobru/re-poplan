@@ -28,6 +28,7 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
   for (auto name :
        {"REAL", "INTEGER", "WORD", "STRIP", "CSTRIP", "PAIR", "REF", "SYNTAX"})
     bind(name, word(name));
+  word("FUNCTION"); // DATAWORD's six-character FUNCTI class word.
   bind("NUMERR", Value(std::int64_t(0)));
   bind("INDEC", Value(std::int64_t(0)));
   // Resident function identifiers have class 040 in the original dictionary.
@@ -95,7 +96,8 @@ std::vector<Value> Runtime::items(Value v) const {
   std::set<Handle> seen;
   while (!empty_list(v)) {
     auto &o = object(v);
-    if (o.kind != Object::Kind::pair || !seen.insert(v.handle()).second)
+    if (o.kind != Object::Kind::pair || o.plain_pair ||
+        !seen.insert(v.handle()).second)
       throw Fault("finite proper list required");
     result.push_back(o.fields.at(0));
     v = o.fields.at(1);
@@ -125,6 +127,30 @@ std::vector<Value> Runtime::data_components(Value value) const {
     return {o.fields.begin(), o.fields.end() - 1};
   return data_fields(value);
 }
+Value Runtime::data_word(Value value) const {
+  if (value.integer())
+    return words_.at("INTEGE");
+  if (value.real())
+    return words_.at("REAL");
+  const auto &o = object(value);
+  if (o.type.object())
+    return object(o.type).kind == Object::Kind::word ? o.type
+                                                   : object(o.type).type;
+  return words_.at(o.kind == Object::Kind::function    ? "FUNCTI"
+                   : o.kind == Object::Kind::word      ? "WORD"
+                   : o.kind == Object::Kind::pair      ? "PAIR"
+                   : o.kind == Object::Kind::reference ? "REF"
+                                                       : "CSTRIP");
+}
+bool Runtime::character_strip(Value value) const {
+  if (!value.object())
+    return false;
+  const auto &o = object(value);
+  return o.kind == Object::Kind::string ||
+         (o.kind == Object::Kind::strip && o.type.object() &&
+          object(o.type).kind == Object::Kind::word &&
+          object(o.type).text == "CSTRIP");
+}
 bool Runtime::empty_list(Value v) const {
   std::vector<Value> pending;
   std::set<Handle> seen;
@@ -137,7 +163,7 @@ bool Runtime::empty_list(Value v) const {
   }
   bool empty = current.nil_value();
   if (!empty && current.object() &&
-      object(current).kind == Object::Kind::pair) {
+      object(current).kind == Object::Kind::pair && !object(current).plain_pair) {
     const auto &node = object(current);
     const auto tail = node.fields.at(1);
     if (tail.object() && object(tail).kind == Object::Kind::function) {
@@ -475,17 +501,26 @@ bool Runtime::run(std::size_t stop_depth) {
       case Operation::Kind::print: {
         const auto begin =
             f.program->function && !stack.empty() ? stack.size() - 1 : 0;
-        std::string text = "**";
-        for (std::size_t i = begin; i < stack.size(); ++i) {
-          if (i != begin)
-            text += ", ";
-          else
-            text += " ";
-          text += format(stack[i]);
+        auto state = std::make_shared<PrintState>();
+        state->tasks.push_back({PrintTask::Kind::text, {}, "\n"});
+        for (std::size_t i = stack.size(); i-- > begin;) {
+          state->tasks.push_back({PrintTask::Kind::value, stack[i], {}});
+          state->tasks.push_back(
+              {PrintTask::Kind::text, {}, i == begin ? " " : ", "});
         }
-        text += '\n';
+        state->tasks.push_back({PrintTask::Kind::text, {}, "**"});
         stack.resize(begin);
-        output_text(text);
+        start_print(std::move(state));
+        break;
+      }
+      case Operation::Kind::print_step: {
+        // next_print leaves a forcing task intact on NeedList. The normal VM
+        // retry path resumes it after the supplier, without replaying output.
+        auto text = next_print(*f.printer);
+        if (!f.printer->tasks.empty())
+          --f.pc;
+        if (!text.empty())
+          output_text(text);
         break;
       }
       case Operation::Kind::begin_list:
@@ -630,10 +665,13 @@ void Runtime::output_text(const std::string &text) {
     return;
   }
   auto p = std::make_shared<Program>();
+  // Manual 8.3: each character goes through the current CUCHOUT binding.
+  // A consumer may replace itself or suspend before the next character.
+  const auto symbol = identifier("CUCHOUT");
   for (auto c : decode(text)) {
     p->code.push_back(
         {Operation::Kind::push, Value(std::int64_t(c)), {}, {}, {}});
-    p->code.push_back({Operation::Kind::push, consumer, {}, {}, {}});
+    p->code.push_back({Operation::Kind::load, {}, "CUCHOU", {}, {}, symbol});
     p->code.push_back({Operation::Kind::call_value, {}, {}, {}, {}});
   }
   frames.push_back({p, 0, {}, {}, {}, {}, {}});
@@ -957,98 +995,125 @@ void Runtime::compile_stream(Value supplier, bool skip_to_end) {
   initialize_source();
   schedule(primitive(skip_to_end ? "@SKIP" : "@NEXT"), {});
 }
-std::string Runtime::format(Value v, bool raw) const {
-  struct Task {
-    enum Kind { value, tail, text, leave } kind;
-    Value item;
-    std::string literal;
-    bool first = false;
-  };
-  std::vector<Task> tasks{{Task::value, v, {}, false}};
-  std::set<Handle> visiting;
-  std::string result;
-  while (!tasks.empty()) {
-    auto task = std::move(tasks.back());
-    tasks.pop_back();
-    if (task.kind == Task::text) {
-      result += task.literal;
-      continue;
-    }
-    if (task.kind == Task::leave) {
-      visiting.erase(task.item.handle());
-      continue;
-    }
-    auto x = task.item;
-    if (task.kind == Task::tail) {
-      if (empty_list(x))
-        continue;
-      if (!x.object() || object(x).kind != Object::Kind::pair) {
-        result += " | ";
-        tasks.push_back({Task::value, x, {}});
-      } else if (!visiting.insert(x.handle()).second) {
-        result += task.first ? "<cycle>" : " <cycle>";
-      } else {
-        const auto &node = object(x);
-        if (!task.first)
-          result += ' ';
-        tasks.push_back({Task::leave, x, {}});
-        tasks.push_back({Task::tail, node.fields[1], {}, false});
-        tasks.push_back({Task::value, node.fields[0], {}});
-      }
-      continue;
-    }
-    if (x.numeric()) {
-      result += number_text(x);
-      continue;
-    }
+void Runtime::start_print(std::shared_ptr<PrintState> state) {
+  auto p = std::make_shared<Program>();
+  p->code.push_back({Operation::Kind::print_step, {}, {}, {}, {}});
+  Frame frame{p, 0, {}, {}, {}, {}, {}};
+  frame.printer = std::move(state);
+  frames.push_back(std::move(frame));
+}
+void Runtime::print_value(Value value, bool raw) {
+  auto state = std::make_shared<PrintState>();
+  state->raw = raw;
+  state->tasks.push_back({PrintTask::Kind::value, value, {}});
+  start_print(std::move(state));
+}
+std::string Runtime::next_print(PrintState &state) const {
+  using Kind = PrintTask::Kind;
+  auto &tasks = state.tasks;
+  if (tasks.empty())
+    return {};
+  const auto task = tasks.back();
+  const auto x = task.item;
+  if (task.kind == Kind::list_node || task.kind == Kind::list_read) {
+    // 07707..07714: forcing/classification precedes the separator; the head
+    // and tail are read only after its output callback has finished.
     if (empty_list(x)) {
-      result += "[]";
-      continue;
+      tasks.pop_back();
+      return {};
     }
-    if (std::holds_alternative<Undefined>(x.data)) {
-      result += "UNDEF";
-      continue;
+    if (!x.object() || object(x).kind != Object::Kind::pair ||
+        object(x).plain_pair) {
+      tasks.pop_back();
+      tasks.push_back({Kind::value, x, {}});
+      return " | ";
     }
-    if (std::holds_alternative<Terminator>(x.data)) {
-      result += "TERMIN";
-      continue;
+    if (state.visiting.count(x.handle())) {
+      tasks.pop_back();
+      return task.kind == Kind::list_node && !task.index ? " <cycle>" : "<cycle>";
     }
-    const auto &o = object(x);
-    if (o.kind == Object::Kind::word) {
-      result += o.text;
-      continue;
+    if (task.kind == Kind::list_node && !task.index) {
+      tasks.back().kind = Kind::list_read;
+      return " ";
     }
-    if (o.kind == Object::Kind::string) {
-      result += raw ? o.text : "'" + o.text + "'";
-      continue;
-    }
-    if (o.kind == Object::Kind::function) {
-      result += "FUNCTION";
-      continue;
-    }
-    if (visiting.count(x.handle())) {
-      result += "<cycle>";
-      continue;
-    }
-    if (o.kind == Object::Kind::pair) {
-      result += '[';
-      tasks.push_back({Task::text, {}, "]"});
-      tasks.push_back({Task::tail, x, {}, true});
-    } else {
-      visiting.insert(x.handle());
-      result += o.kind == Object::Kind::reference ? "REF(" : "{";
-      tasks.push_back({Task::leave, x, {}});
-      tasks.push_back(
-          {Task::text, {}, o.kind == Object::Kind::reference ? ")" : "}"});
-      auto fields = data_fields(x);
-      for (std::size_t i = fields.size(); i-- > 0;) {
-        tasks.push_back({Task::value, fields[i], {}});
-        if (i)
-          tasks.push_back({Task::text, {}, " "});
-      }
-    }
+    const auto &node = object(x);
+    const auto head = node.fields.at(0), tail = node.fields.at(1);
+    tasks.pop_back();
+    state.visiting.insert(x.handle());
+    tasks.push_back({Kind::leave, x, {}});
+    // 07714..07720 saves TL before recursively printing HD. Link replacement
+    // during HD printing must not redirect this saved tail; mutations of the
+    // saved tail's contents remain observable when its turn comes.
+    tasks.push_back({Kind::list_node, tail, {}});
+    tasks.push_back({Kind::value, head, {}});
+    return {};
   }
-  return result;
+  if (task.kind == Kind::characters) {
+    // 10005..10014 reads each string character before its own callback.
+    const auto &o = object(x);
+    char32_t character;
+    if (o.kind == Object::Kind::string) {
+      const auto chars = decode(o.text);
+      if (task.index >= chars.size())
+        throw Fault("string changed length during printing");
+      character = chars[task.index];
+    } else {
+      const auto n = integer(o.fields.at(task.index));
+      if (n < 0 || n > 0x10ffff)
+        throw Fault("invalid character");
+      character = char32_t(n);
+    }
+    if (++tasks.back().index == task.limit)
+      tasks.pop_back();
+    return encode(character);
+  }
+  tasks.pop_back();
+  if (task.kind == Kind::text)
+    return task.text;
+  if (task.kind == Kind::leave) {
+    state.visiting.erase(x.handle());
+    return {};
+  }
+  if (x.numeric())
+    return number_text(x);
+  if (x.nil_value())
+    return "[]";
+  if (std::holds_alternative<Undefined>(x.data))
+    return "UNDEF";
+  if (std::holds_alternative<Terminator>(x.data))
+    return "TERMIN";
+  const auto &o = object(x);
+  if (o.kind == Object::Kind::word)
+    return o.text;
+  if (character_strip(x)) {
+    const auto count = o.kind == Object::Kind::string ? decode(o.text).size()
+                                                     : o.fields.size();
+    if (!state.raw)
+      tasks.push_back({Kind::text, {}, "'"});
+    if (count)
+      tasks.push_back({Kind::characters, x, {}, 0, count});
+    return state.raw ? "" : "'";
+  }
+  if (state.visiting.count(x.handle()))
+    return "<cycle>";
+  if (o.kind == Object::Kind::pair && !o.plain_pair) {
+    // 07704..07707 emits '[' before 10353/17045 can force a lazy head.
+    tasks.push_back({Kind::text, {}, "]"});
+    tasks.push_back({Kind::list_node, x, {}, 1});
+    return "[";
+  }
+  // 10025..10030 calls DATAWORD then PR for non-list, non-character structures.
+  state.visiting.insert(x.handle());
+  tasks.push_back({Kind::leave, x, {}});
+  tasks.push_back({Kind::value, data_word(x), {}});
+  return {};
+}
+std::string Runtime::format(Value value, bool raw) const {
+  PrintState state{{{PrintTask::Kind::value, value, {}}}, {}, raw};
+  std::string text;
+  while (!state.tasks.empty())
+    text += next_print(state);
+  return text;
 }
 void Runtime::collect() {
   std::vector<Value> pending = stack;
@@ -1101,6 +1166,12 @@ void Runtime::collect() {
   }
   for (auto &f : frames) {
     pending.push_back(f.function);
+    if (f.printer) {
+      for (const auto &task : f.printer->tasks)
+        pending.push_back(task.item);
+      for (auto id : f.printer->visiting)
+        pending.push_back(Value::object(id));
+    }
     pending.insert(pending.end(), f.callees.begin(), f.callees.end());
     mark_program(f.program);
     for (auto &[name, id] : f.environment) {

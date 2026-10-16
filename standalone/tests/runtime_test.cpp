@@ -108,6 +108,15 @@ int main() {
     auto rendered = runtime.format(deep);
     check(rendered == std::string(2000, '[') + "7" + std::string(2000, ']'),
           "deep acyclic lists must not be reported as cycles");
+    runtime.bind("DEEP", deep);
+    const auto before_print = output.str();
+    const auto before_errors = runtime.diagnostics;
+    runtime.options.max_frames = 8;
+    runtime.source("PR(DEEP);");
+    runtime.options.max_frames = 0;
+    check(output.str() == before_print + rendered &&
+              runtime.diagnostics == before_errors,
+          "streaming deep objects uses tasks rather than recursive call frames");
     std::cout << "runtime invariants passed\n";
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
