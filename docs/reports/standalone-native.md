@@ -384,10 +384,11 @@ so the printer could not distinguish an ordinary pair with a NIL tail from a lis
 A native construction marker now preserves that distinction through COPY.
 CONSPAIR output is PAIR, while CONS/:: and source lists retain bracket output.
 List predicates and finite-list extraction respect this marker; handles and shared
-fields are unchanged. Remaining ordinary-pair accessor/comparison behavior is a
-separate explicit TODO: for example historical HD rejects ordinary pairs and
-EQUAL distinguishes them from common-list nodes, while SAMEDATA can accept both
-as the PAIR data class. This increment does not claim that broader audit complete.
+fields are unchanged. Ordinary-pair accessor and comparison behavior was left
+open here: historical HD rejects ordinary pairs and EQUAL distinguishes them
+from common-list nodes, while SAMEDATA can accept both as the PAIR data class.
+That follow-up is closed in the 2026-11-06 section below. This increment does
+not claim that broader audit complete.
 
 Nineteen conformance checks cover invalid PRSTRING argument classes, empty
 strings/INITC, generated nominal classes, pair COPY, list predicates, references,
@@ -402,6 +403,33 @@ additional rejection comparisons establish type-error recovery. Prompt/spacing,
 quote glyphs and the documented mixed Cyrillic/Latin output mappings are normalized;
 modern diagnostic text remains intentionally distinct. Evidence and validation
 logs are in `artifacts/standalone-printer-contracts/`, outside the build area.
+
+## Pair and list access — 2026-11-06
+
+`HD`, `TL`, `DEST`, and `NULL` now require a common-list link. An ordinary
+`CONSPAIR` is rejected before a read or an update. `NULL` rejects numbers and
+other non-lists instead of returning false. `CONS(1,2)` remains a nonempty
+improper link: `ISLIST` and `ISLINK` are true, and `LENGTH` fails when the tail
+is not a link. `FRONT`, `BACK`, and `DESTPAIR` accept both constructions.
+`SAMEDATA` is unchanged, because both have dataword `PAIR`.
+
+`EQUAL` walks list links only. Distinct pairs compare false even with equal
+components; a proper list used as both head and tail of one node compares true.
+Strings compare by text. Re-entering a link that is still being walked raises a
+recoverable error. On dispak, `EQUAL` of a one-element cyclic list faults
+(`atx`) and reports 5632, then continues. The C++ instruction emulator returns
+false for that case instead of faulting. Standalone follows the historical
+failure and recovery. A cyclic ordinary pair compared with itself stays true,
+because pairs are not walked.
+
+Probes are in `artifacts/standalone-pair-access/`. The reference backends were
+not modified.
+
+Final verification: all **4/4** ordinary standalone tests pass (61.23 seconds),
+including **183** conformance checks. All **4/4** ASan/UBSan tests pass
+(313.34 seconds, leak detection disabled). Whitespace check passes. Historical
+dispak confirms the accessor, `NULL`, identity, improper-link, shared-sublist,
+string, and cyclic-list results above.
 
 Final verification: all **4/4** ordinary standalone tests pass (45.33 seconds),
 including **163** conformance checks. All **4/4** ASan/UBSan tests pass

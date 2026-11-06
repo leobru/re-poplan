@@ -276,6 +276,9 @@ public:
   std::vector<Value> data_components(Value) const;
   Value data_word(Value) const;
   bool character_strip(Value) const;
+  // A common-list node, including an improper or dynamic one. Ordinary
+  // CONSPAIR objects are pairs but not list links.
+  bool list_link(Value) const;
   bool empty_list(Value) const;
   void force_list(Value);
   Value function(std::shared_ptr<Program>);

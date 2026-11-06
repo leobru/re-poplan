@@ -1,6 +1,6 @@
 # Standalone native POPLAN: remaining work
 
-Status: 2026-10-16. Applies to `standalone/poplan-native`, relative to documented
+Status: 2026-11-06. Applies to `standalone/poplan-native`, relative to documented
 POPLAN language behavior and the BESM-6 reference implementation. It does **not**
 list missing features in historical POPLAN or untranslated hybrid-backend code.
 
@@ -88,11 +88,17 @@ syntax needs additional documentation or recovery from compiler listings/probes.
   Historical `07773..10001`, `10025..10030`, manual §8.4 and historical/raw
   probes establish the cases. Character strips retain progressive Unicode
   reads, callback suspension and GC coverage.
-- [ ] **Ordinary pairs versus common lists:** finish the access/comparison branch
-  audit now that construction kind is retained for printing and list predicates.
-  Historical HD rejects an ordinary CONSPAIR object and EQUAL distinguishes it
-  from a common-list node; native HD/TL/NULL and EQUAL still share broader paths.
-  SAMEDATA can be true for the two kinds because both have DATAWORD PAIR.
+- [x] **Ordinary pairs versus common lists (completed 2026-11-06):** instruction-only
+  execution of the original image is the baseline. `HD`, `TL`, and `DEST` reject
+  an ordinary `CONSPAIR` before reading or updating it; `NULL` rejects non-lists
+  rather than returning false. `FRONT`, `BACK`, and `DESTPAIR` accept both
+  constructions. `ISLIST`/`ISLINK` follow the list-link tag, so `CONS(1,2)` is a
+  link and `CONSPAIR(1,NIL)` is not. `EQUAL` walks list links only: distinct
+  pairs compare false, and identical pair objects and shared proper sublists
+  compare true. A cyclic list is a recoverable error, matching dispak's fault
+  and recovery rather than the instruction emulator's false result. An empty `FNTOLIST`
+  compares equal to `NIL`. Strings compare by text. `SAMEDATA` remains true for
+  the two kinds because both have `DATAWORD` `PAIR`.
 - [x] **Malformed UTF-8 timing (completed 2026-10-15):** complete commands before
   malformed bytes now execute before the deferred reader error. The lexer retains
   the valid UTF-8 prefix without inventing an EOF at its boundary. Session tests
@@ -179,9 +185,10 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **163 conformance checks**, **4/4 standalone tests**,
-**4/4 standalone sanitizer tests**, **23/23 reference tests**, and Make/historical
-workload checks pass. These results establish the tested baseline, not completeness.
+Current verified baseline: **183 conformance checks**, **4/4 standalone tests**,
+and **4/4 standalone sanitizer tests**. This increment did not rerun the
+reference suite; the machine backends were not modified. These results
+establish the tested baseline, not completeness.
 
 ## 7. Exact resident-ledger snapshot
 

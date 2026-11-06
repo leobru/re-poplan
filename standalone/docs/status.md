@@ -1,6 +1,6 @@
 # Standalone implementation status
 
-Date: 2026-10-16. The implementation lives entirely in this directory. Existing
+Date: 2026-11-06. The implementation lives entirely in this directory. Existing
 machine and compatibility-native code remains independent. This work supersedes
 the legacy representation/accounting requirements only for this new executable.
 
@@ -17,7 +17,7 @@ the legacy representation/accounting requirements only for this new executable.
 | Readers | Resumable ITEMREAD/LISTREAD/NUMBERREAD; macros, NONMAC, quoted-word markers, doubled string quotes, Unicode character literals | Signed bounds, nested lists, supplier timing and split-input tests |
 | Runtime source | Authoritative PROGLIST/NEXTCH; typed POPVAL/MACRESULTS, interleaved COMPILE, generic CARRYON, source loading | Source replacement/chaining/cursor mutation; POPVAL identity/preservation; supplier ordering; libraries |
 | Output | Resumable print tasks, historical list/string traversal order, decimal/EXP PRREAL fields, Unicode consumers reloaded per character, GENOUT | Supplier/callback mutation probes, detached-tail roots, deep/cyclic objects, partial output on failure, callback suspension/GC and UTF-8 files |
-| Lists | Lazy memoized FNTOLIST, list predicates, updaters, traversals, callback ordering; concatenation shares its second operand | Infinite supplier prefix, deferred effects, mutation/sharing, equality and suspended ITEMREAD supplier |
+| Lists | Lazy memoized FNTOLIST, list predicates, updaters, traversals, callback ordering; concatenation shares its second operand. List links stay distinct from ordinary pairs | Infinite supplier prefix, deferred effects, mutation/sharing, link-only EQUAL, improper links, and suspended ITEMREAD supplier |
 | Recovery | ERRFUN callbacks, nested-handler guard, active-variable preservation on SETPOP/errors | Custom handler, nested failure, captured cells and lexer error after completed-command effects |
 | Host services | Streams, clocks, console/file POPMESS, explicit unsupported-device errors | C++ injected-service test and CLI service cases |
 | Workloads | Quine, language/standard functions, Man-or-Boy, recovered examples, fixed-seed tic-tac-toe | Self-contained conformance suite |
@@ -145,4 +145,16 @@ current DATAWORD, including mutable record/strip labels and the six-character
 FUNCTI function label. CONSPAIR objects retain their construction kind across
 COPY and print PAIR even with a NIL tail; common lists still print brackets.
 Historical/raw probes, 19 additional conformance cases and split-input/GC tests
-cover the change. Remaining pair/list access and comparison contracts are in the TODO.
+cover the change.
+
+Pair and list access (2026-11-06, checked against instruction-only execution of
+the original image): `HD`, `TL`, and `DEST` accept only common-list links.
+`NULL` does too, and rejects pairs, numbers, and other non-lists. `NIL` and an
+empty dynamic link are empty lists; `CONS(1,2)` is a nonempty improper link.
+`FRONT`, `BACK`, and `DESTPAIR` accept both ordinary pairs and list links.
+`EQUAL` walks list links only: distinct `CONSPAIR` objects compare false even
+when their components match, and a shared proper sublist compares true.
+Re-entering a link that is still being compared is a recoverable error. Disp ak
+faults there (`atx`, error 5632) and continues; the C++ instruction emulator
+returns false instead of faulting. Strings compare by text. `SAMEDATA` still
+treats both constructions as `PAIR`. Conformance covers these cases.

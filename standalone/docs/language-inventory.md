@@ -1,4 +1,4 @@
-# Standalone language inventory — 2026-10-16
+# Standalone language inventory — 2026-11-06
 
 This is a completeness ledger, not a coverage percentage. It includes all 184
 resident dictionary spellings (six-character significance). The evidence snapshot
@@ -38,7 +38,7 @@ boundaries, not fallback paths.
 | `01454` | `::` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01460` | `<>` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01464` | `ATOM` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01470` | `BACK` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01470` | `BACK` | Implemented; audit open | Accepts list links and ordinary pairs, including updates. Non-pairs fail. Further component edges remain open. |
 | `01474` | `BOOLAN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01500` | `BOOLOR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01504` | `BOUNDS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -57,8 +57,8 @@ boundaries, not fallback paths.
 | `01570` | `DATALE` | Implemented; focused type audit | Manual §6.3; strip-only component count, Unicode strings, custom strips and invalid classes tested in `tests/conformance.py`. |
 | `01574` | `DATALI` | Implemented; audit open | Manual §7.4/7.7; shared component extraction with APPDATA, Unicode characters, references and frozen arguments. Other function classes remain open. |
 | `01600` | `DATAWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01604` | `DEST` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01610` | `DESTPA` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01604` | `DEST` | Implemented; audit open | Requires a nonempty list link. Ordinary pairs, NIL, and non-lists fail before a result is pushed. |
+| `01610` | `DESTPA` | Implemented; audit open | Accepts list links and ordinary pairs. NIL and non-pairs fail. |
 | `01614` | `DESTRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01620` | `DESTWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01624` | `ERASE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -68,10 +68,10 @@ boundaries, not fallback paths.
 | `01644` | `FNPROP` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01650` | `FNTOLI` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01654` | `FORALL` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `01660` | `FRONT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01660` | `FRONT` | Implemented; audit open | Accepts list links and ordinary pairs, including updates. Non-pairs fail. Further component edges remain open. |
 | `01664` | `FROZVA` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01670` | `GENOUT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01674` | `HD` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01674` | `HD` | Implemented; audit open | Requires a nonempty list link. An ordinary pair is rejected before an update; NIL is an empty-list failure. Improper `CONS(1,2)` is accepted. |
 | `01700` | `IDENTF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01704` | `IDENTP` | Partial | Built-in syntax, macros and operators; full mutable special-function protocol absent. |
 | `01710` | `INCHAR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -81,8 +81,8 @@ boundaries, not fallback paths.
 | `01730` | `ISCOMP` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01734` | `ISFUNC` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01740` | `ISINTE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01744` | `ISLINK` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01750` | `ISLIST` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01744` | `ISLINK` | Implemented; audit open | True for a nonempty list link, including an improper tail. False for NIL, ordinary pairs, and an empty dynamic link. |
+| `01750` | `ISLIST` | Implemented; audit open | True for NIL and any list link, including improper and empty dynamic links. False for an ordinary pair even when its tail is NIL or a list. |
 | `01754` | `ISREAL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01760` | `ISWORD` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01764` | `ITEMRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -100,7 +100,7 @@ boundaries, not fallback paths.
 | `02044` | `NIL` | Implemented; audit open | `src/runtime.cpp` bootstrap; type/value conformance tests. |
 | `02050` | `NL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02054` | `NOT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02060` | `NULL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02060` | `NULL` | Implemented; audit open | True for NIL and an empty dynamic link. False for a nonempty link, including an improper one. Pairs, numbers, and other non-lists raise an error. |
 | `02064` | `PARTAP` | Implemented; audit open | Historical updater probes and `tests/conformance.py`: independent frozen partial updaters, no implicit composition updater, explicit replacement. Further branches remain open. |
 | `02070` | `POPMES` | Modern replacement | Console and UTF-8 host files; historical device descriptors rejected. |
 | `02074` | `POPVAL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -120,7 +120,7 @@ boundaries, not fallback paths.
 | `02164` | `SUBSCR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02170` | `SUBSCC` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02174` | `TERMIN` | Implemented; audit open | `src/runtime.cpp` bootstrap; type/value conformance tests. |
-| `02200` | `TL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02200` | `TL` | Implemented; audit open | Requires a nonempty list link, including an improper tail. Ordinary pairs are rejected before an update; NIL is an empty-list failure. |
 | `02204` | `TRUE` | Implemented; audit open | `src/runtime.cpp` bootstrap; type/value conformance tests. |
 | `02210` | `UNDEF` | Implemented; audit open | `src/runtime.cpp` bootstrap; type/value conformance tests. |
 | `02214` | `UPDATE` | Implemented; audit open | Manual §7.7 and historical probes: arbitrary element assignment/readback, clearing cached defaults, replacement, invocation errors and protection tested. Call dispatch rejects unpaired functions before ordinary effects; generated updater branch audit remains open. |
@@ -173,7 +173,7 @@ boundaries, not fallback paths.
 | `02510` | `COPYLI` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02514` | `COREUS` | Modern replacement | Returns unspecified budget 0 and estimated host bytes; no historical accounting. |
 | `02520` | `COS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02524` | `EQUAL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02524` | `EQUAL` | Implemented; audit open | Walks list links only. Distinct ordinary pairs compare false; a shared proper sublist compares true. Re-entering a link still being walked is a recoverable error, as on dispak. Empty dynamic links compare equal to NIL. Strings compare by text. Other compounds compare by identity. |
 | `02530` | `EXP` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02534` | `FNCOMP` | Implemented; audit open | Historical updater probes and `tests/conformance.py`: independent frozen partial updaters, no implicit composition updater, explicit replacement. Further branches remain open. |
 | `02540` | `LENGTH` | Implemented; audit open | Manual §7.3; separate list traversal, NIL/nested lists, memoized supplier calls and cyclic-list rejection tested in `tests/conformance.py`; mutating suppliers still need audit. |

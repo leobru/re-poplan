@@ -308,14 +308,14 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     else if (name == "ATOM")
       b = !v.object() || object(v).kind != Object::Kind::pair;
     else if (name == "ISLIST" || name == "ISLINK") {
+      // List identity is the construction tag, not a well-formed tail.
+      // CONS(1,2) is a link; CONSPAIR(1,NIL) is not. empty_list forces a
+      // dynamic link before the nonempty test.
       bool empty = empty_list(v);
-      b = empty || (v.object() && object(v).kind == Object::Kind::pair &&
-                    !object(v).plain_pair &&
-                    (object(v).fields[1].nil_value() ||
-                     (object(v).fields[1].object() &&
-                      object(object(v).fields[1]).kind == Object::Kind::pair)));
+      bool link = list_link(v);
+      b = empty || link;
       if (name == "ISLINK")
-        b = b && !empty;
+        b = link && !empty;
     } else if (v.object())
       b = object(v).kind ==
           (name == "ISFUNC" ? Object::Kind::function : Object::Kind::word);
@@ -454,8 +454,14 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "FRONT" || name == "BACK" || name == "HD" || name == "TL") {
     auto v = pop();
-    if ((name == "HD" || name == "TL") && empty_list(v))
-      throw Fault("nonempty list required");
+    if (name == "HD" || name == "TL") {
+      // HD/TL accept only list links. An empty link or NIL is a different
+      // failure from a pair, number, or other non-list.
+      if (v.nil_value() || (list_link(v) && empty_list(v)))
+        throw Fault("nonempty list required");
+      if (!list_link(v))
+        throw Fault("list required");
+    }
     auto &o = get(v, Object::Kind::pair);
     auto i = name == "FRONT" || name == "HD" ? 0 : 1;
     if (update)
@@ -466,15 +472,22 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "DEST" || name == "DESTPA") {
     auto v = pop();
-    if (name == "DEST" && empty_list(v))
-      throw Fault("nonempty list required");
+    if (name == "DEST") {
+      if (v.nil_value() || (list_link(v) && empty_list(v)))
+        throw Fault("nonempty list required");
+      if (!list_link(v))
+        throw Fault("list required");
+    }
     auto &o = get(v, Object::Kind::pair);
     push(o.fields[0]);
     push(o.fields[1]);
     return;
   }
   if (name == "NULL") {
-    boolean(empty_list(pop()));
+    auto v = pop();
+    if (!v.nil_value() && !list_link(v))
+      throw Fault("list required");
+    boolean(empty_list(v));
     return;
   }
   if (name == "<>") {
@@ -830,32 +843,66 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     return;
   }
   if (name == "EQUAL") {
-    std::vector<std::pair<Value, Value>> pending{{pop(), pop()}};
-    std::set<std::pair<Handle, Handle>> seen;
-    bool same = true;
-    while (!pending.empty() && same) {
-      auto [a, b] = pending.back();
-      pending.pop_back();
+    // Walk list links only. Ordinary pairs, references and strips compare by
+    // identity; strings compare by text. Re-entering a link pair still being
+    // walked is the historical cyclic-list failure: dispak faults inside EQUAL
+    // and recovers, while a finished shared proper sublist compares true. An
+    // empty dynamic link compares equal to NIL once forced.
+    struct Item {
+      Value left, right;
+      int stage = 0;
+    };
+    std::vector<Item> work{{pop(), pop()}};
+    std::map<std::pair<Handle, Handle>, int> mark;
+    auto same_leaf = [&](Value a, Value b) {
       if (equal(a, b))
-        continue;
-      bool ae = empty_list(a), be = empty_list(b);
-      if (ae || be) {
-        same = ae && be;
-        continue;
-      }
-      if (!a.object() || !b.object()) {
-        same = false;
-        break;
-      }
+        return true;
+      if (!a.object() || !b.object())
+        return false;
       auto &x = object(a), &y = object(b);
-      if (x.kind != Object::Kind::pair || y.kind != Object::Kind::pair) {
-        same = false;
-        break;
-      }
-      if (!seen.emplace(a.handle(), b.handle()).second)
+      return x.kind == Object::Kind::string &&
+             y.kind == Object::Kind::string && x.text == y.text;
+    };
+    auto emptied = [&](Value v) {
+      return list_link(v) ? empty_list(v) : v.nil_value();
+    };
+    bool same = true;
+    while (!work.empty() && same) {
+      auto item = work.back();
+      if (list_link(item.left))
+        empty_list(item.left);
+      if (list_link(item.right))
+        empty_list(item.right);
+      if (emptied(item.left) || emptied(item.right)) {
+        same = emptied(item.left) && emptied(item.right);
+        work.pop_back();
         continue;
-      pending.emplace_back(x.fields[0], y.fields[0]);
-      pending.emplace_back(x.fields[1], y.fields[1]);
+      }
+      if (!list_link(item.left) || !list_link(item.right)) {
+        same = same_leaf(item.left, item.right);
+        work.pop_back();
+        continue;
+      }
+      const auto key =
+          std::make_pair(item.left.handle(), item.right.handle());
+      if (item.stage == 0) {
+        const auto found = mark.find(key);
+        if (found != mark.end()) {
+          if (found->second != 2)
+            throw Fault("cyclic list");
+          work.pop_back();
+          continue;
+        }
+        mark[key] = 1;
+        work.back().stage = 1;
+        const auto &x = object(item.left);
+        const auto &y = object(item.right);
+        work.push_back({x.fields[1], y.fields[1]});
+        work.push_back({x.fields[0], y.fields[0]});
+        continue;
+      }
+      mark[key] = 2;
+      work.pop_back();
     }
     boolean(same);
     return;

@@ -95,7 +95,34 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('INITC(2)->S;49->SUBSCC(1,S);50->SUBSCC(2,S);FUNCTION C X;IF X=49 THEN 57->SUBSCC(2,S) CLOSE;CHAROUT(X) END;C->CUCHOUT;PRSTRING(S);',
         '19')
     run('EQUAL([1 [2 3]],[1 [2 3]])=>', '** 1\n')
-    run('CONSPAIR(1,NIL)->A;A->BACK(A);CONSPAIR(1,NIL)->B;B->BACK(B);EQUAL(A,B)=>', '** 1\n')
+    run('CONSPAIR(1,NIL)->A;A->BACK(A);CONSPAIR(1,NIL)->B;B->BACK(B);EQUAL(A,A),EQUAL(A,B)=>',
+        '** 1, 0\n')
+    run('HD(CONSPAIR(1,NIL));\n4=>', '** 4\n', 'list required')
+    run('TL(CONSPAIR(1,CONS(2,NIL)));\n4=>', '** 4\n', 'list required')
+    run('DEST(CONSPAIR(1,2));\n4=>', '** 4\n', 'list required')
+    run('HD(NIL);\n4=>', '** 4\n', 'nonempty list required')
+    run('NULL(CONSPAIR(1,2));\nNULL(1);\nNULL("FOO");\n4=>', '** 4\n', 'list required')
+    run('NULL(NIL),NULL("NIL"),NULL(CONS(1,2))=>', '** 1, 1, 0\n')
+    run('FRONT(CONSPAIR(1,2)),BACK(CONS(3,NIL)),DESTPAIR(CONS(4,NIL))=>',
+        '** 1, [], 4, []\n')
+    run('FRONT(1);\n4=>', '** 4\n', 'compound value required')
+    run('FRONT(NIL);\n4=>', '** 4\n', 'wrong argument type for FRONT')
+    run('CONSPAIR(1,2)->P;CONSPAIR(1,2)->Q;EQUAL(P,Q),EQUAL(P,P)=>', '** 0, 1\n')
+    run('CONSPAIR(1,2)->P;EQUAL(P::NIL,P::NIL),EQUAL(P::NIL,CONSPAIR(1,2)::NIL)=>',
+        '** 1, 0\n')
+    run('CONS(1,2)->L;ISLIST(L),ISLINK(L),ATOM(L),HD(L),TL(L)=>',
+        '** 1, 1, 0, 1, 2\n')
+    run('LENGTH(CONS(1,2));\n4=>', '** 4\n', 'finite proper list required')
+    run('CONS(1,NIL)->L;CONS(L,L)->C;EQUAL(C,C),EQUAL(C,CONS(L,L))=>', '** 1, 1\n')
+    run('CONS(1,NIL)->L;L->BACK(L);EQUAL(L,L);\n4=>', '** 4\n', 'cyclic list')
+    run('CONSPAIR(1,2)->P;9->HD(P);\nFRONT(P)=>', '** 1\n', 'list required')
+    run('CONS(1,NIL)->L;9->FRONT(L);CONSPAIR(1,2)->P;7->BACK(P);HD(L),FRONT(P),BACK(P)=>',
+        '** 9, 1, 7\n')
+    run("VARS A B;'AB'->A;'AB'->B;A=B,EQUAL(A,B),EQUAL(A,'A')=>", '** 0, 1, 0\n')
+    run('FUNCTION T;TERMIN END;EQUAL(FNTOLIST(T),NIL),ISLIST(FNTOLIST(T)),ISLINK(FNTOLIST(T))=>',
+        '** 1, 1, 0\n')
+    run('ISLIST(CONSPAIR(1,CONS(2,NIL))),ISLINK(CONSPAIR(1,NIL)),SAMEDATA(CONSPAIR(1,NIL),1::NIL)=>',
+        '** 0, 0, 1\n')
     run('NIL="NIL",ISWORD(NIL),DATAWORD(NIL),ISLINK([1]),ISLINK(CONSREF(1))=>', '** 1, 1, WORD, 1, 0\n')
     run('0->N;FUNCTION S;N+1->N;N END;FNTOLIST(S)->L;N=>;HD(L),N,HD(L),N=>;TL(L)->T;N=>;HD(T),N=>;9->HD(T);HD(T),N=>', '** 0\n** 1, 1, 1, 1\n** 1\n** 2, 2\n** 9, 2\n')
     run('0->N;FUNCTION S;N+1->N;IF N>2 THEN TERMIN ELSE N CLOSE END;FNTOLIST(S)->L;L=>;N,NULL(TL(TL(L))),N=>', '** [1 2]\n** 3, 1, 3\n')

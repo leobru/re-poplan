@@ -35,7 +35,9 @@ current handoff. Next steps, in order:
    nested printing, suspension and collection tests. Explicit print tasks now
    preserve historical list/string traversal and supplier/callback mutation order.
    PRSTRING now validates character-strip arguments (including INITC); non-list
-   structures print their DATAWORD. Pair/list accessor and comparison audits remain open.
+   structures print their DATAWORD. Pair and list accessors now follow the
+   original image: list operations reject ordinary pairs, and EQUAL walks list
+   links only. Broader per-entry branch audits remain open.
 
 The closure investigation and historical-baseline plan below remain the record
 for the compatibility-native backend; they are not standalone limitations.

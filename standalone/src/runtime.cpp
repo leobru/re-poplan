@@ -91,14 +91,17 @@ Value Runtime::list(const std::vector<Value> &vs) {
     v = pair(*it, v);
   return v;
 }
+bool Runtime::list_link(Value v) const {
+  return v.object() && object(v).kind == Object::Kind::pair &&
+         !object(v).plain_pair;
+}
 std::vector<Value> Runtime::items(Value v) const {
   std::vector<Value> result;
   std::set<Handle> seen;
   while (!empty_list(v)) {
-    auto &o = object(v);
-    if (o.kind != Object::Kind::pair || o.plain_pair ||
-        !seen.insert(v.handle()).second)
+    if (!list_link(v) || !seen.insert(v.handle()).second)
       throw Fault("finite proper list required");
+    auto &o = object(v);
     result.push_back(o.fields.at(0));
     v = o.fields.at(1);
   }
