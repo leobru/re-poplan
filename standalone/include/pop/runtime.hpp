@@ -231,6 +231,11 @@ private:
   bool at(const std::string &) const;
   bool accept(const std::string &);
   void expect(const std::string &);
+  // True only while the spelling remains in Runtime::syntax (CANCEL demotes).
+  bool syntax_at(const std::string &) const;
+  bool syntax_accept(const std::string &);
+  void syntax_expect(const std::string &);
+  void cancel_list(unsigned mode);
   void later(std::function<void()> task) { tasks_.push_back(std::move(task)); }
   void emit(Operation::Kind, std::string = {}, Value = {}, std::size_t = 0);
   void sequence(std::set<std::string>);
@@ -311,7 +316,9 @@ public:
   Value identifier(Value);
   Value binding(Value);
   void bind(Value, Value);
-  void cancel_word(Value);
+  // mode: 0 plain / 1 NONOP / 2 NONMAC. Plain and NONOP keep macro expansion;
+  // NONMAC also clears the macros table entry (historical CANCEL probes).
+  void cancel_word(Value, unsigned mode = 0);
   Value pop();
   void push(Value v) { stack.push_back(v); }
   void call(Value, bool = false);
@@ -355,6 +362,8 @@ public:
   std::vector<Value> stack;
   std::map<std::string, int> operators;
   std::map<std::string, Value> macros;
+  // Live IDENTPROPS SYNTAX spellings; CANCEL removes entries (mutable syntax).
+  std::set<std::string> syntax;
   std::map<Handle, std::unique_ptr<Object>> objects;
   std::map<Handle, Value> cells;
   std::map<Handle, Handle> active;

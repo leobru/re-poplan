@@ -41,9 +41,9 @@ an assertion that each implemented primitive has complete branch coverage.
 
 1. **Syntax and special functions.** SWITCH is a 1-based label jump
    (`N SWITCH L1 … Lk`). SECTION/ENDSEC match this image's stubs (hist 12222 /
-   unmatched closer)—not Edinburgh namespaces. Full mutable syntax and
-   special-function protocols need source-backed semantics and focused tests.
-   The locally available manual is Part 2; do not invent Part 1 grammar.
+   unmatched closer). Mutable SYNTAX is a live table: CANCEL demotes keywords
+   and IDENTPROPS; CANCEL NONMAC clears macros; there is no IDENTPROPS updater.
+   Residual audit: juxtaposition/"no separator" after demotion.
 2. **Diagnostic details.** Modern automatic ERRFUN calls receive the message
    string and integer code **1**, also stored in NUMERR. Callback replacement
    and nested recovery work, but historical error numbers, offending-object

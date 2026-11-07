@@ -73,7 +73,7 @@ boundaries, not fallback paths.
 | `01670` | `GENOUT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01674` | `HD` | Implemented; audit open | Requires a nonempty list link. An ordinary pair is rejected before an update; NIL is an empty-list failure. Improper `CONS(1,2)` is accepted. |
 | `01700` | `IDENTF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01704` | `IDENTP` | Partial | Syntax words and punctuation report SYNTAX; macros MACRO; operators their OPERATION level; unbound and class-name words UNDEF. Full mutable special-function protocol absent. |
+| `01704` | `IDENTP` | Implemented; audit open | Live `Runtime::syntax` reports SYNTAX; macros MACRO; operators their OPERATION level; unbound and class-name words UNDEF. No IDENTPROPS updater on this image. CANCEL demotion covered; juxtaposition-after-demotion audit open. |
 | `01710` | `INCHAR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01714` | `INIT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01720` | `INITC` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -156,7 +156,7 @@ boundaries, not fallback paths.
 | `02404` | `MACRO` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02410` | `NONMAC` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02414` | `NONOP` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `02420` | `OPERAT` | Partial | Operator precedence declarations; full special-function syntax absent. |
+| `02420` | `OPERAT` | Implemented; audit open | VARS OPERATION n Name installs precedence 1..9; IDENTPROPS reports the level. Live SYNTAX word; CANCEL demotes recognition. Bare OPERATION in expressions faults as a syntactic declaration. |
 | `02424` | `OR` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02430` | `RETURN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02434` | `SECTIO` | Implemented; audit open | Syntax code `110` dispatches to hardcoded ERROR_FORMAT **12222** on this image (listing `17240`). Native rejects with `SECTION is not available`. No working namespace/export form. |

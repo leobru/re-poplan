@@ -28,12 +28,14 @@ currently recorded gaps, not a guarantee that no undiscovered defects remain.
   instruction-only). IDENTPROPS is SYNTAX; MEANING/VALOF are UNDEF. Assignment
   to SWITCH is rejected; CANCEL demotes classification. Non-integer or
   out-of-range indices fault (historical 14300). SECTION/ENDSEC remain separate.
-- [ ] **Mutable syntax and special functions:** finish the contracts represented
-  by IDENTPROPS (`IDENTP`) and OPERATION (`OPERAT`). Built-in syntax recognition,
-  macros and operator precedence declarations work; the full mutable
-  special-function protocol remains unresolved. Distinguish language-visible
-  facilities from BESM-only function representations before deciding what must
-  be ported.
+- [x] **Mutable syntax and special functions (completed 2026-11-07):** live
+  `Runtime::syntax` set backs IDENTPROPS SYNTAX and compiler keyword recognition.
+  CANCEL demotes SYNTAX/operators; plain CANCEL and CANCEL NONOP keep macro
+  expansion, CANCEL NONMAC clears macros. VARS OPERATION / VARS MACRO unchanged.
+  IDENTPROPS has no updater on this image (hist 12010). Assignment to a live
+  syntax word faults. Top-level GOON is an invalid closer; GOON inside POPVAL
+  still ends the fragment. Residual: juxtaposition/"no separator" after demotion
+  (hist 04020) remains softer than the image.
 - [x] **IDENTPROPS classification (completed 2026-11-07):** historical probes
   establish SYNTAX for syntax/punctuation (including `->`), OPERATION levels for
   `+` (5) and `::`/`<>`/`FNCOMP` (2), MACRO for macros, and UNDEF for unbound and
@@ -202,17 +204,17 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **205 conformance checks**, **4/4 standalone tests**.
+Current verified baseline: **211 conformance checks**, **4/4 standalone tests**.
 Sanitizer suite not rerun this increment; machine backends were not modified.
 These results establish the tested baseline, not completeness.
 
 ## 7. Exact resident-ledger snapshot
 
-The ledger has 184 rows: 169 implemented-but-audit-open, four partial,
+The ledger has 184 rows: 171 implemented-but-audit-open, two partial,
 one with a focused type audit, two modern replacements, and six excluded
 interfaces. Counts describe documentation status, not code coverage.
 
-### Implemented; audit open (169)
+### Implemented; audit open (171)
 
 `<`, `>`, `=<`, `>=`, `+`, `-`, `*`, `/`,
 `!`, `//`, `=`, `::`, `<>`, `ATOM`, `BACK`, `BOOLAN`,
@@ -228,9 +230,9 @@ interfaces. Counts describe documentation status, not code coverage.
 `SUBSCR`, `SUBSCC`, `TERMIN`, `TL`, `TRUE`, `UNDEF`, `UPDATE`, `(`,
 `)`, `(%`, `%)`, `.`, `,`, `;`, `[`, `]`,
 `[%`, `%]`, `:`, `->`, `=>`, `AND`, `CANCEL`, `CLOSE`,
-`ELSE`, `ELSEIF`, `END`, `ENDSEC`, `EXIT`, `FUNCTI`, `GOON`, `GOTO`, `IF`,
-`LAMBDA`, `LOOPIF`, `MACRO`, `NONMAC`, `NONOP`, `OR`, `RETURN`, `SECTIO`,
-`SWITCH`, `THEN`, `VARS`, `"`, `COMMEN`, `APPDAT`, `APPLIS`, `APPLY`,
+`ELSE`, `ELSEIF`, `END`, `ENDSEC`, `EXIT`, `FUNCTI`, `GOON`, `GOTO`, `IDENTP`,
+`IF`, `LAMBDA`, `LOOPIF`, `MACRO`, `NONMAC`, `NONOP`, `OPERAT`, `OR`, `RETURN`,
+`SECTIO`, `SWITCH`, `THEN`, `VARS`, `"`, `COMMEN`, `APPDAT`, `APPLIS`, `APPLY`,
 `ARCTAN`, `CARRYO`, `COPYLI`, `COS`, `EQUAL`, `EXP`, `FNCOMP`, `LENGTH`,
 `LIBRAR`, `LISTRE`, `LOG`, `NUMBER`, `POPTIM`, `PRBIN`, `PROCT`, `REV`,
 `SIN`, `SQRT`, `TAN`, `VALOF`, `SYNTAX`, `REAL`, `INTEGE`, `WORD`, `STRIP`,
@@ -240,9 +242,9 @@ interfaces. Counts describe documentation status, not code coverage.
 
 `DATALE`.
 
-### Partial (4)
+### Partial (2)
 
-`ERRFUN`, `IDENTP`, `OPERAT`, `NUMERR`.
+`ERRFUN`, `NUMERR`.
 
 ### Excluded host interface (2)
 

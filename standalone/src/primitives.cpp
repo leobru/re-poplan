@@ -768,18 +768,10 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     return;
   }
   if (name == "IDENTP") {
-    // Historical IDENTPROPS: syntax words and punctuation report SYNTAX,
-    // macros report MACRO, operators report their OPERATION level, cancelled
-    // or never-declared words report UNDEF, and class-name words such as
-    // INTEGER report UNDEF even though the runtime binds them for DATAWORD.
+    // Historical IDENTPROPS: live SYNTAX spellings, macros, OPERATION levels,
+    // UNDEF for cancelled/never-declared and class-name words. CANCEL demotes
+    // SYNTAX entries; there is no IDENTPROPS updater on this image.
     auto &o = get(pop(), Object::Kind::word);
-    static const std::set<std::string> syntax = {
-        "VARS",   "FUNCTI", "IF",     "ELSE",   "ELSEIF", "CLOSE",  "END",
-        "LAMBDA", "MACRO",  "FORALL", "LOOPIF", "RETURN", "GOTO",   "CANCEL",
-        "NONOP",  "NONMAC", "GOON",   "OPERAT", "SECTIO", "ENDSEC", "SWITCH",
-        "AND",    "OR",     "THEN",   "EXIT",   "COMMEN", "&",      "(",
-        ")",      "(%",     "%)",     ".",      ",",      ";",      "[",
-        "]",      "[%",     "%]",     ":",      "->",     "=>",     "\""};
     static const std::set<std::string> class_names = {
         "REAL", "INTEGE", "WORD", "STRIP", "CSTRIP", "PAIR", "REF", "SYNTAX"};
     if (syntax.count(o.text))

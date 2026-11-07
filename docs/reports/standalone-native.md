@@ -456,6 +456,20 @@ consumption, destination parsing, postfix selectors and dotted-update
 continuations are now separate resumable tasks. Conformance covers the
 IDENTPROPS table, dotted read/assign and parenthesized `::` lists.
 
+## Mutable SYNTAX / CANCEL — 2026-11-07
+
+Dispak and instruction-only probes establish that IDENTPROPS SYNTAX is mutable
+via CANCEL, not via an IDENTPROPS updater (UPDATER(IDENTPROPS) is UNDEF; updates
+raise 12010). CANCEL of a syntax word demotes IDENTPROPS to UNDEF and stops
+compiler recognition (`CANCEL VARS` / `CANCEL OPERATION` / `CANCEL SWITCH`).
+Plain CANCEL of a MACRO clears MEANING but keeps IDENTPROPS MACRO and expansion;
+only `CANCEL NONMAC` removes the macro. `CANCEL NONMAC` is always a modifier;
+`CANCEL NONOP` is a modifier when a following target remains, otherwise cancels
+NONOP itself. VARS OPERATION 1..9 and VARS MACRO still install properties.
+Native keeps a live `Runtime::syntax` set wired through IDENTPROPS and keyword
+recognition. Probes: `artifacts/standalone-mutable/`. Ordinary suite **4/4**,
+including **211** conformance checks.
+
 ## SECTION/ENDSEC image stubs — 2026-11-07
 
 Dispak and instruction-only probes show every `SECTION …` form raises

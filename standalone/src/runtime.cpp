@@ -17,6 +17,14 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
   operators = {{"=", 30},  {"/=", 30}, {"<", 30},  {">", 30},      {"=<", 30},
                {">=", 30}, {"+", 50},  {"-", 50},  {"*", 60},      {"/", 60},
                {"//", 60}, {"!", 70},  {"::", 80}, {"<>", 80},     {"FNCOMP", 80}};
+  // Built-in IDENTPROPS SYNTAX spellings. CANCEL removes a name from this set
+  // so the compiler stops recognising it and IDENTPROPS reports UNDEF.
+  syntax = {"VARS",   "FUNCTI", "IF",     "ELSE",   "ELSEIF", "CLOSE",  "END",
+            "LAMBDA", "MACRO",  "FORALL", "LOOPIF", "RETURN", "GOTO",   "CANCEL",
+            "NONOP",  "NONMAC", "GOON",   "OPERAT", "SECTIO", "ENDSEC", "SWITCH",
+            "AND",    "OR",     "THEN",   "EXIT",   "COMMEN", "&",      "(",
+            ")",      "(%",     "%)",     ".",      ",",      ";",      "[",
+            "]",      "[%",     "%]",     ":",      "->",     "=>",     "\""};
   register_primitives();
   empty_source_function = primitive("@EOF");
   bind("@NEG", primitive("@NEG"));
@@ -48,10 +56,9 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
   // INDEC is a resident protected integer flag (dictionary class matches the
   // other immutable system variables). CANCEL replaces its identifier record,
   // so a later binding is writable, matching historical probes.
-  // SWITCH / SECTION / ENDSEC are reserved syntax spellings; protecting them
-  // matches historical rejection until CANCEL replaces the identifier record.
-  for (auto name : {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC",
-                    "SWITCH", "SECTIO", "ENDSEC"}) {
+  // Resident immutable values. Active SYNTAX spellings reject assignment in the
+  // compiler (hist 04060/04020); CANCEL demotes them from Runtime::syntax.
+  for (auto name : {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC"}) {
     auto symbol = identifier(name);
     object(symbol).protected_cell = cell(symbol);
   }
@@ -320,14 +327,24 @@ void Runtime::assign(Value symbol, Value value) {
     throw Fault("assignment to protected identifier");
   bind(symbol, value);
 }
-void Runtime::cancel_word(Value symbol) {
+void Runtime::cancel_word(Value symbol, unsigned mode) {
   const auto name = object(symbol).text;
   auto found = words_.find(name);
   if (found != words_.end() &&
       equal(object(found->second).binding_record, symbol)) {
     object(found->second).binding_record = {};
     operators.erase(name);
-    macros.erase(name);
+    syntax.erase(name);
+    // Plain CANCEL and CANCEL NONOP clear the binding but leave macro
+    // expansion/IDENTPROPS MACRO intact; only CANCEL NONMAC removes macros.
+    if (mode == 2)
+      macros.erase(name);
+  } else {
+    // Syntax-only demotion still applies when the word was never bound.
+    operators.erase(name);
+    syntax.erase(name);
+    if (mode == 2)
+      macros.erase(name);
   }
 }
 Value Runtime::pop() {
@@ -515,7 +532,7 @@ bool Runtime::run(std::size_t stop_depth) {
         break;
       }
       case Operation::Kind::cancel:
-        cancel_word(op.symbol);
+        cancel_word(op.symbol, static_cast<unsigned>(op.target));
         break;
       case Operation::Kind::declare:
         cell(op.symbol);

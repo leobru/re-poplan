@@ -249,7 +249,17 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('IDENTPROPS("SECTION"), IDENTPROPS("ENDSEC")=>', '** SYNTAX, SYNTAX\n')
     run('SECTION;\n4=>', '** 4\n', 'SECTION is not available')
     run('ENDSEC;\n4=>', '** 4\n', 'invalid closing bracket')
-    run('1->SECTION;\n4=>', '** 4\n', 'assignment to protected identifier')
+    run('1->SECTION;\n4=>', '** 4\n', 'incorrect assignment')
+    # Mutable SYNTAX: CANCEL demotes IDENTPROPS and compiler recognition.
+    # Macro CANCEL keeps expansion unless CANCEL NONMAC; OPERATION is SYNTAX.
+    run('CANCEL OPERATION; IDENTPROPS("OPERATION")=>', '** UNDEF\n')
+    run('MACRO M; MACRESULTS([42]) END; CANCEL M; IDENTPROPS("M"), MEANING("M")=>',
+        '** MACRO, UNDEF\n')
+    run('MACRO M; MACRESULTS([42]) END; CANCEL NONMAC M; IDENTPROPS("M"), MEANING("M")=>',
+        '** UNDEF, UNDEF\n')
+    run('CANCEL SWITCH; 1->SWITCH; SWITCH, IDENTPROPS("SWITCH")=>', '** 1, 0\n')
+    run('VARS OPERATION 5 PLUS; IDENTPROPS("PLUS")=>', '** 5\n')
+    run('OPERATION=>\n4=>', '** 4\n', 'declaration of syntactic word')
     # SWITCH: 1-based jump to listed labels (historical POPLAN inside functions).
     run('IDENTPROPS("SWITCH")=>', '** SYNTAX\n')
     run('FUNCTION F N; N SWITCH A B; A: 10; RETURN; B: 20; RETURN END; F(1), F(2)=>',
@@ -262,7 +272,7 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
         '** 22\n')
     run('FUNCTION F N; N SWITCH A B; A: 10; RETURN; B: 20; RETURN END; F(0);\n4=>',
         '** 4\n', 'integer required before SWITCH')
-    run('1->SWITCH;\n4=>', '** 4\n', 'assignment to protected identifier')
+    run('1->SWITCH;\n4=>', '** 4\n', 'incorrect assignment')
     run('FUNCTION F;CANCEL X;END;\n4=>', '** 4\n', 'CANCEL is not allowed')
     file = pathlib.Path(temporary) / 'unicode.txt'
     run(f"POPMESS([DO '{file}'])->F;F(955);F(TERMIN);POPMESS([DI '{file}'])->G;G(),G()=>", '** 955, TERMIN\n')
