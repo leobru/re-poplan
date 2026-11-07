@@ -16,10 +16,13 @@ currently recorded gaps, not a guarantee that no undiscovered defects remain.
 
 ## 1. Missing or unresolved language behavior
 
-- [ ] **SECTION / ENDSEC:** recover and implement section binding semantics,
-  scope entry/exit, nesting and recovery behavior. Both currently fail explicitly
-  as unsupported syntax. Establish the grammar from the original compiler or
-  Part 1 of the manual before implementing it.
+- [x] **SECTION / ENDSEC (completed 2026-11-07):** every probed SECTION form on
+  dispak/hybrid raises **12222** via a deliberate ERROR_FORMAT stub at listing
+  `17240` (syntax code `110`). ENDSEC alone raises **04600** (unmatched closer).
+  No successful section namespace/export program exists on this image; native
+  matches with `SECTION is not available` / `invalid closing bracket`, keeps
+  IDENTPROPS SYNTAX, and protects the spellings. Do not invent Edinburgh
+  SECTION semantics without a working historical baseline.
 - [x] **SWITCH (completed 2026-11-07):** historical probes establish
   `N SWITCH L1 … Lk` as a 1-based label jump table inside functions (dispak and
   instruction-only). IDENTPROPS is SYNTAX; MEANING/VALOF are UNDEF. Assignment
@@ -199,18 +202,17 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **183 conformance checks**, **4/4 standalone tests**,
-and **4/4 standalone sanitizer tests**. This increment did not rerun the
-reference suite; the machine backends were not modified. These results
-establish the tested baseline, not completeness.
+Current verified baseline: **205 conformance checks**, **4/4 standalone tests**.
+Sanitizer suite not rerun this increment; machine backends were not modified.
+These results establish the tested baseline, not completeness.
 
 ## 7. Exact resident-ledger snapshot
 
-The ledger has 184 rows: 166 implemented-but-audit-open, six partial, two open,
-one unresolved, one with a focused type audit, two modern replacements, and six
-excluded interfaces. Counts describe documentation status, not code coverage.
+The ledger has 184 rows: 169 implemented-but-audit-open, four partial,
+one with a focused type audit, two modern replacements, and six excluded
+interfaces. Counts describe documentation status, not code coverage.
 
-### Implemented; audit open (166)
+### Implemented; audit open (169)
 
 `<`, `>`, `=<`, `>=`, `+`, `-`, `*`, `/`,
 `!`, `//`, `=`, `::`, `<>`, `ATOM`, `BACK`, `BOOLAN`,
@@ -226,13 +228,13 @@ excluded interfaces. Counts describe documentation status, not code coverage.
 `SUBSCR`, `SUBSCC`, `TERMIN`, `TL`, `TRUE`, `UNDEF`, `UPDATE`, `(`,
 `)`, `(%`, `%)`, `.`, `,`, `;`, `[`, `]`,
 `[%`, `%]`, `:`, `->`, `=>`, `AND`, `CANCEL`, `CLOSE`,
-`ELSE`, `ELSEIF`, `END`, `EXIT`, `FUNCTI`, `GOON`, `GOTO`, `IF`,
-`LAMBDA`, `LOOPIF`, `MACRO`, `NONMAC`, `NONOP`, `OR`, `RETURN`, `THEN`,
-`VARS`, `"`, `COMMEN`, `APPDAT`, `APPLIS`, `APPLY`, `ARCTAN`, `CARRYO`,
-`COPYLI`, `COS`, `EQUAL`, `EXP`, `FNCOMP`, `LENGTH`, `LIBRAR`, `LISTRE`,
-`LOG`, `NUMBER`, `POPTIM`, `PRBIN`, `PROCT`, `REV`, `SIN`, `SQRT`,
-`TAN`, `VALOF`, `SYNTAX`, `REAL`, `INTEGE`, `WORD`, `STRIP`, `CSTRIP`,
-`PAIR`, `REF`, `/=`, `REFOF`, `NTERM`, `POPDAT`.
+`ELSE`, `ELSEIF`, `END`, `ENDSEC`, `EXIT`, `FUNCTI`, `GOON`, `GOTO`, `IF`,
+`LAMBDA`, `LOOPIF`, `MACRO`, `NONMAC`, `NONOP`, `OR`, `RETURN`, `SECTIO`,
+`SWITCH`, `THEN`, `VARS`, `"`, `COMMEN`, `APPDAT`, `APPLIS`, `APPLY`,
+`ARCTAN`, `CARRYO`, `COPYLI`, `COS`, `EQUAL`, `EXP`, `FNCOMP`, `LENGTH`,
+`LIBRAR`, `LISTRE`, `LOG`, `NUMBER`, `POPTIM`, `PRBIN`, `PROCT`, `REV`,
+`SIN`, `SQRT`, `TAN`, `VALOF`, `SYNTAX`, `REAL`, `INTEGE`, `WORD`, `STRIP`,
+`CSTRIP`, `PAIR`, `REF`, `/=`, `REFOF`, `NTERM`, `POPDAT`.
 
 ### Implemented; focused type audit (1)
 
@@ -249,10 +251,6 @@ excluded interfaces. Counts describe documentation status, not code coverage.
 ### Modern replacement (2)
 
 `POPMES`, `COREUS`.
-
-### Open (2)
-
-`ENDSEC`, `SECTIO`.
 
 ### Excluded encoding interface (4)
 

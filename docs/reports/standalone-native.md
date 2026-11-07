@@ -456,6 +456,18 @@ consumption, destination parsing, postfix selectors and dotted-update
 continuations are now separate resumable tasks. Conformance covers the
 IDENTPROPS table, dotted read/assign and parenthesized `::` lists.
 
+## SECTION/ENDSEC image stubs — 2026-11-07
+
+Dispak and instruction-only probes show every `SECTION …` form raises
+**ОШИБКА 12222**. The listing at `17240` loads error number `12222` and jumps to
+`ERROR_FORMAT`—a hardcoded stub for syntax code `110` (SECTIO dictionary value),
+not a recoverable parse of section namespaces. Bare `ENDSEC` raises **04600**
+(invalid closing bracket). IDENTPROPS reports SYNTAX for both. Native matches
+with `SECTION is not available` and `invalid closing bracket`, protects the
+spellings, and does not invent Edinburgh-style section binding. Probes:
+`artifacts/standalone-section/`. Ordinary standalone suite **4/4**, including
+**205** conformance checks; whitespace check passes.
+
 ## SWITCH label jump — 2026-11-07
 
 Dispak and instruction-only probes establish executable SWITCH syntax inside

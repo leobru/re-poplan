@@ -244,7 +244,12 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('POPVAL([2 =>;GOON;99 =>]);4=>', '** 2\n** 4\n')
     run('NTERM=UNDEF=>', '** 1\n')
     run('JUMPOUT();\n4=>', '** 4\n', 'monitor handoff')
-    run('SECTION;\n4=>', '** 4\n', 'unsupported standalone syntax')
+    # SECTION/ENDSEC: this image stubs SECTION (hist 12222) and treats bare
+    # ENDSEC as an unmatched closer (hist 04600); no namespace binding exists.
+    run('IDENTPROPS("SECTION"), IDENTPROPS("ENDSEC")=>', '** SYNTAX, SYNTAX\n')
+    run('SECTION;\n4=>', '** 4\n', 'SECTION is not available')
+    run('ENDSEC;\n4=>', '** 4\n', 'invalid closing bracket')
+    run('1->SECTION;\n4=>', '** 4\n', 'assignment to protected identifier')
     # SWITCH: 1-based jump to listed labels (historical POPLAN inside functions).
     run('IDENTPROPS("SWITCH")=>', '** SYNTAX\n')
     run('FUNCTION F N; N SWITCH A B; A: 10; RETURN; B: 20; RETURN END; F(1), F(2)=>',

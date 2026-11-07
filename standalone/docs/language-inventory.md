@@ -145,7 +145,7 @@ boundaries, not fallback paths.
 | `02330` | `ELSE` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02334` | `ELSEIF` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02340` | `END` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `02344` | `ENDSEC` | Open | Paired section boundary absent. |
+| `02344` | `ENDSEC` | Implemented; audit open | Syntax code `111`. Bare ENDSEC faults as an unmatched closer (hist 04600). No live SECTION body exists on this image to pair with. |
 | `02350` | `EXIT` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02354` | `FUNCTI` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02360` | `GOON` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
@@ -159,7 +159,7 @@ boundaries, not fallback paths.
 | `02420` | `OPERAT` | Partial | Operator precedence declarations; full special-function syntax absent. |
 | `02424` | `OR` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02430` | `RETURN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `02434` | `SECTIO` | Open | Source handler exists; standalone section binding semantics absent. |
+| `02434` | `SECTIO` | Implemented; audit open | Syntax code `110` dispatches to hardcoded ERROR_FORMAT **12222** on this image (listing `17240`). Native rejects with `SECTION is not available`. No working namespace/export form. |
 | `02440` | `SWITCH` | Implemented; audit open | `N SWITCH L1 … Lk` — 1-based jump to label Li inside a function. IDENTPROPS SYNTAX; VALUE UNDEF. Out-of-range/non-integer faults. Top-level forward labels remain an audit. |
 | `02444` | `THEN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02450` | `VARS` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |

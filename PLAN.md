@@ -22,8 +22,8 @@ current handoff. Next steps, in order:
    DATALIST component extraction; COPY rejects interned words and functions.
    UPDATER supports arbitrary elements and explicit clearing; partial updaters
    capture independent arguments, and compositions require explicit updaters. The callback
-   mutation difference is recorded in the status matrix. SECTION/ENDSEC and full mutable
-   syntax/special functions remain unresolved.
+   mutation difference is recorded in the status matrix. Full mutable
+   syntax/special functions remain unresolved (SECTION/ENDSEC match image stubs).
 4. **In progress:** [184-resident ledger](standalone/docs/language-inventory.md),
    byte-split/GC/interactive tests and historical semantic probes are in place.
    Complete per-entry branch audits and remaining diagnostic/input contracts

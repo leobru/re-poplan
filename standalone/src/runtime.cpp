@@ -48,11 +48,10 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
   // INDEC is a resident protected integer flag (dictionary class matches the
   // other immutable system variables). CANCEL replaces its identifier record,
   // so a later binding is writable, matching historical probes.
-  // SWITCH is a reserved syntax spelling (dictionary value UNDEF); protecting
-  // its identifier matches historical rejection of `1->SWITCH` / `VARS SWITCH`
-  // until CANCEL replaces the record.
-  for (auto name :
-       {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC", "SWITCH"}) {
+  // SWITCH / SECTION / ENDSEC are reserved syntax spellings; protecting them
+  // matches historical rejection until CANCEL replaces the identifier record.
+  for (auto name : {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC",
+                    "SWITCH", "SECTIO", "ENDSEC"}) {
     auto symbol = identifier(name);
     object(symbol).protected_cell = cell(symbol);
   }

@@ -557,8 +557,13 @@ void Compiler::cancel() {
 void Compiler::imperative() {
   if (macro([this] { imperative(); }))
     return;
-  if (at("SECTIO") || at("ENDSEC"))
-    throw Fault("unsupported standalone syntax " + peek().text, peek().where);
+  // Historical SECTIO syntax code 110 dispatches to ERROR_FORMAT 12222 (listing
+  // 17240); ENDSEC alone is an unmatched closer (04600). Do not invent
+  // Edinburgh section namespaces that this image never runs.
+  if (at("SECTIO"))
+    throw Fault("SECTION is not available", peek().where);
+  if (at("ENDSEC"))
+    throw Fault("invalid closing bracket", peek().where);
   // N SWITCH L1 L2 ... Lk  — 1-based jump to label Lk (historical POPLAN).
   if (accept("SWITCH")) {
     later([this] { switch_labels(); });
