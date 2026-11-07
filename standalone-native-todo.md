@@ -20,9 +20,11 @@ currently recorded gaps, not a guarantee that no undiscovered defects remain.
   scope entry/exit, nesting and recovery behavior. Both currently fail explicitly
   as unsupported syntax. Establish the grammar from the original compiler or
   Part 1 of the manual before implementing it.
-- [ ] **SWITCH:** determine whether and how the resident spelling is executable
-  language syntax. Its original binding is UNDEF; its presence in the dictionary
-  alone is insufficient evidence. Standalone currently rejects it explicitly.
+- [x] **SWITCH (completed 2026-11-07):** historical probes establish
+  `N SWITCH L1 … Lk` as a 1-based label jump table inside functions (dispak and
+  instruction-only). IDENTPROPS is SYNTAX; MEANING/VALOF are UNDEF. Assignment
+  to SWITCH is rejected; CANCEL demotes classification. Non-integer or
+  out-of-range indices fault (historical 14300). SECTION/ENDSEC remain separate.
 - [ ] **Mutable syntax and special functions:** finish the contracts represented
   by IDENTPROPS (`IDENTP`) and OPERATION (`OPERAT`). Built-in syntax recognition,
   macros and operator precedence declarations work; the full mutable
@@ -251,10 +253,6 @@ excluded interfaces. Counts describe documentation status, not code coverage.
 ### Open (2)
 
 `ENDSEC`, `SECTIO`.
-
-### Unresolved (1)
-
-`SWITCH`.
 
 ### Excluded encoding interface (4)
 

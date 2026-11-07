@@ -456,6 +456,25 @@ consumption, destination parsing, postfix selectors and dotted-update
 continuations are now separate resumable tasks. Conformance covers the
 IDENTPROPS table, dotted read/assign and parenthesized `::` lists.
 
+## SWITCH label jump — 2026-11-07
+
+Dispak and instruction-only probes establish executable SWITCH syntax inside
+functions:
+
+```pop2
+FUNCTION F N; N SWITCH A B; A: 10; RETURN; B: 20; RETURN END; F(1), F(2)=>
+** 10, 20
+```
+
+The integer before `SWITCH` selects a following label name 1-based. Labels may
+appear before or after the SWITCH in the same function. IDENTPROPS reports
+SYNTAX; the dictionary value word remains UNDEF. Empty stack / non-integer /
+out-of-range indices raise historical error 14300 («ПЕРЕД SWITCH НЕ ЦЕЛОЕ»).
+Top-level `1 SWITCH A B; A: …` fails with undefined labels (15000) because
+interactive statement boundaries do not share one resolve unit—the native
+implementation matches the successful in-function contract. SECTION/ENDSEC are
+unchanged. Probes live in `artifacts/standalone-switch/`.
+
 ## INDEC protection and `&` — 2026-11-07
 
 Dispak and instruction-only probes show `INDEC` starts at 0 and rejects

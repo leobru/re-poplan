@@ -39,10 +39,12 @@ The [184-resident inventory](language-inventory.md) distinguishes implemented
 paths, unresolved contracts and intentional modern-host exclusions. This is not
 an assertion that each implemented primitive has complete branch coverage.
 
-1. **Syntax and special functions.** SECTION/ENDSEC and SWITCH remain explicit
-   unsupported-syntax failures. Full mutable syntax and special-function
-   protocols need source-backed semantics and focused tests. The locally
-   available manual is Part 2; do not infer Part 1 grammar from generic POP-2.
+1. **Syntax and special functions.** SECTION/ENDSEC remain explicit
+   unsupported-syntax failures. SWITCH is implemented as a 1-based label jump
+   (`N SWITCH L1 … Lk`) matching historical function probes. Full mutable syntax
+   and special-function protocols need source-backed semantics and focused tests.
+   The locally available manual is Part 2; do not infer Part 1 grammar from
+   generic POP-2.
 2. **Diagnostic details.** Modern automatic ERRFUN calls receive the message
    string and integer code **1**, also stored in NUMERR. Callback replacement
    and nested recovery work, but historical error numbers, offending-object

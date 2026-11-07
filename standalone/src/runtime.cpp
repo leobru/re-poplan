@@ -48,7 +48,11 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
   // INDEC is a resident protected integer flag (dictionary class matches the
   // other immutable system variables). CANCEL replaces its identifier record,
   // so a later binding is writable, matching historical probes.
-  for (auto name : {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC"}) {
+  // SWITCH is a reserved syntax spelling (dictionary value UNDEF); protecting
+  // its identifier matches historical rejection of `1->SWITCH` / `VARS SWITCH`
+  // until CANCEL replaces the record.
+  for (auto name :
+       {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC", "SWITCH"}) {
     auto symbol = identifier(name);
     object(symbol).protected_cell = cell(symbol);
   }
@@ -499,6 +503,18 @@ bool Runtime::run(std::size_t stop_depth) {
         break;
       case Operation::Kind::go:
         throw Fault("unresolved label");
+      case Operation::Kind::switch_go: {
+        // Historical 14300 «ПЕРЕД SWITCH НЕ ЦЕЛОЕ»: index must be an integer
+        // in 1..N for the listed labels.
+        auto index = pop();
+        if (!index.integer())
+          throw Fault("integer required before SWITCH");
+        const auto n = std::get<std::int64_t>(index.data);
+        if (n < 1 || static_cast<std::size_t>(n) > op.targets.size())
+          throw Fault("integer required before SWITCH");
+        f.pc = op.targets[static_cast<std::size_t>(n - 1)];
+        break;
+      }
       case Operation::Kind::cancel:
         cancel_word(op.symbol);
         break;

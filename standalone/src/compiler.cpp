@@ -557,8 +557,13 @@ void Compiler::cancel() {
 void Compiler::imperative() {
   if (macro([this] { imperative(); }))
     return;
-  if (at("SECTIO") || at("ENDSEC") || at("SWITCH"))
+  if (at("SECTIO") || at("ENDSEC"))
     throw Fault("unsupported standalone syntax " + peek().text, peek().where);
+  // N SWITCH L1 L2 ... Lk  — 1-based jump to label Lk (historical POPLAN).
+  if (accept("SWITCH")) {
+    later([this] { switch_labels(); });
+    return;
+  }
   if (accept("@EMPTY"))
     return;
   if (accept("FUNCTI")) {
@@ -629,24 +634,64 @@ void Compiler::imperative() {
     return;
   }
   later([this] {
+    // Consume SWITCH alone in this task; label reads may NeedList.
+    if (accept("SWITCH")) {
+      later([this] { switch_labels(); });
+      return;
+    }
     if (accept("=>"))
       emit(Operation::Kind::print);
   });
   later([this] { assignment(); });
   later([this] { expression(); });
 }
+void Compiler::switch_labels() {
+  auto labels = std::make_shared<std::vector<std::string>>();
+  later([this, labels] { switch_labels_collect(labels); });
+}
+void Compiler::switch_labels_collect(
+    std::shared_ptr<std::vector<std::string>> labels) {
+  // Label names continue until a statement stopper or closing keyword.
+  // One name per task so NeedList cannot replay a consumed label.
+  static const std::set<std::string> stops = {
+      "END",    "CLOSE", "ELSE",   "ELSEIF", "THEN",   "AND",
+      "OR",     "EXIT",  "RETURN", "GOTO",   "IF",     "LOOPIF",
+      "FORALL"};
+  if (peek().kind == Token::Kind::word && !stops.count(peek().text)) {
+    labels->push_back(take().text);
+    later([this, labels] { switch_labels_collect(labels); });
+    return;
+  }
+  if (labels->empty())
+    throw Fault("SWITCH requires at least one label");
+  Operation op{Operation::Kind::switch_go};
+  op.where = location_;
+  op.names = std::move(*labels);
+  program_->code.push_back(std::move(op));
+}
 void Compiler::resolve() {
   std::map<std::string, std::size_t> labels;
   for (std::size_t i = 0; i < program_->code.size(); ++i)
     if (program_->code[i].kind == Operation::Kind::label)
       labels[program_->code[i].name] = i;
-  for (auto &op : program_->code)
+  for (auto &op : program_->code) {
     if (op.kind == Operation::Kind::go) {
       auto found = labels.find(op.name);
       if (found == labels.end())
         throw Fault("unknown label " + op.name);
       op.kind = Operation::Kind::jump;
       op.target = found->second;
+    } else if (op.kind == Operation::Kind::switch_go) {
+      if (op.names.empty())
+        throw Fault("SWITCH requires at least one label");
+      op.targets.clear();
+      for (const auto &name : op.names) {
+        auto found = labels.find(name);
+        if (found == labels.end())
+          throw Fault("undefined labels");
+        op.targets.push_back(found->second);
+      }
     }
+  }
 }
 } // namespace pop

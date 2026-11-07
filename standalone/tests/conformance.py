@@ -245,6 +245,19 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('NTERM=UNDEF=>', '** 1\n')
     run('JUMPOUT();\n4=>', '** 4\n', 'monitor handoff')
     run('SECTION;\n4=>', '** 4\n', 'unsupported standalone syntax')
+    # SWITCH: 1-based jump to listed labels (historical POPLAN inside functions).
+    run('IDENTPROPS("SWITCH")=>', '** SYNTAX\n')
+    run('FUNCTION F N; N SWITCH A B; A: 10; RETURN; B: 20; RETURN END; F(1), F(2)=>',
+        '** 10, 20\n')
+    run('FUNCTION F N; GOTO S; A: 10; RETURN; B: 20; RETURN; S: N SWITCH A B END;'
+        'F(1), F(2)=>', '** 10, 20\n')
+    run('FUNCTION F N; N SWITCH A B C; A: 10; RETURN; B: 20; RETURN; C: 30; RETURN END;'
+        'F(1), F(2), F(3)=>', '** 10, 20, 30\n')
+    run('FUNCTION F; 2 SWITCH A B; A: 11; RETURN; B: 22; RETURN END; F()=>',
+        '** 22\n')
+    run('FUNCTION F N; N SWITCH A B; A: 10; RETURN; B: 20; RETURN END; F(0);\n4=>',
+        '** 4\n', 'integer required before SWITCH')
+    run('1->SWITCH;\n4=>', '** 4\n', 'assignment to protected identifier')
     run('FUNCTION F;CANCEL X;END;\n4=>', '** 4\n', 'CANCEL is not allowed')
     file = pathlib.Path(temporary) / 'unicode.txt'
     run(f"POPMESS([DO '{file}'])->F;F(955);F(TERMIN);POPMESS([DI '{file}'])->G;G(),G()=>", '** 955, TERMIN\n')

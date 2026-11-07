@@ -109,7 +109,9 @@ struct Operation {
     declare,
     for_setup,
     for_test,
-    for_next
+    for_next,
+    // 1-based jump table: pop integer N, jump to names/targets[N-1].
+    switch_go
   };
   Kind kind = Kind::push;
   Value value;
@@ -117,6 +119,13 @@ struct Operation {
   std::size_t target = 0;
   Location where;
   Value symbol{};
+  std::vector<std::string> names;
+  std::vector<std::size_t> targets;
+  Operation() = default;
+  Operation(Kind k, Value v = {}, std::string n = {}, std::size_t t = 0,
+            Location w = {}, Value s = {})
+      : kind(k), value(std::move(v)), name(std::move(n)), target(t),
+        where(std::move(w)), symbol(std::move(s)) {}
 };
 struct Program {
   std::vector<Operation> code;
@@ -237,6 +246,8 @@ private:
   void assigned(std::string);
   void dotted_update();
   void dotted_update_after(std::string);
+  void switch_labels();
+  void switch_labels_collect(std::shared_ptr<std::vector<std::string>>);
   void conditional(bool = false);
   void function(bool = false, bool = false);
   void declaration();

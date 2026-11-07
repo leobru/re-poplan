@@ -160,7 +160,7 @@ boundaries, not fallback paths.
 | `02424` | `OR` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02430` | `RETURN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02434` | `SECTIO` | Open | Source handler exists; standalone section binding semantics absent. |
-| `02440` | `SWITCH` | Unresolved | Resident spelling alone does not establish executable syntax; binding is UNDEF. |
+| `02440` | `SWITCH` | Implemented; audit open | `N SWITCH L1 … Lk` — 1-based jump to label Li inside a function. IDENTPROPS SYNTAX; VALUE UNDEF. Out-of-range/non-integer faults. Top-level forward labels remain an audit. |
 | `02444` | `THEN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02450` | `VARS` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02454` | `"` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
