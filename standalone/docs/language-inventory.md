@@ -138,7 +138,7 @@ boundaries, not fallback paths.
 | `02274` | `:` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02300` | `->` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02304` | `=>` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `02310` | `&` | Partial | Accepted as numeric exponent separator; other syntax uses need evidence. |
+| `02310` | `&` | Implemented; audit open | Numeric exponent separator with `$`; IDENTPROPS SYNTAX. No other language use established against the original image. |
 | `02314` | `AND` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02320` | `CANCEL` | Implemented; audit open | Separate identifier records preserve old compiled bindings while word interning/VALOF use the new binding. Split/GC tests and historical probe. Restricted to top-level compilation. |
 | `02324` | `CLOSE` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
@@ -202,7 +202,7 @@ boundaries, not fallback paths.
 | `02674` | `REFOF` | Implemented; audit open | Historical probes and 06457/06464 listing: dynamic identifier reference; repeated identity, mutation, copying, cancellation and collection tests. |
 | `02700` | `NTERM` | Implemented; audit open | Explicit initial UNDEF, matching resident bootstrap; no terminal-device number emulation. |
 | `02704` | `NUMERR` | Partial | Automatic modern error stores code 1; historical catalog and suppression semantics excluded from this implementation so far. |
-| `02710` | `INDEC` | Partial | Initialized; all historical interactive flag semantics not established. |
+| `02710` | `INDEC` | Implemented; audit open | Resident 0, protected like TRUE/NIL; CANCEL lifts protection. No further interactive-flag effect observed on NUMBERREAD while protected. |
 | `02714` | `POPDAT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02720` | `CODIPC` | Excluded encoding interface | Explicit error: Unicode scalar values replace historical character-code conversion. |
 | `02724` | `CODPIC` | Excluded encoding interface | Explicit error: Unicode scalar values replace historical character-code conversion. |

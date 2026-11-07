@@ -455,3 +455,14 @@ turning `1->A` into a load of `A` and breaking dotted destinations. Arrow
 consumption, destination parsing, postfix selectors and dotted-update
 continuations are now separate resumable tasks. Conformance covers the
 IDENTPROPS table, dotted read/assign and parenthesized `::` lists.
+
+## INDEC protection and `&` — 2026-11-07
+
+Dispak and instruction-only probes show `INDEC` starts at 0 and rejects
+assignment with protected-variable error 04040. `CANCEL INDEC` then allows a
+new binding. Standalone now protects `INDEC` with the same identifier-cell rule
+as `TRUE`/`NIL`. `&` remains an exponent marker with `$` and reports SYNTAX;
+no other language use appears on the original image (bare `&` is a missing
+separator). Latin dispak input maps ASCII `&` to GOST `∧`, which is a host
+transliteration mismatch rather than evidence against the manual's `&` exponent
+spelling.

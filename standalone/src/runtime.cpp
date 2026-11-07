@@ -45,7 +45,10 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
     if (bound.object() && object(bound).kind == Object::Kind::function)
       object(symbol).protected_cell = cell(symbol);
   }
-  for (auto name : {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN"}) {
+  // INDEC is a resident protected integer flag (dictionary class matches the
+  // other immutable system variables). CANCEL replaces its identifier record,
+  // so a later binding is writable, matching historical probes.
+  for (auto name : {"TRUE", "FALSE", "NIL", "UNDEF", "TERMIN", "INDEC"}) {
     auto symbol = identifier(name);
     object(symbol).protected_cell = cell(symbol);
   }

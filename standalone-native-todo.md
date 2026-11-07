@@ -37,11 +37,18 @@ currently recorded gaps, not a guarantee that no undiscovered defects remain.
   token before a possible NeedList are split so restarts cannot drop `->` or `.`.
   Remaining: mutable IDENTPROPS/OPERATION special-function protocol, protection
   and declaration/cancellation edge rules beyond ordinary resident protection.
-- [ ] **Other uses of `&`:** exponent-separator syntax works. Establish whether
-  additional language uses are required, then implement and test those established
-  by evidence; do not invent uses from generic POP-2 grammars.
-- [ ] **INDEC:** it is initialized, but the historical interactive flag's complete
-  language-visible semantics and relevant standalone behavior are not established.
+- [x] **Other uses of `&` (completed 2026-11-07):** `&` is SYNTAX for IDENTPROPS
+  and a numeric exponent separator alongside `$` (manual §8.5 / `3.14&-3`).
+  Historical Latin dispak input maps ASCII `&` to GOST `∧` and rejects it as a
+  separator; standalone keeps the documented `&`/`$` exponent spelling. No other
+  language use (binary operator, juxtaposition) is established; bare `&` between
+  values fails as a missing separator on the original image.
+- [x] **INDEC protection (completed 2026-11-07):** resident value is 0 with
+  DATAWORD INTEGER and IDENTPROPS 0. Assignment is rejected as protected, matching
+  dispak error 04040. CANCEL replaces the identifier record so a later binding is
+  writable. No further interactive-flag effect on NUMBERREAD or compilation was
+  observed while protected; remaining interactive/session semantics stay open only
+  if new evidence appears.
 
 Evidence limitation: the locally available `pop-2-opt.md` is **Part 2**. Part 1
 syntax needs additional documentation or recovery from compiler listings/probes.
@@ -229,9 +236,9 @@ excluded interfaces. Counts describe documentation status, not code coverage.
 
 `DATALE`.
 
-### Partial (6)
+### Partial (4)
 
-`ERRFUN`, `IDENTP`, `&`, `OPERAT`, `NUMERR`, `INDEC`.
+`ERRFUN`, `IDENTP`, `OPERAT`, `NUMERR`.
 
 ### Excluded host interface (2)
 

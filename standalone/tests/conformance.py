@@ -135,6 +135,13 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('IDENTPROPS("::"),IDENTPROPS("*"),IDENTPROPS("+")=>', '** 2, 4, 5\n')
     run('(1+2)::(3+4)=>', '** [3 | 7]\n')
     run('(1::(2::(3::NIL)))=>', '** [1 2 3]\n')
+    # INDEC is a protected resident flag; CANCEL lifts protection via a new record.
+    run('INDEC=>', '** 0\n')
+    run('1->INDEC;\n4=>', '** 4\n', 'assignment to protected identifier')
+    run('CANCEL INDEC; 1->INDEC; INDEC=>', '** 1\n')
+    # & is SYNTAX and a numeric exponent marker ($/&); not a binary operator.
+    run('IDENTPROPS("&")=>', '** SYNTAX\n')
+    run('1.5$2, 1.5&-3=>', '** 150.0, 0.0015\n')
     run('NIL="NIL",ISWORD(NIL),DATAWORD(NIL),ISLINK([1]),ISLINK(CONSREF(1))=>', '** 1, 1, WORD, 1, 0\n')
     run('0->N;FUNCTION S;N+1->N;N END;FNTOLIST(S)->L;N=>;HD(L),N,HD(L),N=>;TL(L)->T;N=>;HD(T),N=>;9->HD(T);HD(T),N=>', '** 0\n** 1, 1, 1, 1\n** 1\n** 2, 2\n** 9, 2\n')
     run('0->N;FUNCTION S;N+1->N;IF N>2 THEN TERMIN ELSE N CLOSE END;FNTOLIST(S)->L;L=>;N,NULL(TL(TL(L))),N=>', '** [1 2]\n** 3, 1, 3\n')
