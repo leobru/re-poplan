@@ -123,6 +123,18 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
         '** 1, 1, 0\n')
     run('ISLIST(CONSPAIR(1,CONS(2,NIL))),ISLINK(CONSPAIR(1,NIL)),SAMEDATA(CONSPAIR(1,NIL),1::NIL)=>',
         '** 0, 0, 1\n')
+    # IDENTPROPS: syntax words, OPERATION levels, unbound/class names, macros.
+    run('IDENTPROPS("VARS"),IDENTPROPS("+"),IDENTPROPS("::"),IDENTPROPS("->"),'
+        'IDENTPROPS("NOSUCH"),IDENTPROPS("INTEGER")=>',
+        '** SYNTAX, 5, 2, SYNTAX, UNDEF, UNDEF\n')
+    # Dotted read/assignment targets; NeedList-safe destination parsing.
+    run('[4 5]->A; A.HD, A.TL.HD=>', '** 4, 5\n')
+    run('[4 5]->A; 9->A.HD; A=>', '** [9 5]\n')
+    run('[1 2 3]->L; 8->L.TL.HD; L=>', '** [1 8 3]\n')
+    # :: OPERATION level is tighter than * / +; parenthesized cons is a proper list.
+    run('IDENTPROPS("::"),IDENTPROPS("*"),IDENTPROPS("+")=>', '** 2, 4, 5\n')
+    run('(1+2)::(3+4)=>', '** [3 | 7]\n')
+    run('(1::(2::(3::NIL)))=>', '** [1 2 3]\n')
     run('NIL="NIL",ISWORD(NIL),DATAWORD(NIL),ISLINK([1]),ISLINK(CONSREF(1))=>', '** 1, 1, WORD, 1, 0\n')
     run('0->N;FUNCTION S;N+1->N;N END;FNTOLIST(S)->L;N=>;HD(L),N,HD(L),N=>;TL(L)->T;N=>;HD(T),N=>;9->HD(T);HD(T),N=>', '** 0\n** 1, 1, 1, 1\n** 1\n** 2, 2\n** 9, 2\n')
     run('0->N;FUNCTION S;N+1->N;IF N>2 THEN TERMIN ELSE N CLOSE END;FNTOLIST(S)->L;L=>;N,NULL(TL(TL(L))),N=>', '** [1 2]\n** 3, 1, 3\n')

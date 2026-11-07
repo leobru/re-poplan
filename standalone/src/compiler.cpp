@@ -24,7 +24,7 @@ Token Compiler::take() {
   return t;
 }
 bool Compiler::at(const std::string &s) const {
-  const auto &t = peek();
+  const auto t = peek();
   return (t.kind == Token::Kind::word || t.kind == Token::Kind::symbol) &&
          t.text == s;
 }
@@ -209,8 +209,8 @@ void Compiler::primary() {
     later([this] { postfix(); });
     return;
   }
-  later([this] { postfix(); });
   if (t.text == "\"") {
+    later([this] { postfix(); });
     later([this] {
       // The closing marker must be available before consuming the payload.
       if (peek(1).text != "\"")
@@ -222,14 +222,23 @@ void Compiler::primary() {
     return;
   }
   if (t.text == "NONOP" || t.text == "NONMAC") {
+    later([this] { postfix(); });
     later([this] { emit(Operation::Kind::load, take().text); });
     return;
   }
   if (t.text == ".") {
+    // Prefix .F applies F to the current stack top. Read the selector in its
+    // own task so NeedList after consuming '.' cannot replay the dot.
+    later([this] { postfix(); });
     later([this] { emit(Operation::Kind::call_value); });
-    later([this] { expression(90); });
+    later([this] {
+      if (peek().kind != Token::Kind::word)
+        throw Fault("expected selector after '.'");
+      emit(Operation::Kind::load, take().text);
+    });
     return;
   }
+  later([this] { postfix(); });
   if (t.text == "+") {
     later([this] { primary(); });
     return;
@@ -312,10 +321,17 @@ void Compiler::postfix() {
     return;
   }
   if (accept(".")) {
-    later([this] { postfix(); });
-    later([this] { emit(Operation::Kind::call_value); });
-    later([this] { expression(90); });
+    // A.TL.HD is HD(TL(A)). Selector read is a separate task so NeedList after
+    // '.' cannot replay the dot.
+    later([this] { postfix_dot(); });
   }
+}
+void Compiler::postfix_dot() {
+  if (peek().kind != Token::Kind::word)
+    throw Fault("expected selector after '.'");
+  auto selector = take().text;
+  later([this] { postfix(); });
+  later([this, selector] { emit(Operation::Kind::call, selector); });
 }
 void Compiler::arguments(std::string end, bool separator) {
   if (accept(end))
@@ -352,25 +368,54 @@ void Compiler::literal_list(
 void Compiler::assignment() {
   if (!accept("->"))
     return;
+  // Consume only the arrow in this task. Destination parsing peeks the next
+  // source token and may NeedList; a restart must not see a consumed arrow.
   later([this] { assignment(); });
-  later([this] {
-    if (accept("NONOP") || accept("NONMAC")) {
-      later([this] {
-        auto name = take().text;
-        later([this, name] { assigned(name); });
-      });
-      return;
-    }
+  later([this] { assignment_target(); });
+}
+void Compiler::assignment_target() {
+  if (accept("NONOP") || accept("NONMAC")) {
     auto name = take().text;
     later([this, name] { assigned(name); });
-  });
+  } else if (at("\"")) {
+    take();
+    if (peek(1).text != "\"")
+      throw Fault("expected closing word quote");
+    auto quoted = take();
+    take();
+    emit(Operation::Kind::push, {}, runtime_.word(quoted.text));
+    expect(".");
+    later([this] { dotted_update(); });
+  } else {
+    auto name = take().text;
+    later([this, name] { assigned(name); });
+  }
 }
 void Compiler::assigned(std::string name) {
   if (accept("(")) {
     later([this, name] { emit(Operation::Kind::update, name); });
     later([this] { arguments(")"); });
+  } else if (accept(".")) {
+    emit(Operation::Kind::load, name);
+    // Selector read is a separate task so NeedList after '.' cannot replay it.
+    later([this] { dotted_update(); });
   } else
     emit(Operation::Kind::store, name);
+}
+void Compiler::dotted_update() {
+  if (peek().kind != Token::Kind::word)
+    throw Fault("expected selector after '.'");
+  auto selector = take().text;
+  // Decide whether another '.' follows in a fresh task: peeking it may
+  // NeedList after the selector has already been consumed.
+  later([this, selector] { dotted_update_after(selector); });
+}
+void Compiler::dotted_update_after(std::string selector) {
+  if (accept(".")) {
+    emit(Operation::Kind::call, selector);
+    later([this] { dotted_update(); });
+  } else
+    emit(Operation::Kind::update, selector);
 }
 void Compiler::conditional(bool loop) {
   auto state = std::make_shared<Conditional>();

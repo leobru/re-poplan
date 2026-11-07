@@ -230,9 +230,13 @@ private:
   void binary(int);
   void primary();
   void postfix();
+  void postfix_dot();
   void arguments(std::string, bool = false);
   void assignment();
+  void assignment_target();
   void assigned(std::string);
+  void dotted_update();
+  void dotted_update_after(std::string);
   void conditional(bool = false);
   void function(bool = false, bool = false);
   void declaration();

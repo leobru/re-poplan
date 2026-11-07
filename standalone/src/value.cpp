@@ -261,8 +261,9 @@ std::vector<Token> tokenize(const std::string &source, const std::string &name,
         t.text += char(chars[pos]);
         advance();
       }
-      if (pos < chars.size() && chars[pos] == ':' &&
-          (t.text == "2" || t.text == "8")) {
+      if (pos + 1 < chars.size() && chars[pos] == ':' &&
+          digit(chars[pos + 1]) && (t.text == "2" || t.text == "8")) {
+        // Require a digit after the base marker so 2::3 is cons, not 2:.
         t.text += ':';
         advance();
         while (pos < chars.size() && digit(chars[pos])) {

@@ -1,6 +1,6 @@
 # Standalone native POPLAN: remaining work
 
-Status: 2026-11-06. Applies to `standalone/poplan-native`, relative to documented
+Status: 2026-11-07. Applies to `standalone/poplan-native`, relative to documented
 POPLAN language behavior and the BESM-6 reference implementation. It does **not**
 list missing features in historical POPLAN or untranslated hybrid-backend code.
 
@@ -25,13 +25,18 @@ currently recorded gaps, not a guarantee that no undiscovered defects remain.
   alone is insufficient evidence. Standalone currently rejects it explicitly.
 - [ ] **Mutable syntax and special functions:** finish the contracts represented
   by IDENTPROPS (`IDENTP`) and OPERATION (`OPERAT`). Built-in syntax recognition,
-  macros and operator precedence declarations work; the full protocol remains
-  unresolved. Distinguish language-visible facilities from BESM-only function
-  representations before deciding what must be ported.
-- [ ] **Syntax identifier classification:** establish and implement remaining
-  syntax-word properties, protection and declaration/cancellation rules, including
-  interactions with IDENTPROPS, macros and operator declarations. Ordinary resident
-  function/value protection is already implemented; do not list it as missing.
+  macros and operator precedence declarations work; the full mutable
+  special-function protocol remains unresolved. Distinguish language-visible
+  facilities from BESM-only function representations before deciding what must
+  be ported.
+- [x] **IDENTPROPS classification (completed 2026-11-07):** historical probes
+  establish SYNTAX for syntax/punctuation (including `->`), OPERATION levels for
+  `+` (5) and `::`/`<>`/`FNCOMP` (2), MACRO for macros, and UNDEF for unbound and
+  class-name words such as INTEGER. Dotted read chains (`A.TL.HD`) and dotted
+  assignment targets (`9->A.HD`, `8->L.TL.HD`) work; compiler tasks that consume a
+  token before a possible NeedList are split so restarts cannot drop `->` or `.`.
+  Remaining: mutable IDENTPROPS/OPERATION special-function protocol, protection
+  and declaration/cancellation edge rules beyond ordinary resident protection.
 - [ ] **Other uses of `&`:** exponent-separator syntax works. Establish whether
   additional language uses are required, then implement and test those established
   by evidence; do not invent uses from generic POP-2 grammars.

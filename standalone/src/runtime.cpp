@@ -11,9 +11,12 @@ Runtime::Runtime(std::istream &i, std::ostream &o, std::ostream &e,
   auto nil = make(Object::Kind::word);
   object(nil).text = "NIL";
   words_["NIL"] = nil;
+  // Internal ranks grow with binding tightness. IDENTPROPS reports
+  // (100 - rank) / 10, matching historical OPERATION levels: :: <> FNCOMP = 2,
+  // ! = 3, * / // = 4, + - = 5, comparisons = 7.
   operators = {{"=", 30},  {"/=", 30}, {"<", 30},  {">", 30},      {"=<", 30},
-               {">=", 30}, {"::", 40}, {"<>", 40}, {"FNCOMP", 40}, {"+", 50},
-               {"-", 50},  {"*", 60},  {"/", 60},  {"//", 60},     {"!", 70}};
+               {">=", 30}, {"+", 50},  {"-", 50},  {"*", 60},      {"/", 60},
+               {"//", 60}, {"!", 70},  {"::", 80}, {"<>", 80},     {"FNCOMP", 80}};
   register_primitives();
   empty_source_function = primitive("@EOF");
   bind("@NEG", primitive("@NEG"));

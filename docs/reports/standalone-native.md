@@ -440,3 +440,18 @@ historical/raw printer comparisons, historical/hybrid trivial checks and fresh
 example/game comparisons with the saved historical outputs. Whitespace checks
 pass; each final command exit status was checked. The reference backends were
 not changed, and earlier measurements remain intact.
+
+## IDENTPROPS and dotted assignment — 2026-11-07
+
+Instruction-only/original-image and dispak probes establish IDENTPROPS results
+for syntax words (`SYNTAX`, including `->`), operators (`+` → 5, `::`/`<>`/
+`FNCOMP` → 2), unbound names and class words (`UNDEF`). Dotted reads
+(`A.HD`, `A.TL.HD`) and dotted stores (`9->A.HD`, `8->L.TL.HD`) match that
+baseline.
+
+The compiler bug was NeedList restart safety: a task that consumed `->` or `.`
+and then peeked the next token could be replayed after the token was gone,
+turning `1->A` into a load of `A` and breaking dotted destinations. Arrow
+consumption, destination parsing, postfix selectors and dotted-update
+continuations are now separate resumable tasks. Conformance covers the
+IDENTPROPS table, dotted read/assign and parenthesized `::` lists.

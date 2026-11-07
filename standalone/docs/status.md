@@ -1,6 +1,6 @@
 # Standalone implementation status
 
-Date: 2026-11-06. The implementation lives entirely in this directory. Existing
+Date: 2026-11-07. The implementation lives entirely in this directory. Existing
 machine and compatibility-native code remains independent. This work supersedes
 the legacy representation/accounting requirements only for this new executable.
 
@@ -12,7 +12,7 @@ the legacy representation/accounting requirements only for this new executable.
 | Dictionary | Interned words, separate identifier records, six-character significance, aliases, mutable cells; CANCEL preserves old compiled bindings | Collision, redeclaration, dynamic restoration, REFOF and retired-identifier collection tests |
 | Functions | Explicit VM frames, local/result parameters, recursion, dynamic helper lookup, shared captured cells | Function/nested fixtures, depth 1000, canonical Man-or-Boy K=10 = -67 |
 | Storage | Stable handles; tracing collector marks programs, active/saved/captured cells and object graphs; cyclic collection | Rooted and unreachable cycle tests; collection during Man-or-Boy |
-| Compiler | Explicit resumable tasks; literals, assignments, computed calls, conditionals, loops, labels, returns, partials, operators and macros | Language fixture, every-byte split tests with GC, example library |
+| Compiler | Explicit resumable tasks; literals, assignments (including dotted targets), computed calls, conditionals, loops, labels, returns, partials, operators and macros | Language fixture, dotted read/assign cases, every-byte split tests with GC, example library |
 | Generated functions | Partial application/composition, updaters, records, strips, arrays including supplied storage callbacks | Standard-function fixture, nominal class/width tests, custom initializer test |
 | Readers | Resumable ITEMREAD/LISTREAD/NUMBERREAD; macros, NONMAC, quoted-word markers, doubled string quotes, Unicode character literals | Signed bounds, nested lists, supplier timing and split-input tests |
 | Runtime source | Authoritative PROGLIST/NEXTCH; typed POPVAL/MACRESULTS, interleaved COMPILE, generic CARRYON, source loading | Source replacement/chaining/cursor mutation; POPVAL identity/preservation; supplier ordering; libraries |

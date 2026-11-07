@@ -73,7 +73,7 @@ boundaries, not fallback paths.
 | `01670` | `GENOUT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01674` | `HD` | Implemented; audit open | Requires a nonempty list link. An ordinary pair is rejected before an update; NIL is an empty-list failure. Improper `CONS(1,2)` is accepted. |
 | `01700` | `IDENTF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01704` | `IDENTP` | Partial | Built-in syntax, macros and operators; full mutable special-function protocol absent. |
+| `01704` | `IDENTP` | Partial | Syntax words and punctuation report SYNTAX; macros MACRO; operators their OPERATION level; unbound and class-name words UNDEF. Full mutable special-function protocol absent. |
 | `01710` | `INCHAR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01714` | `INIT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01720` | `INITC` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |

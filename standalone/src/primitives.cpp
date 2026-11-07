@@ -768,18 +768,30 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     return;
   }
   if (name == "IDENTP") {
+    // Historical IDENTPROPS: syntax words and punctuation report SYNTAX,
+    // macros report MACRO, operators report their OPERATION level, cancelled
+    // or never-declared words report UNDEF, and class-name words such as
+    // INTEGER report UNDEF even though the runtime binds them for DATAWORD.
     auto &o = get(pop(), Object::Kind::word);
     static const std::set<std::string> syntax = {
-        "VARS", "FUNCTI", "IF",    "ELSE",   "ELSEIF", "CLOSE",
-        "END",  "LAMBDA", "MACRO", "FORALL", "LOOPIF", "RETURN",
-        "GOTO", "CANCEL", "NONOP", "NONMAC", "GOON"};
+        "VARS",   "FUNCTI", "IF",     "ELSE",   "ELSEIF", "CLOSE",  "END",
+        "LAMBDA", "MACRO",  "FORALL", "LOOPIF", "RETURN", "GOTO",   "CANCEL",
+        "NONOP",  "NONMAC", "GOON",   "OPERAT", "SECTIO", "ENDSEC", "SWITCH",
+        "AND",    "OR",     "THEN",   "EXIT",   "COMMEN", "&",      "(",
+        ")",      "(%",     "%)",     ".",      ",",      ";",      "[",
+        "]",      "[%",     "%]",     ":",      "->",     "=>",     "\""};
+    static const std::set<std::string> class_names = {
+        "REAL", "INTEGE", "WORD", "STRIP", "CSTRIP", "PAIR", "REF", "SYNTAX"};
     if (syntax.count(o.text))
       push(word("SYNTAX"));
     else if (macros.count(o.text))
       push(word("MACRO"));
+    else if (operators.count(o.text))
+      push(Value(std::int64_t((100 - operators.at(o.text)) / 10)));
+    else if (!o.binding_record.object() || class_names.count(o.text))
+      push({});
     else
-      push(Value(std::int64_t(
-          operators.count(o.text) ? (100 - operators[o.text]) / 10 : 0)));
+      push(Value(std::int64_t(0)));
     return;
   }
   if (name == "APPLIS" || name == "MAPLIS") {
