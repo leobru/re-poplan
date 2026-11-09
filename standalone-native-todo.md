@@ -85,10 +85,12 @@ syntax needs additional documentation or recovery from compiler listings/probes.
   detection and an 8192 host depth cap approximating hist «structure too deep»
   on non-terminating FNTOLIST. Normal/lazy/cyclic LENGTH and sharing cases remain
   covered. Residual: reentrant supplier edge combinations with printers.
-- [ ] **Source/compiler combinations:** extend edge coverage for quote markers,
-  macros, NONMAC, mutable operators, POPVAL/MACRESULTS, COMPILE/CARRYON and source
-  replacement/chaining, especially combinations with suspension, cancellation,
-  recovery and collection. These features are implemented, not wholesale omissions.
+- [x] **Source/compiler combinations (completed 2026-11-09):** POPVAL/PROGLIST
+  nested lists expand as `[` … `]` tokens so `MACRESULTS([8])` inside a program
+  list matches hist. POPVAL of VARS/FUNCTION/IF/MACRO fragments, dual POPVAL,
+  preserved program lists, MACRO/NONMAC/MACRESULTS, mutable OPERATION+CANCEL, and
+  existing COMPILE/CARRYON session splits are covered. Residual: quote-marker
+  oddities and COMPILE-of-string forms that hist also rejects (04400).
 - [x] **Output consumer rebinding (completed 2026-10-15):** each output character
   reloads CUCHOUT, so a consumer can redirect subsequent characters, including
   during nested printing and GENOUT. Tests cover all output primitives, invalid
@@ -206,7 +208,7 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **226 conformance checks**, **4/4 standalone tests**.
+Current verified baseline: **230 conformance checks**, **4/4 standalone tests**.
 Sanitizer suite not rerun this increment; machine backends were not modified.
 These results establish the tested baseline, not completeness.
 

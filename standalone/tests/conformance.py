@@ -50,6 +50,12 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('VARS OPERATION 5 PLUS;NONOP + -> NONOP PLUS;2 PLUS 3*4=>', '** 14\n')
     run('MACRO TWICE;ITEMREAD()->X;MACRESULTS([%X,",",X%]) END;TWICE 7=>', '** 7, 7\n')
     run('POPVAL([FUNCTION DOUBLE X;X*2 END;DOUBLE(21)=>;GOON]);', '** 42\n')
+    # Nested lists in POPVAL/PROGLIST source expand as [ ... ] tokens (MACRESULTS).
+    run('POPVAL([MACRO M; MACRESULTS([8]) END; M=>; GOON]);', '** 8\n')
+    run('POPVAL([VARS X; 1->X; X=>; GOON]);', '** 1\n')
+    run('POPVAL([IF 1=1 THEN 2 ELSE 3 CLOSE=>; GOON]);', '** 2\n')
+    run('[%1, "=>", ";", "GOON"%]->L; POPVAL(L); L=>; POPVAL(L)=>',
+        '** 1\n** [1 => ; GOON]\n** 1\n**\n')
     run('VARS R;RECORDFNS("POINT",[0 8])->Y->X->D->C;C(10,20)->R;21->Y(R);DATALIST(R)=>', '** [10 21]\n')
     run('RECORDFNS("POINT",[1])->X->D->C;C(2);\n4=>', '** 4\n', 'component out of range')
     run('STRIPFNS("BYTE",8)->S->I;I(1)->B;256->S(1,B);\n4=>', '** 4\n', 'component out of range')

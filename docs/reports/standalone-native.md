@@ -456,6 +456,14 @@ consumption, destination parsing, postfix selectors and dotted-update
 continuations are now separate resumable tasks. Conformance covers the
 IDENTPROPS table, dotted read/assign and parenthesized `::` lists.
 
+## POPVAL nested-list source tokens — 2026-11-09
+
+`POPVAL([MACRO M; MACRESULTS([8]) END; M=>; GOON])` failed natively because the
+inner `[8]` became a nested list value in PROGLIST and `text_tokens` rejected it.
+Historical POPLAN reconstructs nested lists as `[` … `]` source tokens. Native
+now expands list_link/NIL elements that way and splices multi-token expansions
+back into PROGLIST. Probes: `artifacts/standalone-source/`.
+
 ## Section 2 component/COPY/LENGTH audits — 2026-11-09
 
 DATALIST/APPDATA now reject non-partial/non-composition functions (hist 10170),

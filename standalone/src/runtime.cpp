@@ -1,5 +1,6 @@
 #include "pop/runtime.hpp"
 #include <algorithm>
+#include <functional>
 #include <limits>
 #include <sstream>
 #include <unordered_set>
@@ -921,6 +922,22 @@ Token Runtime::peek_source(std::size_t offset) {
                : std::holds_alternative<Undefined>(node.fields[0].data)))
         return *node.source_token;
       auto tokens = text_tokens(list({node.fields[0]}), "<PROGLIST>");
+      tokens.pop_back(); // drop end marker
+      if (tokens.empty())
+        return {};
+      // Nested lists expand to several tokens; splice the remainder into the
+      // unread PROGLIST tail so subsequent peeks see 8 and ] after [.
+      if (tokens.size() > 1 && offset == 0) {
+        auto rest = node.fields[1];
+        for (auto it = tokens.rbegin(); it != tokens.rend(); ++it) {
+          auto value = token_value(*it);
+          it->value = value;
+          rest = pair(value, rest);
+          object(rest).source_token = *it;
+        }
+        bind("PROGLIST", rest);
+        return peek_source(0);
+      }
       return tokens.front();
     }
     cursor = node.fields[1];
@@ -971,7 +988,7 @@ Value Runtime::token_value(Token t) {
 std::vector<Token> Runtime::text_tokens(Value v, const std::string &name) {
   std::vector<Token> tokens;
   Location location{name, 1, 1};
-  for (auto value : items(v)) {
+  std::function<void(Value)> append = [&](Value value) {
     if (value.numeric())
       tokens.emplace_back(Token::Kind::number, number_text(value), location,
                           value);
@@ -979,19 +996,32 @@ std::vector<Token> Runtime::text_tokens(Value v, const std::string &name) {
       tokens.emplace_back(Token::Kind::string, object(value).text, location,
                           value);
     else if (value.object() && object(value).kind == Object::Kind::word) {
-      auto name = object(value).text;
+      auto text = object(value).text;
       // Recovered libraries contain padded punctuation words such as "-> ".
-      while (!name.empty() && name.back() == ' ')
-        name.pop_back();
-      while (!name.empty() && name.front() == ' ')
-        name.erase(0, 1);
-      auto chars = decode(name);
+      while (!text.empty() && text.back() == ' ')
+        text.pop_back();
+      while (!text.empty() && text.front() == ' ')
+        text.erase(0, 1);
+      auto chars = decode(text);
       auto c = chars.empty() ? 0 : chars.front();
       bool alphabetic = (c >= 'A' && c <= 'Z') || c == '_' || c >= 128;
       tokens.emplace_back(alphabetic ? Token::Kind::word : Token::Kind::symbol,
-                          name, location);
+                          text, location);
+    } else if (value.nil_value() || list_link(value)) {
+      // Nested lists in PROGLIST/POPVAL source expand as [ ... ] token text,
+      // matching historical reconstruction of MACRESULTS([8]) and similar forms.
+      tokens.emplace_back(Token::Kind::symbol, "[", location);
+      ++location.column;
+      for (auto item : items(value)) {
+        append(item);
+        ++location.column;
+      }
+      tokens.emplace_back(Token::Kind::symbol, "]", location);
     } else
       throw Fault("source text requires words, numbers or strings");
+  };
+  for (auto value : items(v)) {
+    append(value);
     ++location.column;
   }
   tokens.emplace_back(Token::Kind::end, "", location);
