@@ -364,6 +364,8 @@ public:
   std::map<std::string, Value> macros;
   // Live IDENTPROPS SYNTAX spellings; CANCEL removes entries (mutable syntax).
   std::set<std::string> syntax;
+  // LENGTH stepper visit set; cleared at each LENGTH entry.
+  std::set<Handle> length_seen_;
   std::map<Handle, std::unique_ptr<Object>> objects;
   std::map<Handle, Value> cells;
   std::map<Handle, Handle> active;

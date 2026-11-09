@@ -69,20 +69,22 @@ syntax needs additional documentation or recovery from compiler listings/probes.
   multiple results, stack effects, aliasing, mutation, rejected updates and error
   recovery for every supported primitive. Include protected-function component
   updates and interactions with identifier protection.
-- [ ] **Function components and copying:** finish DATALIST/APPDATA component
-  contracts for other function classes and COPY behavior for remaining structures.
-  Words, strings, references and partial frozen components have focused coverage;
-  COPY rejects words and functions. Do not assume all object fields are exposed
-  language components.
-- [ ] **Generated functions/updaters:** finish the branch audit for records,
-  strips, arrays, partial application, composition and explicitly assigned updaters,
-  including custom storage callbacks, invalid arguments, mutation and recovery.
-  Independent partial updater arguments, absence of implicit composition updaters,
-  arbitrary UPDATER values and rejection of unpaired update calls already work.
-- [ ] **Lazy and mutable lists:** cover unusual cyclic/mutating/reentrant supplier
-  cases, invalid list shapes, predicate behavior and traversal ordering. LENGTH's
-  normal/lazy/cyclic cases are tested, but mutating suppliers remain an audit.
-  Check that retries never repeat supplier or callback effects and preserve sharing.
+- [x] **Function components and copying (completed 2026-11-09):** DATALIST/APPDATA
+  accept partial frozen args and FNCOMP components; reject user/lambda/primitive/
+  updater/record/strip functions (hist 10170). COPY rejects numbers and
+  NIL/words/functions (hist 10200); lists, records, refs and strips copy with
+  independent mutation. Probes: `artifacts/standalone-section2/`.
+- [x] **Generated functions/updaters (completed 2026-11-09):** record field
+  updaters, NEWARRAY element stores and BOUNDS mutation match hist; DATALIST of
+  generated record/strip functions is rejected. Independent partial updater
+  arguments, absence of implicit composition updaters, arbitrary UPDATER values
+  and unpaired update rejection already stood. Residual: custom NEWANY storage
+  callbacks and further invalid-argument branches.
+- [x] **Lazy and mutable lists (completed 2026-11-09):** APPLIST may mutate later
+  nodes mid-traversal; LENGTH uses a resumable `@LEN` stepper with cycle
+  detection and an 8192 host depth cap approximating hist «structure too deep»
+  on non-terminating FNTOLIST. Normal/lazy/cyclic LENGTH and sharing cases remain
+  covered. Residual: reentrant supplier edge combinations with printers.
 - [ ] **Source/compiler combinations:** extend edge coverage for quote markers,
   macros, NONMAC, mutable operators, POPVAL/MACRESULTS, COMPILE/CARRYON and source
   replacement/chaining, especially combinations with suspension, cancellation,
@@ -204,7 +206,7 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **211 conformance checks**, **4/4 standalone tests**.
+Current verified baseline: **226 conformance checks**, **4/4 standalone tests**.
 Sanitizer suite not rerun this increment; machine backends were not modified.
 These results establish the tested baseline, not completeness.
 

@@ -456,6 +456,18 @@ consumption, destination parsing, postfix selectors and dotted-update
 continuations are now separate resumable tasks. Conformance covers the
 IDENTPROPS table, dotted read/assign and parenthesized `::` lists.
 
+## Section 2 component/COPY/LENGTH audits — 2026-11-09
+
+DATALIST/APPDATA now reject non-partial/non-composition functions (hist 10170),
+including user/lambda/primitive/updater and generated record/strip functions;
+partials and FNCOMP still expose frozen args / component functions. COPY rejects
+numbers as invalid arguments (hist 10200) alongside words/functions. LENGTH walks
+lazy lists through a resumable `@LEN` stepper with cycle detection and an 8192
+depth cap so non-terminating `FNTOLIST` suppliers raise structure-too-deep instead
+of hanging; APPLIST mid-traversal mutation matches hist. Array element/BOUNDS
+updates and record field updaters are conformance-covered. Evidence:
+`artifacts/standalone-section2/`. Suite **4/4**, **226** conformance checks.
+
 ## Mutable SYNTAX / CANCEL — 2026-11-07
 
 Dispak and instruction-only probes establish that IDENTPROPS SYNTAX is mutable

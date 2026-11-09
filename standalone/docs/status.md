@@ -81,14 +81,16 @@ establish POPVAL list preservation, REFOF dynamic visibility/copy/identity,
 CANCEL's separation of interned word identity from compiled bindings, and error
 variable visibility. These files are evidence, not runtime dependencies.
 
-The component audit unifies DATALIST and APPDATA for words, strings, references
-and partial functions; the underlying callable is not a frozen component.
-COPY rejects interned words instead of creating noncanonical duplicates.
+The component audit unifies DATALIST and APPDATA for words, strings, references,
+partial frozen arguments and FNCOMP components. Other function classes
+(user/lambda/primitive/updater/generated record and strip functions) are
+rejected (hist 10170); the underlying callable is not a frozen component.
+COPY rejects numbers, interned words and functions (hist 10200) and copies
+lists/records/refs/strips with independent mutation.
 APPDATA retains the snapshot semantics of the manual §7.3 example
 (`DATALIST` followed by `APPLIST`). A historical mutation probe instead observes
-later component changes during callbacks. This is an explicit standalone
-behavior difference, not historical conformance; other function classes still
-need component-layout audits.
+later component changes during callbacks — an explicit standalone difference for
+that probe, not a license to accept invalid function classes.
 
 UPDATER accepts any element as documented in §7.7, including UNDEF. Explicit
 assignment suppresses automatic updater generation; invoking a nonfunction

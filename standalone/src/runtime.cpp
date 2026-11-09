@@ -114,7 +114,12 @@ bool Runtime::list_link(Value v) const {
 std::vector<Value> Runtime::items(Value v) const {
   std::vector<Value> result;
   std::set<Handle> seen;
+  // Historical walks fault with «ВЕЛИКА ГЛУБИНА СТРУКТУР» on extreme depth /
+  // non-terminating lazy lists. A host cap approximates that protection.
+  constexpr std::size_t kMaxListDepth = 8192;
   while (!empty_list(v)) {
+    if (result.size() >= kMaxListDepth)
+      throw Fault("structure too deep");
     if (!list_link(v) || !seen.insert(v.handle()).second)
       throw Fault("finite proper list required");
     auto &o = object(v);
@@ -134,16 +139,21 @@ std::vector<Value> Runtime::data_components(Value value) const {
     empty_list(value);
   const auto &o = object(value);
   // Manual sections 7.4 and 7.7: words expose characters, partials expose
-  // frozen arguments only. APPDATA uses the same snapshot as DATALIST (7.3).
+  // frozen arguments only, compositions expose their two functions. Other
+  // function classes are rejected (hist 10170), matching APPDATA.
   if (o.kind == Object::Kind::string || o.kind == Object::Kind::word) {
     std::vector<Value> result;
     for (auto c : decode(o.text))
       result.push_back(Value(std::int64_t(c)));
     return result;
   }
-  if (o.kind == Object::Kind::function &&
-      o.function_kind == Object::FunctionKind::partial)
-    return {o.fields.begin(), o.fields.end() - 1};
+  if (o.kind == Object::Kind::function) {
+    if (o.function_kind == Object::FunctionKind::partial)
+      return {o.fields.begin(), o.fields.end() - 1};
+    if (o.function_kind == Object::FunctionKind::composition)
+      return o.fields;
+    throw Fault("invalid DATALIST/APPDATA argument");
+  }
   return data_fields(value);
 }
 Value Runtime::data_word(Value value) const {

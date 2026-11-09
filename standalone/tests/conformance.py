@@ -180,6 +180,36 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
     run('NEWARRAY([1 2 1 3],LAMBDA X Y;10*X+Y END)->A;[1 2 1 2]->BOUNDSLIST(A);A(2,1),BOUNDSLIST(A)=>', '** 13, [1 2 1 2]\n')
     run('[2 3]->B;[1]<>B->A;9->HD(B);A,TL(A)=B=>', '** [1 9 3], 1\n')
     run('DATALIST("CAT"),DATALIST(NONOP +(%1%))=>', '** [67 65 84], [1]\n')
+    # DATALIST/APPDATA: only partials and compositions among functions (hist 10170).
+    run('IDENTFN FNCOMP CONT->C; DATALIST(C)=>', '** [FUNCTI FUNCTI]\n')
+    run('FUNCTION F X; X END; DATALIST(F);\n4=>', '** 4\n',
+        'invalid DATALIST/APPDATA argument')
+    run('DATALIST(SIN);\n4=>', '** 4\n', 'invalid DATALIST/APPDATA argument')
+    run('DATALIST(UPDATER(CONT));\n4=>', '** 4\n',
+        'invalid DATALIST/APPDATA argument')
+    run('RECORDFNS("PT",[0 8])->Y->X->D->C; DATALIST(C);\n4=>', '** 4\n',
+        'invalid DATALIST/APPDATA argument')
+    run('STRIPFNS("B",8)->S->I; DATALIST(S);\n4=>', '** 4\n',
+        'invalid DATALIST/APPDATA argument')
+    run('APPDATA(SIN,IDENTFN);\n4=>', '** 4\n',
+        'invalid DATALIST/APPDATA argument')
+    # COPY rejects numbers/NIL; compounds (lists, records, refs, strips) copy.
+    run('COPY(17);\n4=>', '** 4\n', 'invalid COPY argument')
+    run('COPY(NIL);\n4=>', '** 4\n', 'COPY cannot copy an interned word')
+    run('RECORDFNS("PT",[0 8])->Y->X->D->C; C(1,2)->R; COPY(R)->R2; 9->X(R); '
+        'DATALIST(R),DATALIST(R2)=>', '** [9 2], [1 2]\n')
+    run('CONSREF(5)->R; COPY(R)->R2; 8->CONT(R); CONT(R),CONT(R2)=>', '** 8, 5\n')
+    # Mutating APPLIST and non-terminating LENGTH (hist structure-too-deep).
+    run('0->N; FUNCTION S; N+1->N; IF N>3 THEN TERMIN ELSE N CLOSE END; '
+        'FNTOLIST(S)->L; APPLIST(L, LAMBDA X; IF X=1 THEN 99->HD(TL(L)) CLOSE; X END); '
+        'L=>', '** 1, 99, 3, [1 99 3]\n')
+    run('FUNCTION S; 1 END; LENGTH(FNTOLIST(S));\n4=>', '** 4\n',
+        'structure too deep')
+    # Array update and bounds mutation.
+    run('NEWARRAY([1 2], LAMBDA; 0 END)->A; A(1),A(2)=>; 9->A(1); A(1)=>',
+        '** 1, 2, 0, 0\n** 9\n')
+    run('NEWARRAY([1 2], LAMBDA; 0 END)->A; BOUNDS(A)=>; [0 1]->BOUNDS(A); A(0)=>',
+        '** 1, 2, [1 2]\n** 0\n')
     run("DATALENGTH('λёж'),DATALENGTH(INIT(0)),DATALENGTH(INITC(4)),LENGTH(NIL),LENGTH([1 [2 3]])=>",
         '** 3, 0, 4, 0, 2\n')
     run('STRIPFNS("BYTE",8)->S->I;DATALENGTH(I(3))=>', '** 3\n')

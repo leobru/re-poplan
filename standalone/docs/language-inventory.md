@@ -51,11 +51,11 @@ boundaries, not fallback paths.
 | `01540` | `CONSRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01544` | `CONSWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01550` | `CONT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01554` | `COPY` | Implemented; audit open | Manual §6.1/7.3 and historical word probe; rejects interned words and functions, tests shallow pair sharing and distinct identity. Other structure branches remain open. |
+| `01554` | `COPY` | Implemented; audit open | Manual §6.1/7.3; rejects numbers (hist 10200), interned words and functions; copies lists/records/refs/strips with independent mutation. Further exotic structure branches remain open. |
 | `01560` | `CUCHIN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01564` | `CUCHOU` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01570` | `DATALE` | Implemented; focused type audit | Manual §6.3; strip-only component count, Unicode strings, custom strips and invalid classes tested in `tests/conformance.py`. |
-| `01574` | `DATALI` | Implemented; audit open | Manual §7.4/7.7; shared component extraction with APPDATA, Unicode characters, references and frozen arguments. Other function classes remain open. |
+| `01574` | `DATALI` | Implemented; audit open | Manual §7.4/7.7; shared with APPDATA. Accepts words/strings/refs/records/strips, partial frozen args and FNCOMP components; rejects other function classes (hist 10170). |
 | `01600` | `DATAWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01604` | `DEST` | Implemented; audit open | Requires a nonempty list link. Ordinary pairs, NIL, and non-lists fail before a result is pushed. |
 | `01610` | `DESTPA` | Implemented; audit open | Accepts list links and ordinary pairs. NIL and non-pairs fail. |
@@ -165,7 +165,7 @@ boundaries, not fallback paths.
 | `02450` | `VARS` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02454` | `"` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02460` | `COMMEN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `02464` | `APPDAT` | Implemented; audit open | Manual §7.3 DATALIST/APPLIST example; partial arguments exclude callable, empty partial and Unicode/reference cases tested. Callback mutation uses a snapshot; historical implementation reads live components. |
+| `02464` | `APPDAT` | Implemented; audit open | Same acceptance/rejection as DATALIST (hist 10170). Callback mutation uses a DATALIST snapshot; historical implementation reads live components — explicit standalone difference. |
 | `02470` | `APPLIS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02474` | `APPLY` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02500` | `ARCTAN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -176,7 +176,7 @@ boundaries, not fallback paths.
 | `02524` | `EQUAL` | Implemented; audit open | Walks list links only. Distinct ordinary pairs compare false; a shared proper sublist compares true. Re-entering a link still being walked is a recoverable error, as on dispak. Empty dynamic links compare equal to NIL. Strings compare by text. Other compounds compare by identity. |
 | `02530` | `EXP` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02534` | `FNCOMP` | Implemented; audit open | Historical updater probes and `tests/conformance.py`: independent frozen partial updaters, no implicit composition updater, explicit replacement. Further branches remain open. |
-| `02540` | `LENGTH` | Implemented; audit open | Manual §7.3; separate list traversal, NIL/nested lists, memoized supplier calls and cyclic-list rejection tested in `tests/conformance.py`; mutating suppliers still need audit. |
+| `02540` | `LENGTH` | Implemented; audit open | Manual §7.3; resumable `@LEN` stepper with cycle detection and 8192 depth cap (hist structure-too-deep on non-terminating FNTOLIST). NIL/nested/lazy/cyclic cases tested; APPLIST mid-traversal mutation covered. |
 | `02544` | `LIBRAR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02550` | `LISTRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02554` | `LOG` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |

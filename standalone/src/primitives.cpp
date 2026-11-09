@@ -526,7 +526,10 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "COPY") {
     auto v = pop();
-    if (v.object() && object(v).source_forward.object())
+    // Hist 10200 rejects numbers, NIL/words and functions; compounds copy.
+    if (!v.object())
+      throw Fault("invalid COPY argument");
+    if (object(v).source_forward.object())
       empty_list(v);
     auto &o = object(v);
     if (o.kind == Object::Kind::word)
@@ -543,8 +546,28 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     return;
   }
   if (name == "LENGTH") {
-    // Manual section 7.3: count list elements, forcing lazy tails.
-    push(Value(std::int64_t(items(pop()).size())));
+    // Manual section 7.3: count list elements, forcing lazy tails. Use a
+    // stepper so NeedList retries resume the count instead of restarting
+    // (infinite FNTOLIST would otherwise never hit the depth cap).
+    length_seen_.clear();
+    schedule(generated("@LEN", {pop(), Value(std::int64_t(0))}), {});
+    return;
+  }
+  if (name == "@LEN") {
+    constexpr std::size_t kMaxListDepth = 8192;
+    auto list = fn->fields[0];
+    auto count = integer(fn->fields[1]);
+    if (empty_list(list)) {
+      push(Value(count));
+      return;
+    }
+    if (!list_link(list))
+      throw Fault("finite proper list required");
+    if (static_cast<std::size_t>(count) >= kMaxListDepth)
+      throw Fault("structure too deep");
+    if (!length_seen_.insert(list.handle()).second)
+      throw Fault("finite proper list required");
+    schedule(generated("@LEN", {object(list).fields[1], Value(count + 1)}), {});
     return;
   }
   if (name == "DATALE") {

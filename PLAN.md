@@ -22,9 +22,9 @@ current handoff. Next steps, in order:
    DATALIST component extraction; COPY rejects interned words and functions.
    UPDATER supports arbitrary elements and explicit clearing; partial updaters
    capture independent arguments, and compositions require explicit updaters. The callback
-   mutation difference is recorded in the status matrix. Mutable SYNTAX/CANCEL
-   and SECTION/ENDSEC image stubs are recorded; juxtaposition-after-demotion
-   remains an audit.
+   mutation difference is recorded in the status matrix. Mutable SYNTAX/CANCEL,
+   SECTION/ENDSEC stubs, and section-2 DATALIST/COPY/LENGTH/updater audits are
+   recorded; juxtaposition-after-demotion and remaining ledger audits stay open.
 4. **In progress:** [184-resident ledger](standalone/docs/language-inventory.md),
    byte-split/GC/interactive tests and historical semantic probes are in place.
    Complete per-entry branch audits and remaining diagnostic/input contracts
