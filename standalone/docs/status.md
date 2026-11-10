@@ -41,9 +41,10 @@ an assertion that each implemented primitive has complete branch coverage.
 
 1. **Syntax and special functions.** SWITCH is a 1-based label jump
    (`N SWITCH L1 … Lk`). SECTION/ENDSEC match this image's stubs (hist 12222 /
-   unmatched closer). Mutable SYNTAX is a live table: CANCEL demotes keywords
-   and IDENTPROPS; CANCEL NONMAC clears macros; there is no IDENTPROPS updater.
-   Residual audit: juxtaposition/"no separator" after demotion.
+   unmatched closer).    Mutable SYNTAX is a live table: CANCEL demotes keywords
+   and IDENTPROPS; plain CANCEL keeps macro VALOF/expansion; CANCEL NONMAC
+   clears macros; MEANING is a separate word component; there is no IDENTPROPS
+   updater. Residual audit: juxtaposition/"no separator" after demotion.
 2. **Diagnostic details.** Modern automatic ERRFUN calls receive the message
    string and integer code **1**, also stored in NUMERR. Callback replacement
    and nested recovery work, but historical error numbers, offending-object
@@ -65,7 +66,9 @@ an assertion that each implemented primitive has complete branch coverage.
    conformance includes decimal/EXP formatting, BOUNDSLIST updates, stable
    UPDATER identity, REFOF, word/partial introspection and character literals,
    and separate LENGTH list traversal / DATALENGTH strip component counts with
-   invalid-type recovery. Corpus success alone does not close those audits.
+   invalid-type recovery. Focused hist audits now cover MEANING/VALOF, 40-bit
+   LOG*, word CHAR/CONS/DEST rules, APPLY stack use and BOUNDSLIST expand;
+   remaining ledger rows still need per-branch closure.
 5. **Host accounting.** COREUSED remains an approximate host-storage estimate.
    Historical memory budgets, machine code, encoding conversions and monitor
    handoff are intentionally excluded, with explicit errors for unsupported

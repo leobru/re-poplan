@@ -166,6 +166,8 @@ struct Object {
   std::map<Handle, Handle> environment;
   FunctionKind function_kind = FunctionKind::user;
   Value property, updater, type;
+  // Word MEANING component (§7.4); independent of the identifier VALOF cell.
+  Value meaning;
   Value referent, binding_reference, binding_record;
   std::optional<Token> source_token;
   Value source_forward;

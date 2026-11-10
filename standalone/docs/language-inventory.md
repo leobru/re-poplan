@@ -37,19 +37,19 @@ boundaries, not fallback paths.
 | `01450` | `=` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01454` | `::` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01460` | `<>` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01464` | `ATOM` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01464` | `ATOM` | Implemented; audit open | True for numbers/NIL/words/functions; false for lists and ordinary pairs. |
 | `01470` | `BACK` | Implemented; audit open | Accepts list links and ordinary pairs, including updates. Non-pairs fail. Further component edges remain open. |
-| `01474` | `BOOLAN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01500` | `BOOLOR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01504` | `BOUNDS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01474` | `BOOLAN` | Implemented; audit open | Truth via `.truth()`; non-zero/non-nil compounds count as true. |
+| `01500` | `BOOLOR` | Implemented; audit open | Truth via `.truth()`; non-zero/non-nil compounds count as true. |
+| `01504` | `BOUNDS` | Implemented; audit open | Shrink/expand updates match hist; expanding past allocated strip storage is allowed and fails on later access. |
 | `01510` | `CHARIN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01514` | `CHAROU` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01520` | `CHARWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01520` | `CHARWO` | Implemented; audit open | Args are word then index; slots 1..6 with zero-fill past length; index outside 1..6 faults; empty word rejected. |
 | `01524` | `COMPIL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01530` | `CONS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01534` | `CONSPA` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01540` | `CONSRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01544` | `CONSWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01544` | `CONSWO` | Implemented; audit open | Length 0 rejected; chars masked to 8 bits; more than 6 chars truncated; empty-word result rejected. |
 | `01550` | `CONT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01554` | `COPY` | Implemented; audit open | Manual §6.1/7.3; rejects numbers (hist 10200), interned words and functions; copies lists/records/refs/strips with independent mutation. Further exotic structure branches remain open. |
 | `01560` | `CUCHIN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -60,8 +60,8 @@ boundaries, not fallback paths.
 | `01604` | `DEST` | Implemented; audit open | Requires a nonempty list link. Ordinary pairs, NIL, and non-lists fail before a result is pushed. |
 | `01610` | `DESTPA` | Implemented; audit open | Accepts list links and ordinary pairs. NIL and non-pairs fail. |
 | `01614` | `DESTRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01620` | `DESTWO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01624` | `ERASE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01620` | `DESTWO` | Implemented; audit open | Pushes characters then count; empty word rejected (hist 04610). |
+| `01624` | `ERASE` | Implemented; audit open | Pops one stack value; empty-stack ERASE underflows. |
 | `01630` | `ERRFUN` | Partial | VM callback and nested recovery implemented; modern message/code 1, historical numbers/offending-object/suppression contract not complete. |
 | `01634` | `FALSE` | Implemented; audit open | `src/runtime.cpp` bootstrap; type/value conformance tests. |
 | `01640` | `FNPART` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -72,12 +72,12 @@ boundaries, not fallback paths.
 | `01664` | `FROZVA` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01670` | `GENOUT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01674` | `HD` | Implemented; audit open | Requires a nonempty list link. An ordinary pair is rejected before an update; NIL is an empty-list failure. Improper `CONS(1,2)` is accepted. |
-| `01700` | `IDENTF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01700` | `IDENTF` | Implemented; audit open | Identity function; no updater. |
 | `01704` | `IDENTP` | Implemented; audit open | Live `Runtime::syntax` reports SYNTAX; macros MACRO; operators their OPERATION level; unbound and class-name words UNDEF. No IDENTPROPS updater on this image. CANCEL demotion covered; juxtaposition-after-demotion audit open. |
 | `01710` | `INCHAR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01714` | `INIT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01720` | `INITC` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `01724` | `INTOF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01724` | `INTOF` | Implemented; audit open | Requires a real; floors toward -∞; overflow faults. Integers rejected (hist 14000). |
 | `01730` | `ISCOMP` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01734` | `ISFUNC` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01740` | `ISINTE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -87,33 +87,33 @@ boundaries, not fallback paths.
 | `01760` | `ISWORD` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01764` | `ITEMRE` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `01770` | `JUMPOU` | Excluded host interface | 12022 listing uses console/monitor extracodes; standalone reports unsupported historical monitor handoff. |
-| `01774` | `LOGAND` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02000` | `LOGNOT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02004` | `LOGOR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02010` | `LOGSHI` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `01774` | `LOGAND` | Implemented; audit open | Unsigned 40-bit with non-negative integer args; negatives fault (hist 14630). |
+| `02000` | `LOGNOT` | Implemented; audit open | Unsigned 40-bit complement; `LOGNOT(0)=2^40-1`; negatives fault (hist 14620). |
+| `02004` | `LOGOR` | Implemented; audit open | Unsigned 40-bit with non-negative integer args; negatives fault (hist 14640). |
+| `02010` | `LOGSHI` | Implemented; audit open | Unsigned 40-bit value; shift magnitude >= 40 yields 0; negative values fault (hist 14600). |
 | `02014` | `MACRES` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02020` | `MAPLIS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02024` | `MEANIN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02020` | `MAPLIS` | Implemented; audit open | Common-list links only (hist 12020); ordinary pairs rejected before callbacks. |
+| `02024` | `MEANIN` | Implemented; audit open | Word-object component independent of VALOF (manual 7.4). Defaults UNDEF; CANCEL does not clear it; writable on residents such as SIN. |
 | `02030` | `NEWANY` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02034` | `NEWARR` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02040` | `NEXTCH` | Implemented; audit open | Authoritative remaining source chains; test source replacement and chaining. |
 | `02044` | `NIL` | Implemented; audit open | `src/runtime.cpp` bootstrap; type/value conformance tests. |
 | `02050` | `NL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02054` | `NOT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02054` | `NOT` | Implemented; audit open | Logical negation of `.truth()`; NIL/compounds follow BOOLAND rules. |
 | `02060` | `NULL` | Implemented; audit open | True for NIL and an empty dynamic link. False for a nonempty link, including an improper one. Pairs, numbers, and other non-lists raise an error. |
 | `02064` | `PARTAP` | Implemented; audit open | Historical updater probes and `tests/conformance.py`: independent frozen partial updaters, no implicit composition updater, explicit replacement. Further branches remain open. |
 | `02070` | `POPMES` | Modern replacement | Console and UTF-8 host files; historical device descriptors rejected. |
-| `02074` | `POPVAL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02074` | `POPVAL` | Implemented; audit open | Nested lists and word-quote markers (`["X"]` LENGTH 3) reconstruct as source tokens; MEANING/VALOF fragments covered under byte-split. |
 | `02100` | `PR` | Implemented; audit open | Historical `07704..07727`, `10025..10030`: streaming list/string order and non-list DATAWORD labels; plain pairs, references, mutable classes, INITC, suspension/GC and error prefixes tested. Further branches remain open. |
 | `02104` | `PRINT` | Implemented; audit open | Uses the resumable PR task path and retains the supplied value. Standard-function and callback corpus; remaining PR contracts apply. |
 | `02110` | `PRREAL` | Implemented; audit open | Decimal field width and EXP significant precision; modern IEEE rendering. |
 | `02114` | `PROGLI` | Implemented; audit open | Authoritative list cursor shared by compiler/readers, with in-place cursor mutation and deferred input. |
 | `02120` | `PRSTRI` | Implemented; audit open | Historical `07773..10014`: accepts literal strings/built-in INITC, rejects other classes before output/forcing; progressive Unicode component reads, mutation, suspension/GC and recovery tested. |
-| `02124` | `REALOF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02124` | `REALOF` | Implemented; audit open | Requires an integer; reals rejected (hist 14020). |
 | `02130` | `RECORD` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02134` | `SAMEDA` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02140` | `SETPOP` | Implemented; audit open | Explicit and automatic reset preserve active variable values and restore standard source/output. Nested/source recovery branches need further audit. |
-| `02144` | `SIGN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02144` | `SIGN` | Implemented; audit open | -1/0/1 for numbers including -0.0; non-numbers fault (hist 10130). |
 | `02150` | `SP` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02154` | `STACKL` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02160` | `STRIPF` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
@@ -140,7 +140,7 @@ boundaries, not fallback paths.
 | `02304` | `=>` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02310` | `&` | Implemented; audit open | Numeric exponent separator with `$`; IDENTPROPS SYNTAX. No other language use established against the original image. |
 | `02314` | `AND` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
-| `02320` | `CANCEL` | Implemented; audit open | Separate identifier records preserve old compiled bindings while word interning/VALOF use the new binding. Split/GC tests and historical probe. Restricted to top-level compilation. |
+| `02320` | `CANCEL` | Implemented; audit open | Clears identifier VALOF binding except for live macros (plain CANCEL keeps VALOF/expansion); never clears word MEANING. CANCEL NONMAC drops macros+binding. SYNTAX/OPERATION demotion covered. |
 | `02324` | `CLOSE` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02330` | `ELSE` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02334` | `ELSEIF` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
@@ -166,11 +166,11 @@ boundaries, not fallback paths.
 | `02454` | `"` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02460` | `COMMEN` | Implemented; audit open | `src/compiler.cpp` / lexer; language fixture and split compiler tests. |
 | `02464` | `APPDAT` | Implemented; audit open | Same acceptance/rejection as DATALIST (hist 10170). Callback mutation uses a DATALIST snapshot; historical implementation reads live components — explicit standalone difference. |
-| `02470` | `APPLIS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02474` | `APPLY` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02470` | `APPLIS` | Implemented; audit open | Common-list links only (hist 12020); ordinary pairs rejected; mid-traversal mutation covered. |
+| `02474` | `APPLY` | Implemented; audit open | Stack-top function applied to remaining stack args (`2,3,+,APPLY()`); parenthesized non-function top faults. |
 | `02500` | `ARCTAN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02504` | `CARRYO` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02510` | `COPYLI` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02510` | `COPYLI` | Implemented; audit open | Finite proper lists only; ordinary pairs rejected (hist 12020). |
 | `02514` | `COREUS` | Modern replacement | Returns unspecified budget 0 and estimated host bytes; no historical accounting. |
 | `02520` | `COS` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02524` | `EQUAL` | Implemented; audit open | Walks list links only. Distinct ordinary pairs compare false; a shared proper sublist compares true. Re-entering a link still being walked is a recoverable error, as on dispak. Empty dynamic links compare equal to NIL. Strings compare by text. Other compounds compare by identity. |
@@ -184,7 +184,7 @@ boundaries, not fallback paths.
 | `02564` | `POPTIM` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02570` | `PRBIN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02574` | `PROCT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
-| `02600` | `REV` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
+| `02600` | `REV` | Implemented; audit open | Finite proper lists only; ordinary pairs rejected (hist 12020). |
 | `02604` | `SIN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02610` | `SQRT` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |
 | `02614` | `TAN` | Implemented; audit open | `src/primitives.cpp`; standard-function/conformance corpus; individual edge contracts require audit. |

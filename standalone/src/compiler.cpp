@@ -221,6 +221,8 @@ void Compiler::primary() {
     return;
   if (t.kind == Token::Kind::number || t.kind == Token::Kind::quoted ||
       t.kind == Token::Kind::string) {
+    if (t.kind == Token::Kind::quoted && t.text.empty())
+      throw Fault("empty word");
     emit(Operation::Kind::push, {}, literal(t));
     later([this] { postfix(); });
     return;
@@ -383,9 +385,22 @@ void Compiler::literal_list(
   } else if (syntax_accept("["))
     lists->emplace_back();
   else {
-    auto v = literal(take());
-    lists->back().push_back(v);
-    literal_roots_->code.push_back({Operation::Kind::push, v, {}, {}, {}});
+    // Historical list constants keep word-quote markers as elements, so
+    // ["X"] is [" X "] with LENGTH 3 and POPVAL can reconstruct a literal.
+    auto token = take();
+    auto push_literal = [&](Value v) {
+      lists->back().push_back(v);
+      literal_roots_->code.push_back({Operation::Kind::push, v, {}, {}, {}});
+    };
+    if (token.kind == Token::Kind::quoted) {
+      auto quote = runtime_.word("\"");
+      push_literal(quote);
+      if (!token.text.empty())
+        push_literal(runtime_.word(token.text));
+      push_literal(quote);
+    } else {
+      push_literal(literal(token));
+    }
   }
   later([this, lists] { literal_list(lists); });
 }

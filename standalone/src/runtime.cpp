@@ -84,6 +84,9 @@ const Object &Runtime::object(Value v) const {
 }
 Value Runtime::word(const std::string &name) {
   auto key = canonical(name);
+  // Historical empty-word literals and constructors raise 04610/14140.
+  if (key.empty())
+    throw Fault("empty word");
   auto it = words_.find(key);
   if (it != words_.end())
     return it->second;
@@ -341,13 +344,16 @@ void Runtime::assign(Value symbol, Value value) {
 void Runtime::cancel_word(Value symbol, unsigned mode) {
   const auto name = object(symbol).text;
   auto found = words_.find(name);
+  // MEANING is a word component and is never cleared by CANCEL. Plain CANCEL
+  // of a live macro keeps VALOF/expansion (hist); only CANCEL NONMAC drops
+  // the binding together with macro recognition.
+  const bool keep_macro_binding = mode != 2 && macros.count(name);
   if (found != words_.end() &&
       equal(object(found->second).binding_record, symbol)) {
-    object(found->second).binding_record = {};
+    if (!keep_macro_binding)
+      object(found->second).binding_record = {};
     operators.erase(name);
     syntax.erase(name);
-    // Plain CANCEL and CANCEL NONOP clear the binding but leave macro
-    // expansion/IDENTPROPS MACRO intact; only CANCEL NONMAC removes macros.
     if (mode == 2)
       macros.erase(name);
   } else {
@@ -983,6 +989,11 @@ Value Runtime::token_value(Token t) {
     Compiler c(*this);
     return c.literal(t);
   }
+  if (t.kind == Token::Kind::quoted && t.text.empty()) {
+    // "" is not a word value. @PHYS still needs a placeholder for the list
+    // node; Kind::quoted on source_token lets literal_list/primary decide.
+    return word("\"");
+  }
   return word(t.text);
 }
 std::vector<Token> Runtime::text_tokens(Value v, const std::string &name) {
@@ -1280,6 +1291,7 @@ void Runtime::collect() {
     pending.push_back(o.property);
     pending.push_back(o.updater);
     pending.push_back(o.type);
+    pending.push_back(o.meaning);
     mark_program(o.program);
     for (auto &[name, id] : o.environment) {
       pending.push_back(Value::object(name));

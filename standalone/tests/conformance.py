@@ -216,6 +216,74 @@ with tempfile.TemporaryDirectory(prefix="poplan-standalone-test-") as temporary:
         '** 1, 2, 0, 0\n** 9\n')
     run('NEWARRAY([1 2], LAMBDA; 0 END)->A; BOUNDS(A)=>; [0 1]->BOUNDS(A); A(0)=>',
         '** 1, 2, [1 2]\n** 0\n')
+    # BOUNDSLIST may expand beyond allocated storage; later access faults (hist).
+    run('NEWARRAY([1 2], LAMBDA X; X END)->A; [1 3]->BOUNDSLIST(A); BOUNDSLIST(A)=>',
+        '** [1 3]\n')
+    run('NEWARRAY([1 2], LAMBDA X; X END)->A; [1 3]->BOUNDSLIST(A); A(3)=>;4=>',
+        '** 4\n', 'strip subscript out of bounds')
+    # MEANING is a word component independent of VALOF (manual 7.4).
+    run('VARS X; 99->MEANING("X"); MEANING("X"), VALOF("X"), X=>',
+        '** 99, UNDEF, UNDEF\n')
+    run('VARS W; "CAT"->W; 99->MEANING(W); MEANING(W), VALOF(W), W=>',
+        '** 99, UNDEF, CAT\n')
+    run('99->MEANING("SIN"); MEANING("SIN"), VALOF("SIN")=>; SIN(0)=>',
+        '** 99, FUNCTI\n** 0.0\n')
+    run('VARS X; 17->X; 99->MEANING("X"); CANCEL X; MEANING("X"), VALOF("X")=>',
+        '** 99, UNDEF\n')
+    run('MACRO M; MACRESULTS([42]) END; 99->MEANING("M"); CANCEL M; '
+        'MEANING("M"), VALOF("M"), IDENTPROPS("M")=>; M=>',
+        '** 99, FUNCTI, MACRO\n** 42\n')
+    # LOG* are unsigned 40-bit; negatives fault; large shifts clear.
+    run('LOGAND(6,3), LOGOR(4,1), LOGSHIFT(3,2), LOGAND(LOGNOT(0),7)=>',
+        '** 2, 5, 12, 7\n')
+    run('LOGSHIFT(1,39), LOGSHIFT(1,40), LOGNOT(0)=>',
+        '** 549755813888, 0, 1099511627775\n')
+    run('LOGNOT(-1)=>;4=>', '** 4\n', 'non-negative integer required')
+    run('LOGAND(-1,1)=>;4=>', '** 4\n', 'non-negative integer required')
+    # Words: six character slots, 8-bit CONSWORD chars, no empty word.
+    run('CHARWORD("AB",1), CHARWORD("AB",2), CHARWORD("AB",3), CHARWORD("AB",6)=>',
+        '** 65, 66, 0, 0\n')
+    run('CHARWORD("AB",7)=>;4=>', '** 4\n', 'word character index out of bounds')
+    run('CONSWORD(0)=>;4=>', '** 4\n', 'invalid CONSWORD length')
+    run('CONSWORD(256,1)->W; CHARWORD(W,1)=>', '** 0\n')
+    run('"";\n4=>', '** 4\n', 'empty word')
+    # APPLY takes the function from the stack top.
+    run('2, 3, NONOP +, APPLY()=>', '** 5\n')
+    run('APPLY(IDENTFN, [7]);4=>', '** 4\n', 'function required')
+    # List constants store word-quote markers (hist LENGTH ["X"]=3).
+    run('LENGTH(["X"]), ["X"], LENGTH([""]), [""]=>',
+        '** 3, [" X "], 2, [" "]\n')
+    run('POPVAL(["X"=>;GOON]);', '** X\n')
+    run('POPVAL(["SIN"=>;GOON]);', '** SIN\n')
+    run('POPVAL([VARS W; "X"->W; 7->MEANING(W); MEANING(W), W=>; GOON]);',
+        '** 7, X\n')
+    run('POPVAL([7->MEANING("SIN"); MEANING("SIN")=>; GOON]);', '** 7\n')
+    # Resident numeric/predicate/stack/list edges (hist INTOF/REALOF/SIGN/…).
+    run('INTOF(3.7), INTOF(-1.2), REALOF(3), SIGN(-4), SIGN(0), SIGN(2.5)=>',
+        '** 3, -2, 3.0, -1, 0, 1\n')
+    run('INTOF(3)=>;4=>', '** 4\n', 'INTOF requires real')
+    run('REALOF(3.0)=>;4=>', '** 4\n', 'integer required')
+    run('SIGN([1])=>;4=>', '** 4\n', 'numeric comparison requires numbers')
+    run('ATOM(1), ATOM(NIL), ATOM([1]), ATOM(CONSPAIR(1,2)), ATOM(SIN)=>',
+        '** 1, 1, 0, 0, 1\n')
+    run('BOOLAND(1,0), BOOLOR(0,2), BOOLAND(NIL,1), NOT(0), NOT(7)=>',
+        '** 0, 1, 1, 1, 0\n')
+    run('IDENTFN(17), ISCOMPND(SIN), ISFUNC(1), DATAWORD(TRUE)=>',
+        '** 17, 1, 0, INTEGE\n')
+    run('1,2,3; ERASE(); ERASE(); STACKLENGTH()=>', '** 1, 1\n')
+    run('REV([1 2 3]), REV(NIL), COPYLIST([1 2])=>' ,
+        '** [3 2 1], [], [1 2]\n')
+    run('REV(CONSPAIR(1,2))=>;4=>', '** 4\n', 'finite proper list required')
+    run('COPYLIST(CONSPAIR(1,NIL))=>;4=>', '** 4\n',
+        'finite proper list required')
+    # MAPLIST/APPLIST reject ordinary pairs (hist 12020), like LENGTH/REV.
+    run('MAPLIST(NIL, IDENTFN)=>', '** []\n')
+    run('APPLIST(NIL, IDENTFN); 4=>', '** 4\n')
+    run('MAPLIST([1 2], LAMBDA X; X*10 END)=>', '** [10 20]\n')
+    run('MAPLIST(CONSPAIR(1,NIL), IDENTFN)=>;4=>', '** 4\n',
+        'finite proper list required')
+    run('APPLIST(CONSPAIR(1,NIL), IDENTFN)=>;4=>', '** 4\n',
+        'finite proper list required')
     run("DATALENGTH('λёж'),DATALENGTH(INIT(0)),DATALENGTH(INITC(4)),LENGTH(NIL),LENGTH([1 [2 3]])=>",
         '** 3, 0, 4, 0, 2\n')
     run('STRIPFNS("BYTE",8)->S->I;DATALENGTH(I(3))=>', '** 3\n')

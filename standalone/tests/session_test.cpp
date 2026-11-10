@@ -61,6 +61,16 @@ int main() {
     splits("FUNCTION F X;LAMBDA;X+1->X;X END END;F(1)->G;G(),G()=>",
            "** 2, 3\n");
     splits("POPVAL([2+3 =>;GOON]);4=>", "** 5\n** 4\n");
+    // List constants keep word-quote markers; POPVAL reconstructs literals.
+    splits("LENGTH([\"X\"]), LENGTH([\"\"])=>", "** 3, 2\n");
+    splits("POPVAL([\"X\"=>;GOON]);", "** X\n");
+    splits("POPVAL([VARS W; \"X\"->W; 7->MEANING(W); MEANING(W), W=>; GOON]);",
+           "** 7, X\n");
+    splits("MACRO M; MACRESULTS([8]) END; 3->MEANING(\"M\"); CANCEL M; "
+           "MEANING(\"M\"), VALOF(\"M\")=>; M=>",
+           "** 3, FUNCTI\n** 8\n");
+    splits("LOGSHIFT(1,40), LOGNOT(0)=>", "** 0, 1099511627775\n");
+    splits("2, 3, NONOP +, APPLY()=>", "** 5\n");
     splits("LISTREAD()->L; [[1 2] CAT]\nL=>", "** [[1 2] CAT]\n");
     splits("NUMBERREAD()->N; -9223372036854775808\nN=>",
            "** -9223372036854775808\n");

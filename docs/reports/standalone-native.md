@@ -464,6 +464,44 @@ Historical POPLAN reconstructs nested lists as `[` … `]` source tokens. Native
 now expands list_link/NIL elements that way and splices multi-token expansions
 back into PROGLIST. Probes: `artifacts/standalone-source/`.
 
+## Primitive contracts audit — 2026-11-09
+
+Dispak probes established several primitive contracts that native had wrong or
+only partially modelled:
+
+- **MEANING** is the word object's full-element component (manual 7.4), not an
+  alias of VALOF. It defaults to UNDEF even when VALOF holds a function/macro;
+  CANCEL never clears it; plain CANCEL of a macro keeps VALOF/expansion.
+- **LOGAND/LOGOR/LOGNOT/LOGSHIFT** are unsigned 40-bit ops; negatives fault
+  (hist 14600/14620/14630/14640); `LOGNOT(0)=2^40-1`; shift magnitude ≥ 40
+  yields 0.
+- **CHARWORD** uses slots 1..6 with zero-fill past the word length; **CONSWORD**
+  masks characters to 8 bits, rejects length 0, truncates above 6; empty words
+  are rejected (hist 04610/14140).
+- **APPLY** takes the function from the stack top (`2,3,+,APPLY()`).
+- **BOUNDSLIST** may expand past allocated strip storage; later access faults.
+
+Evidence: `artifacts/standalone-primitives/`. Suite **4/4**, **248**
+conformance checks.
+
+## MAPLIST/APPLIST pair rejection — 2026-11-09
+
+`@EACH` now requires a common-list link after the empty check, so
+`MAPLIST`/`APPLIST` reject ordinary `CONSPAIR` values before callbacks (hist
+12020), matching LENGTH/REV/COPYLIST. Focused tests also lock INTOF/REALOF/SIGN/
+ATOM/BOOL*/IDENTFN/ERASE/REV/COPYLIST edges. Suite **4/4**, **269** conformance
+checks.
+
+## Quote markers and resumption — 2026-11-09
+
+Historical list constants store word quotes as marker elements: `["X"]` has
+LENGTH 3 (`"`, `X`, `"`). Native `literal_list` now expands `Kind::quoted` the
+same way, so `POPVAL(["SIN"=>;GOON])` yields the word SIN rather than VALOF(SIN),
+and `POPVAL` can assign/MEANING through quoted words. Empty `""` remains a
+fault outside list markers (`LENGTH([""])=2`). Session byte-split+collect tests
+cover MEANING under POPVAL, macro CANCEL+VALOF, LOG*, APPLY and quote lists.
+Suite **4/4**, **253** conformance checks.
+
 ## Section 2 component/COPY/LENGTH audits — 2026-11-09
 
 DATALIST/APPDATA now reject non-partial/non-composition functions (hist 10170),
@@ -482,13 +520,14 @@ Dispak and instruction-only probes establish that IDENTPROPS SYNTAX is mutable
 via CANCEL, not via an IDENTPROPS updater (UPDATER(IDENTPROPS) is UNDEF; updates
 raise 12010). CANCEL of a syntax word demotes IDENTPROPS to UNDEF and stops
 compiler recognition (`CANCEL VARS` / `CANCEL OPERATION` / `CANCEL SWITCH`).
-Plain CANCEL of a MACRO clears MEANING but keeps IDENTPROPS MACRO and expansion;
-only `CANCEL NONMAC` removes the macro. `CANCEL NONMAC` is always a modifier;
-`CANCEL NONOP` is a modifier when a following target remains, otherwise cancels
-NONOP itself. VARS OPERATION 1..9 and VARS MACRO still install properties.
-Native keeps a live `Runtime::syntax` set wired through IDENTPROPS and keyword
-recognition. Probes: `artifacts/standalone-mutable/`. Ordinary suite **4/4**,
-including **211** conformance checks.
+Plain CANCEL of a MACRO keeps IDENTPROPS MACRO, expansion and VALOF; only
+`CANCEL NONMAC` removes the macro and binding. MEANING is a separate word
+component and is not cleared by CANCEL (corrected 2026-11-09). `CANCEL NONMAC`
+is always a modifier; `CANCEL NONOP` is a modifier when a following target
+remains, otherwise cancels NONOP itself. VARS OPERATION 1..9 and VARS MACRO still
+install properties. Native keeps a live `Runtime::syntax` set wired through
+IDENTPROPS and keyword recognition. Probes: `artifacts/standalone-mutable/`.
+Ordinary suite **4/4**, including **211** conformance checks.
 
 ## SECTION/ENDSEC image stubs — 2026-11-07
 

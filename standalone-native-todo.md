@@ -31,11 +31,12 @@ currently recorded gaps, not a guarantee that no undiscovered defects remain.
 - [x] **Mutable syntax and special functions (completed 2026-11-07):** live
   `Runtime::syntax` set backs IDENTPROPS SYNTAX and compiler keyword recognition.
   CANCEL demotes SYNTAX/operators; plain CANCEL and CANCEL NONOP keep macro
-  expansion, CANCEL NONMAC clears macros. VARS OPERATION / VARS MACRO unchanged.
-  IDENTPROPS has no updater on this image (hist 12010). Assignment to a live
-  syntax word faults. Top-level GOON is an invalid closer; GOON inside POPVAL
-  still ends the fragment. Residual: juxtaposition/"no separator" after demotion
-  (hist 04020) remains softer than the image.
+  expansion and macro VALOF, CANCEL NONMAC clears macros+binding. MEANING is a
+  separate word component and is not cleared by CANCEL. VARS OPERATION / VARS
+  MACRO unchanged. IDENTPROPS has no updater on this image (hist 12010).
+  Assignment to a live syntax word faults. Top-level GOON is an invalid closer;
+  GOON inside POPVAL still ends the fragment. Residual: juxtaposition/"no
+  separator" after demotion (hist 04020) remains softer than the image.
 - [x] **IDENTPROPS classification (completed 2026-11-07):** historical probes
   establish SYNTAX for syntax/punctuation (including `->`), OPERATION levels for
   `+` (5) and `::`/`<>`/`FNCOMP` (2), MACRO for macros, and UNDEF for unbound and
@@ -63,12 +64,16 @@ syntax needs additional documentation or recovery from compiler listings/probes.
 ## 2. Implemented behavior needing further semantic audits
 
 - [ ] **Every resident branch:** close each “Implemented; audit open” row in the
-  ledger with source evidence and focused tests. The complete spelling list is
-  included below so generic corpus coverage cannot hide an open entry.
-- [ ] **Primitive contracts:** audit argument types, bounds, argument order,
-  multiple results, stack effects, aliasing, mutation, rejected updates and error
-  recovery for every supported primitive. Include protected-function component
-  updates and interactions with identifier protection.
+  ledger with source evidence and focused tests. Progress 2026-11-09: INTOF/
+  REALOF/SIGN/ATOM/BOOL*/NOT/IDENTFN/ERASE/REV/COPYLIST plus MAPLIST/APPLIST
+  pair rejection (hist 12020) have focused conformance. Remaining spellings
+  below still need per-branch closure.
+- [x] **Primitive contracts (completed 2026-11-09):** focused hist audit closed
+  MEANING vs VALOF (word component; CANCEL never clears MEANING; plain macro
+  CANCEL keeps VALOF), unsigned 40-bit LOG*/negative rejection, CHARWORD slots
+  1..6 with zero-fill, CONSWORD 8-bit mask/length rules, empty-word rejection,
+  APPLY stack convention, and BOUNDSLIST expand-beyond-storage. Residual: many
+  other residents still carry only corpus coverage in the ledger.
 - [x] **Function components and copying (completed 2026-11-09):** DATALIST/APPDATA
   accept partial frozen args and FNCOMP components; reject user/lambda/primitive/
   updater/record/strip functions (hist 10170). COPY rejects numbers and
@@ -87,10 +92,12 @@ syntax needs additional documentation or recovery from compiler listings/probes.
   covered. Residual: reentrant supplier edge combinations with printers.
 - [x] **Source/compiler combinations (completed 2026-11-09):** POPVAL/PROGLIST
   nested lists expand as `[` … `]` tokens so `MACRESULTS([8])` inside a program
-  list matches hist. POPVAL of VARS/FUNCTION/IF/MACRO fragments, dual POPVAL,
-  preserved program lists, MACRO/NONMAC/MACRESULTS, mutable OPERATION+CANCEL, and
-  existing COMPILE/CARRYON session splits are covered. Residual: quote-marker
-  oddities and COMPILE-of-string forms that hist also rejects (04400).
+  list matches hist. Word quotes in `[…]` list constants store `" … "` markers
+  (hist LENGTH `["X"]=3`) so POPVAL reconstructs literals (`["SIN"=>]` yields
+  the word, not VALOF). POPVAL of VARS/FUNCTION/IF/MACRO/MEANING fragments,
+  dual POPVAL, preserved program lists, MACRO/NONMAC/MACRESULTS, mutable
+  OPERATION+CANCEL, and existing COMPILE/CARRYON session splits are covered.
+  Residual: COMPILE-of-string forms that hist also rejects (04400).
 - [x] **Output consumer rebinding (completed 2026-10-15):** each output character
   reloads CUCHOUT, so a consumer can redirect subsequent characters, including
   during nested printing and GENOUT. Tests cover all output primitives, invalid
@@ -129,10 +136,11 @@ syntax needs additional documentation or recovery from compiler listings/probes.
   scalars and truncated EOF, at every two-way byte split with GC. They assert
   exactly-once prior output, a single diagnostic at the correct location and
   successful subsequent input. See the verification report's UTF-8 timing entry.
-- [ ] **Resumption, unwinding and GC:** exercise all newly covered branches under
-  byte-split feeds and collection, including nested source contexts, callbacks,
-  saved/captured bindings, error handlers and object cycles. Existing tests cover
-  many such paths, not every resident combination.
+- [x] **Resumption, unwinding and GC (completed 2026-11-09):** byte-split+collect
+  session coverage now includes MEANING/VALOF under POPVAL, macro CANCEL keeping
+  VALOF, 40-bit LOG*, APPLY, quote-marker list constants, and MEANING retained
+  across GC while reachable. Nested ERRFUN/SETPOP/UTF-8/printer suspension paths
+  from earlier work remain. Residual: not every resident×callback combination.
 
 ## 3. Diagnostic compatibility: clarify the remaining boundary
 
@@ -208,7 +216,7 @@ silently emulate the machine.
   or `/tmp`, and preserve earlier measurements. Keep native-operation counts
   separate from historical machine-step counts.
 
-Current verified baseline: **230 conformance checks**, **4/4 standalone tests**.
+Current verified baseline: **269 conformance checks**, **4/4 standalone tests**.
 Sanitizer suite not rerun this increment; machine backends were not modified.
 These results establish the tested baseline, not completeness.
 

@@ -369,24 +369,37 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "LOGAND" || name == "LOGOR" || name == "LOGNOT" ||
       name == "LOGSHI") {
+    // Historical logical ops are unsigned 40-bit (POPLAN component size); they
+    // reject negatives. Results stay in 0..2^40-1 rather than host int64 wrap.
+    constexpr std::uint64_t kLogicalBits = 40;
+    constexpr std::uint64_t kLogicalMask = (std::uint64_t(1) << kLogicalBits) - 1;
+    auto logical = [&](Value v) -> std::uint64_t {
+      auto n = integer(v);
+      if (n < 0)
+        throw Fault("non-negative integer required");
+      return std::uint64_t(n) & kLogicalMask;
+    };
     std::uint64_t bits = 0;
     if (name == "LOGNOT")
-      bits = ~std::uint64_t(integer(pop()));
+      bits = (~logical(pop())) & kLogicalMask;
     else {
       auto y = integer(pop());
-      auto x = std::uint64_t(integer(pop()));
-      if (name == "LOGAND")
-        bits = x & std::uint64_t(y);
-      else if (name == "LOGOR")
-        bits = x | std::uint64_t(y);
-      else
-        bits = y >= 64 || y <= -64 ? 0
-               : y < 0             ? x >> unsigned(-y)
-                                   : x << unsigned(y);
+      auto x = logical(pop());
+      if (name == "LOGAND" || name == "LOGOR") {
+        if (y < 0)
+          throw Fault("non-negative integer required");
+        auto yy = std::uint64_t(y) & kLogicalMask;
+        bits = name == "LOGAND" ? (x & yy) : (x | yy);
+      } else {
+        // LOGSHIFT: shift count may be negative; magnitude >= 40 yields 0.
+        bits = y >= static_cast<std::int64_t>(kLogicalBits) ||
+                       y <= -static_cast<std::int64_t>(kLogicalBits)
+                   ? 0
+               : y < 0 ? x >> unsigned(-y)
+                       : (x << unsigned(y)) & kLogicalMask;
+      }
     }
-    std::int64_t n;
-    std::memcpy(&n, &bits, sizeof n);
-    push(Value(n));
+    push(Value(std::int64_t(bits)));
     return;
   }
   if (name == "ERASE") {
@@ -681,8 +694,12 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
         auto span =
             integer(arithmetic("+", arithmetic("-", Value(hi), Value(lo)),
                                Value(std::int64_t(1))));
-        if (std::uint64_t(span) > o.width / total)
-          throw Fault("array bounds exceed storage");
+        // Historical BOUNDSLIST updates may exceed allocated storage; access
+        // beyond the strip fails later (hist 10100), matching dispak.
+        if (span < 0 ||
+            (total && std::uint64_t(span) >
+                          std::numeric_limits<std::size_t>::max() / total))
+          throw Fault("array too large");
         total *= std::size_t(span);
         bounds.push_back(lo);
         bounds.push_back(hi);
@@ -750,23 +767,33 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     return;
   }
   if (name == "CHARWO") {
-    auto index = size(pop());
+    // Words have six character slots (§7.4); indices outside 1..6 fault, while
+    // unfilled slots within that range read as 0 (hist 14130 / zero pad).
+    auto index = integer(pop());
     auto &o = get(pop(), Object::Kind::word);
-    auto chars = decode(o.text);
-    if (index < 1 || index > chars.size())
+    if (o.text.empty())
+      throw Fault("empty word");
+    if (index < 1 || index > 6)
       throw Fault("word character index out of bounds");
-    push(Value(std::int64_t(chars[index - 1])));
+    auto chars = decode(o.text);
+    if (static_cast<std::size_t>(index) > chars.size())
+      push(Value(std::int64_t(0)));
+    else
+      push(Value(std::int64_t(chars[static_cast<std::size_t>(index) - 1])));
     return;
   }
   if (name == "CONSWO") {
     auto n = size(pop());
+    if (n == 0)
+      throw Fault("invalid CONSWORD length");
     std::vector<char32_t> chars(n);
     for (std::size_t i = n; i-- > 0;) {
+      // Historical characters are 8-bit; values mask into 0..255.
       auto c = integer(pop());
-      if (c < 0 || c > 0x10ffff)
-        throw Fault("invalid character");
-      chars[i] = char32_t(c);
+      chars[i] = char32_t(static_cast<std::uint8_t>(c));
     }
+    if (chars.size() > 6)
+      chars.resize(6);
     std::string s;
     for (auto c : chars)
       s += encode(c);
@@ -775,13 +802,24 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
   }
   if (name == "DESTWO") {
     auto &o = get(pop(), Object::Kind::word);
+    if (o.text.empty())
+      throw Fault("empty word");
     auto chars = decode(o.text);
     for (auto c : chars)
       push(Value(std::int64_t(c)));
     push(Value(std::int64_t(chars.size())));
     return;
   }
-  if (name == "MEANIN" || name == "VALOF") {
+  if (name == "MEANIN") {
+    // MEANING is the word object's full-element component, not VALOF.
+    auto &o = get(pop(), Object::Kind::word);
+    if (update)
+      o.meaning = pop();
+    else
+      push(o.meaning);
+    return;
+  }
+  if (name == "VALOF") {
     auto symbol = pop();
     get(symbol, Object::Kind::word);
     if (update)
@@ -826,7 +864,11 @@ void Runtime::invoke(const std::string &name, Object *fn, bool update) {
     auto v = fn->fields[0];
     if (empty_list(v))
       return;
-    const auto &node = get(v, Object::Kind::pair);
+    // MAPLIST/APPLIST require common-list links (hist 12020); ordinary pairs
+    // and non-lists are rejected before the callback runs.
+    if (!list_link(v))
+      throw Fault("finite proper list required");
+    const auto &node = object(v);
     auto p = std::make_shared<Program>();
     pushop(*p, node.fields[0]);
     callop(*p, fn->fields[1]);
